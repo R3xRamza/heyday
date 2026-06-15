@@ -13,6 +13,7 @@ const SORT_MAP = {
 const PATCH_FIELDS = [
   'stage', 'lead_source', 'assigned_to_name', 'assigned_to', 'is_contacted',
   'tags', 'notes', 'description', 'email', 'phone', 'first_name', 'last_name', 'name',
+  'birthday', 'anniversary',
 ];
 
 function buildListQuery(query) {
@@ -92,7 +93,7 @@ router.get('/', (req, res) => {
     SELECT c.id, c.external_id, c.name, c.first_name, c.last_name, c.email, c.phone,
       c.stage, c.lead_source, c.assigned_to_name, c.is_contacted, c.tags,
       c.last_contacted, c.date_added, c.property_address, c.property_city,
-      c.street, c.city, c.state, c.company, u.name as assigned_user_name
+      c.street, c.city, c.state, c.company, c.birthday, u.name as assigned_user_name
     FROM contacts c
     LEFT JOIN users u ON u.id = c.assigned_to
     WHERE ${where}

@@ -1,13 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ListChecks, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
+
 const TIMING_ANCHORS = ['CLOSING', 'LISTING', 'ACCEPTANCE', 'OPTION END', 'CREATED'];
+const TEAM_ROLES = ['operations', 'marketing', 'analyst', 'owner_lead'];
+const ROLE_LABELS = {
+  operations: 'Operations',
+  marketing: 'Marketing',
+  analyst: 'Analyst',
+  owner_lead: 'Owner Lead',
+};
 
 function emptyTask(sortOrder) {
   return {
     id: null,
     title: '',
+    calendar_nickname: '',
+    default_role: 'operations',
     timing_value: 0,
     timing_direction: 'A',
     timing_anchor: 'CLOSING',
@@ -23,6 +33,20 @@ export default function ChecklistEditor() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [teamMembers, setTeamMembers] = useState([]);
+
+  const assigneeOptions = useMemo(() => {
+    const byRole = {};
+    for (const member of teamMembers) {
+      if (!byRole[member.role]) byRole[member.role] = member;
+    }
+    return TEAM_ROLES
+      .filter((role) => byRole[role])
+      .map((role) => ({
+        value: role,
+        label: `${byRole[role].name} (${ROLE_LABELS[role]})`,
+      }));
+  }, [teamMembers]);
 
   const loadTemplates = useCallback(async (selectId) => {
     setLoading(true);
@@ -59,6 +83,13 @@ export default function ChecklistEditor() {
   useEffect(() => {
     loadTemplates();
   }, [loadTemplates]);
+
+  useEffect(() => {
+    fetch('/api/team', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((json) => setTeamMembers(json.members || []))
+      .catch(() => setTeamMembers([]));
+  }, []);
 
   function selectTemplate(t) {
     setSelectedId(t.id);
@@ -123,6 +154,8 @@ export default function ChecklistEditor() {
       credentials: 'include',
       body: JSON.stringify({
         title: task.title,
+        calendar_nickname: task.calendar_nickname ?? '',
+        default_role: task.default_role || 'operations',
         timing_value: task.timing_value,
         timing_direction: task.timing_direction,
         timing_anchor: task.timing_anchor,
@@ -190,10 +223,19 @@ export default function ChecklistEditor() {
     if (res.ok) await loadTemplates(draft.id);
   }
 
-  function updateTaskField(index, key, value) {
+  function saveTaskAtIndex(index) {
+    const task = draft?.tasks?.[index];
+    if (task) saveTask(task);
+  }
+
+  function updateTaskField(index, key, value, save = false) {
     setDraft((prev) => {
       if (!prev) return prev;
       const tasks = prev.tasks.map((t, i) => (i === index ? { ...t, [key]: value } : t));
+      if (save) {
+        const updated = tasks[index];
+        if (updated?.title?.trim()) saveTask(updated);
+      }
       return { ...prev, tasks };
     });
   }
@@ -335,58 +377,104 @@ export default function ChecklistEditor() {
                       draft.tasks.map((task, index) => (
                         <div
                           key={task.id ?? `new-${index}`}
-                          className="grid grid-cols-12 gap-2 items-start p-3 bg-surface-container-low/50 border border-outline-variant/15 rounded-lg"
+                          className="p-4 bg-surface-container-low/50 border border-outline-variant/15 rounded-lg space-y-3"
                         >
-                          <div className="col-span-12 sm:col-span-5">
-                            <input
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
+                              Full title
+                            </label>
+                            <textarea
+                              rows={3}
                               value={task.title}
                               onChange={(e) => updateTaskField(index, 'title', e.target.value)}
-                              onBlur={() => saveTask(task)}
+                              onBlur={() => saveTaskAtIndex(index)}
                               placeholder="Task title"
-                              className="w-full text-sm font-medium text-primary bg-transparent border border-outline-variant/20 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-secondary/30 outline-none"
+                              className="w-full min-h-[72px] text-sm font-medium text-primary bg-surface border border-outline-variant/20 rounded-lg px-3 py-2 focus:ring-2 focus:ring-secondary/30 outline-none resize-y"
                             />
                           </div>
-                          <div className="col-span-4 sm:col-span-2">
-                            <input
-                              type="number"
-                              min={0}
-                              value={task.timing_value ?? 0}
-                              onChange={(e) => updateTaskField(index, 'timing_value', Number(e.target.value))}
-                              onBlur={() => saveTask(task)}
-                              title="Days offset"
-                              className="w-full text-sm text-primary bg-surface border border-outline-variant/20 rounded-lg px-2 py-1.5"
-                            />
+
+                          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                            <div className="sm:col-span-3 space-y-1">
+                              <label className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
+                                Calendar nickname
+                              </label>
+                              <input
+                                value={task.calendar_nickname ?? ''}
+                                onChange={(e) => updateTaskField(index, 'calendar_nickname', e.target.value)}
+                                onBlur={() => saveTaskAtIndex(index)}
+                                placeholder="Short label for calendars"
+                                maxLength={32}
+                                className="w-full text-sm text-primary bg-surface border border-outline-variant/20 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-secondary/30 outline-none"
+                              />
+                            </div>
+                            <div className="sm:col-span-3 space-y-1">
+                              <label className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
+                                Default assignee
+                              </label>
+                              <select
+                                value={task.default_role || 'operations'}
+                                onChange={(e) => updateTaskField(index, 'default_role', e.target.value, true)}
+                                className="w-full text-sm text-primary bg-surface border border-outline-variant/20 rounded-lg px-2 py-1.5"
+                              >
+                                {assigneeOptions.length > 0 ? (
+                                  assigneeOptions.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                  ))
+                                ) : (
+                                  TEAM_ROLES.map((role) => (
+                                    <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                                  ))
+                                )}
+                              </select>
+                            </div>
+                            <div className="sm:col-span-1 space-y-1">
+                              <label className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
+                                Days
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                value={task.timing_value ?? 0}
+                                onChange={(e) => updateTaskField(index, 'timing_value', Number(e.target.value))}
+                                onBlur={() => saveTaskAtIndex(index)}
+                                title="Days offset"
+                                className="w-full text-sm text-primary bg-surface border border-outline-variant/20 rounded-lg px-2 py-1.5"
+                              />
+                            </div>
+                            <div className="sm:col-span-2 space-y-1">
+                              <label className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
+                                When
+                              </label>
+                              <select
+                                value={task.timing_direction || 'A'}
+                                onChange={(e) => updateTaskField(index, 'timing_direction', e.target.value, true)}
+                                className="w-full text-sm text-primary bg-surface border border-outline-variant/20 rounded-lg px-2 py-1.5"
+                              >
+                                <option value="A">After</option>
+                                <option value="B">Before</option>
+                              </select>
+                            </div>
+                            <div className="sm:col-span-3 space-y-1">
+                              <label className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
+                                Anchor
+                              </label>
+                              <select
+                                value={task.timing_anchor || 'CLOSING'}
+                                onChange={(e) => {
+                                  updateTaskField(index, 'timing_anchor', e.target.value);
+                                  saveTask({ ...task, timing_anchor: e.target.value });
+                                }}
+                                className="w-full text-sm text-primary bg-surface border border-outline-variant/20 rounded-lg px-2 py-1.5"
+                              >
+                                {TIMING_ANCHORS.map((a) => (
+                                  <option key={a} value={a}>{a}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
-                          <div className="col-span-4 sm:col-span-2">
-                            <select
-                              value={task.timing_direction || 'A'}
-                              onChange={(e) => {
-                                updateTaskField(index, 'timing_direction', e.target.value);
-                                const updated = { ...task, timing_direction: e.target.value };
-                                saveTask(updated);
-                              }}
-                              className="w-full text-sm text-primary bg-surface border border-outline-variant/20 rounded-lg px-2 py-1.5"
-                            >
-                              <option value="A">After</option>
-                              <option value="B">Before</option>
-                            </select>
-                          </div>
-                          <div className="col-span-4 sm:col-span-3">
-                            <select
-                              value={task.timing_anchor || 'CLOSING'}
-                              onChange={(e) => {
-                                updateTaskField(index, 'timing_anchor', e.target.value);
-                                saveTask({ ...task, timing_anchor: e.target.value });
-                              }}
-                              className="w-full text-sm text-primary bg-surface border border-outline-variant/20 rounded-lg px-2 py-1.5"
-                            >
-                              {TIMING_ANCHORS.map((a) => (
-                                <option key={a} value={a}>{a}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="col-span-12 sm:col-span-12 flex items-center justify-end gap-1 sm:col-start-1">
-                            <span className="text-[10px] text-on-surface-variant/60 mr-auto sm:mr-0 sm:hidden">
+
+                          <div className="flex items-center justify-end gap-1 pt-1 border-t border-outline-variant/10">
+                            <span className="text-[10px] text-on-surface-variant/60 mr-auto">
                               Order #{task.sort_order ?? index}
                             </span>
                             <button

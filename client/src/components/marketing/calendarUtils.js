@@ -71,6 +71,33 @@ export function buildWeekCells(focusDate) {
   return cells;
 }
 
+export function monthKeyFromDate(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+}
+
+export function monthKeyFromStr(dateStr) {
+  return dateStr?.slice(0, 7) ?? '';
+}
+
+export function monthsInDateRange(startStr, endStr) {
+  const months = new Set();
+  const start = parseISODateForRange(startStr);
+  const end = parseISODateForRange(endStr);
+  if (!start || !end) return [];
+  const cur = new Date(start);
+  cur.setDate(1);
+  while (cur <= end) {
+    months.add(monthKeyFromDate(cur));
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  return [...months];
+}
+
+function parseISODateForRange(str) {
+  const d = new Date(`${str}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function monthRange(viewDate) {
   const y = viewDate.getFullYear();
   const m = viewDate.getMonth();
@@ -123,4 +150,24 @@ export function sortDayEvents(events) {
 
     return (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' });
   });
+}
+
+/** End date for toolbar celebration fetch when today is Friday (through Sunday). */
+export function fridayCelebrationFetchEnd(todayStr) {
+  const d = new Date(`${todayStr}T12:00:00`);
+  if (d.getDay() !== 5) return todayStr;
+  while (d.getDay() !== 0) {
+    d.setDate(d.getDate() + 1);
+  }
+  return toDateStr(d);
+}
+
+export function partitionFridayCelebrations(events, todayStr) {
+  const friday = [];
+  const weekend = [];
+  for (const e of events) {
+    if (e.date === todayStr) friday.push(e);
+    else weekend.push(e);
+  }
+  return { friday, weekend };
 }

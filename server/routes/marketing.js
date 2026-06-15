@@ -65,6 +65,46 @@ router.get('/birthdays', (req, res) => {
   res.json({ events });
 });
 
+const MONTH_KEY_RE = /^\d{4}-\d{2}$/;
+
+function validateMonthKey(month) {
+  if (!month || !MONTH_KEY_RE.test(month)) return 'month must be YYYY-MM';
+  const [, m] = month.split('-').map(Number);
+  if (m < 1 || m > 12) return 'month must be YYYY-MM';
+  return null;
+}
+
+router.get('/birthday-pins', (req, res) => {
+  const { month } = req.query;
+  const err = validateMonthKey(month);
+  if (err) return res.status(400).json({ error: err });
+
+  const rows = db.prepare(`
+    SELECT contact_id FROM marketing_birthday_pins WHERE month = ? ORDER BY contact_id ASC
+  `).all(month);
+
+  res.json({ month, contact_ids: rows.map((r) => r.contact_id) });
+});
+
+router.put('/birthday-pins', (req, res) => {
+  const { month, contact_ids: contactIds } = req.body;
+  const err = validateMonthKey(month);
+  if (err) return res.status(400).json({ error: err });
+  if (!Array.isArray(contactIds)) return res.status(400).json({ error: 'contact_ids array is required' });
+
+  const ids = [...new Set(contactIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
+
+  db.transaction(() => {
+    db.prepare('DELETE FROM marketing_birthday_pins WHERE month = ?').run(month);
+    const insert = db.prepare('INSERT INTO marketing_birthday_pins (month, contact_id) VALUES (?, ?)');
+    for (const contactId of ids) {
+      insert.run(month, contactId);
+    }
+  })();
+
+  res.json({ month, contact_ids: ids });
+});
+
 router.get('/platform-goals', (_req, res) => {
   const goals = db.prepare(`
     SELECT * FROM marketing_platform_goals ORDER BY sort_order ASC, platform ASC

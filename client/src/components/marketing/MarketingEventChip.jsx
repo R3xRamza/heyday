@@ -7,6 +7,7 @@ import { MARKETING_POST_DRAG_TYPE } from './calendarUtils';
 function PostChip({ event, onEditPost }) {
   const { bg, text, border, icon } = chipStyleForPlatform(event.platform);
   const draggedRef = useRef(false);
+  const isDone = event.raw?.status === 'done' || event.status === 'done';
 
   function handleDragStart(e) {
     e.stopPropagation();
@@ -38,10 +39,12 @@ function PostChip({ event, onEditPost }) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClick={handleClick}
-      className={`w-full text-left px-2 py-1.5 text-[11px] font-semibold rounded-md truncate hover:brightness-95 transition-colors flex items-center gap-1.5 cursor-grab active:cursor-grabbing shadow-sm ${bg} ${text} ${border || ''}`}
+      className={`w-full text-left px-2 py-1.5 text-[11px] font-semibold rounded-md truncate hover:brightness-95 transition-colors flex items-center gap-1.5 cursor-grab active:cursor-grabbing shadow-sm ${bg} ${text} ${border || ''} ${
+        isDone ? 'opacity-55 saturate-50' : ''
+      }`}
     >
-      <Icon name={icon} className="!text-[14px] shrink-0" />
-      <span className="truncate">{event.title}</span>
+      <Icon name={isDone ? 'check_circle' : icon} className="!text-[14px] shrink-0" />
+      <span className={`truncate ${isDone ? 'line-through' : ''}`}>{event.title}</span>
     </button>
   );
 }
@@ -90,7 +93,7 @@ export default function MarketingEventChip({ event, onEditPost, onTaskClick }) {
   return (
     <Link
       to={`/crm/${event.contactId}`}
-      className="block w-full text-left px-2 py-1.5 text-[11px] font-semibold rounded-md bg-purple/10 text-purple truncate hover:bg-purple/15 transition-colors flex items-center gap-1.5"
+      className="block w-full text-left px-2 py-1.5 text-[11px] font-semibold rounded-md bg-purple/10 text-purple truncate hover:bg-purple/15 transition-colors flex items-center gap-1.5 select-none"
     >
       <Icon name={isBirthday ? 'cake' : 'home'} className="!text-[14px] shrink-0" />
       <span className="truncate">

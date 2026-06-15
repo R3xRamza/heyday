@@ -10,9 +10,17 @@ alwaysApply: true
 ## STACK
 
 - Monorepo root: `package.json` runs `npm run dev` (nodemon API :3001 + Vite client :5173)
-- Server: Node ESM, Express, better-sqlite3 (`heyday.db`), JWT auth via cookie, `foreign_keys ON`
+- Server: Node ESM, Express, better-sqlite3 (`heyday.db` or `DATABASE_PATH`), JWT auth via cookie, `foreign_keys ON`
 - Client: React 18, React Router, Tailwind, Vite proxy `/api` → localhost:3001
 - Build: `npm run build` (client only). No commits unless user asks.
+
+## DEPLOY (Railway — live)
+
+- Repo: `github.com/R3xRamza/heyday`
+- URL: `https://heyday-production-ce72.up.railway.app`
+- `railway.toml`: build client + `npm start` (production serves SPA from `client/dist`)
+- Env: `NODE_ENV=production`, `JWT_SECRET`, `CLIENT_URL` (full `https://` URL), `DATABASE_PATH=/data/heyday.db` with Volume at `/data`
+- Local `heyday.db` is gitignored; Railway starts fresh unless volume seeded or data imported
 
 ## DEV
 
@@ -25,10 +33,11 @@ alwaysApply: true
 - `server/index.js` — app entry, mounts `/api/*` routes with `authMiddleware`
 - `server/routes/` — auth, crm, tasks, transactions, marketing, checklists, team, revenue, gmail
 - `server/lib/` — migrate.js, business logic (transactionParties, applyChecklists, marketingCalendar, activity, etc.)
-- `server/db.js` — SQLite init + `runMigrations()`
+- `server/db.js` — SQLite init + `runMigrations()`; `DATABASE_PATH` env overrides default `heyday.db` path
 - `client/src/App.jsx` — all routes
 - `client/src/pages/` — screen-level components
 - `client/src/components/` — shared UI (Sidebar, DashboardLayout, TopNav, marketing/*, etc.)
+- `client/src/context/SidebarContext.jsx` — collapsible sidebar state (`sidebar-collapsed-v1`)
 - `client/src/utils/format.js` — formatDate, formatCurrency, shortAddress, DateText pattern
 - `client/src/index.css` — global + `.calendar-grid` (7 cols), `.marketing-calendar-*` styles
 
@@ -53,7 +62,8 @@ alwaysApply: true
 
 - Client fetch: always `credentials: 'include'`
 - `ProtectedRoute` wraps authenticated pages
-- `DashboardLayout` = Sidebar (260px) + TopNav + main; `compactHeader` hides title/search for full-bleed pages (marketing)
+- `DashboardLayout` = Sidebar + TopNav + main; sidebar 260px expanded / 72px collapsed; main margin follows `sidebarWidth`
+- `SidebarContext` in `App.jsx`; collapse persisted in `sidebar-collapsed-v1`
 
 ## DESIGN SYSTEM
 
@@ -61,7 +71,9 @@ alwaysApply: true
 - Tailwind tokens: primary-container, secondary, surface-*, on-surface-variant
 - `html` font-size 18px (`index.css`)
 - Logo: import from `client/src/assets/heyday-logo.png` (NOT `/public` path alone)
-- Sidebar width 260px; main `ml-[260px]`
+- Sidebar width 260px expanded, 72px collapsed; main `marginLeft` from `SidebarContext` (not hardcoded)
+- Task Hub NavLink uses `end` — `/tasks/:userId` (“My tasks”) must not activate `/tasks`
+- Sidebar label **Marketing**; marketing page TopNav title **Marketing Calendar**
 - Icons: `shared/Icon.jsx` (Material Symbols) + lucide in Sidebar
 - Reuse `DashboardLayout`, `DateText` for non-wrapping dates
 
@@ -89,10 +101,19 @@ alwaysApply: true
 - Layout: slim header, collapsible weekly goals (`PlatformQuotasRow`), single-row toolbar, hero month/week calendar grid
 - Weekly goals: 5 platform quota slots, LAST WK counts, current-week progress, NEXT post title
 - Calendar: Sun–Sat grid; social post drag-and-drop reschedule; platform filter; category pills (Social | Tasks | Milestones)
+- Day cell order: **Social → Tasks → Milestones** (`MarketingDayEvents.jsx`)
+- Friday toolbar milestones popover: Fri celebrations, separator, Sat+Sun (`partitionFridayCelebrations`, fetch through Sunday)
 - Social posts: platform-colored chips; `PATCH /api/marketing/posts/:id` for date moves
 - Tasks: Adam-assigned transaction tasks only; grey task chips; complete via `MarketingTaskModal`
 - Data: `marketing_posts`, `marketing_platform_goals`, CRM birthdays/anniversaries, `GET /api/tasks` (assigned_to + date range)
-- localStorage: `marketing-categories-v4`, `marketing-platform-filter-v1`, `marketing-quota-slots-v1`, `marketing-goals-collapsed-v1`
+- localStorage: `marketing-categories-v4`, `marketing-platform-filter-v1`, `marketing-quota-slots-v1`, `marketing-goals-collapsed-v1`, `sidebar-collapsed-v1`
+
+## RECENT (2026-06-15)
+
+- Railway deploy + GitHub; `railway.toml`; `DATABASE_PATH` for volume persistence
+- Collapsible sidebar + compact footer/logout
+- Marketing calendar: social-first day cells; Friday milestone popover grouping
+- Team logins: admin `admin123`; team `heyday123` (see README.md)
 
 ## CODE CONVENTIONS
 

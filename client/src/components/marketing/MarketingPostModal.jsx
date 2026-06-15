@@ -3,7 +3,17 @@ import Icon from '../shared/Icon';
 
 const QUOTA_PLATFORM_KEYS = ['Instagram', 'TikTok', 'YouTube', 'Facebook', 'LinkedIn'];
 
-export default function MarketingPostModal({ open, post, platforms, defaultScheduledDate, onClose, onSave, onDelete }) {
+export default function MarketingPostModal({
+  open,
+  post,
+  platforms,
+  defaultScheduledDate,
+  onClose,
+  onSave,
+  onDelete,
+  onComplete,
+  onMarkActive,
+}) {
   const platformOptions = useMemo(() => {
     const filtered = platforms.filter((p) =>
       QUOTA_PLATFORM_KEYS.some((k) => k.toLowerCase() === (p.platform || '').toLowerCase()),
@@ -19,6 +29,8 @@ export default function MarketingPostModal({ open, post, platforms, defaultSched
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const isDone = post?.status === 'done';
 
   useEffect(() => {
     if (!open) return;
@@ -47,7 +59,8 @@ export default function MarketingPostModal({ open, post, platforms, defaultSched
     setSaving(true);
     setError('');
     try {
-      await onSave({ ...form, status: 'posting' }, post?.id);
+      const status = post?.id ? (post.status === 'done' ? 'done' : 'posting') : 'posting';
+      await onSave({ ...form, status }, post?.id);
       onClose();
     } catch (err) {
       setError(err.message || 'Save failed');
@@ -69,6 +82,34 @@ export default function MarketingPostModal({ open, post, platforms, defaultSched
     }
   }
 
+  async function handleComplete() {
+    if (!post?.id) return;
+    setSaving(true);
+    setError('');
+    try {
+      await onComplete(post.id);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Could not mark complete');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleMarkActive() {
+    if (!post?.id) return;
+    setSaving(true);
+    setError('');
+    try {
+      await onMarkActive(post.id);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Could not reactivate post');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
@@ -78,6 +119,10 @@ export default function MarketingPostModal({ open, post, platforms, defaultSched
             <Icon name="close" />
           </button>
         </div>
+
+        {isDone && (
+          <p className="text-xs font-semibold text-secondary uppercase tracking-wide">Completed</p>
+        )}
 
         {error && <p className="text-sm text-error">{error}</p>}
 
@@ -126,6 +171,30 @@ export default function MarketingPostModal({ open, post, platforms, defaultSched
             className="w-full mt-1 px-3 py-2 text-sm border border-outline-variant/30 rounded-lg resize-none outline-none"
           />
         </div>
+
+        {post?.id && (
+          <div className="flex flex-col gap-2">
+            {isDone ? (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={handleMarkActive}
+                className="w-full py-2.5 text-xs font-bold border border-outline-variant/30 text-feather rounded-lg hover:bg-off-white disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Mark as active'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={handleComplete}
+                className="w-full py-2.5 text-xs font-bold bg-primary-container text-white rounded-lg hover:brightness-110 disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Mark complete'}
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="flex gap-2 pt-2">
           <button

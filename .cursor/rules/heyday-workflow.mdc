@@ -38,3 +38,12 @@ End with: `npm run build must pass. No commit unless asked.`
 ## Session handoff
 
 Prefer one slice per agent session (single feature/fix). User may start new chats with this rules folder loaded — do not assume prior chat memory.
+
+### Last session (2026-06-15)
+
+- **Deploy:** Railway live; GitHub `R3xRamza/heyday`; `railway.toml`; `DATABASE_PATH` for volumes
+- **Sidebar:** collapse + footer fix (`SidebarContext`, `sidebar-collapsed-v1`)
+- **Nav:** Task Hub `end` prop; Marketing sidebar label vs page title
+- **Marketing calendar:** social-first day cells; Friday milestone popover (Fri | weekend)
+- **Uncommitted locally:** sidebar + marketing changes may need push to trigger Railway redeploy
+- See `README.md` for status, logins, env vars

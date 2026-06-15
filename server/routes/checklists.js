@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db from '../db.js';
 import { resolveTaskRole } from '../lib/taskAssignment.js';
+import { deriveNickname } from '../lib/deriveNickname.js';
 
 const router = Router();
 
@@ -37,6 +38,9 @@ function normalizeTaskBody(body, templateId, existingSortOrder) {
     sort_order = row.m + 1;
   }
   const anchor = TIMING_ANCHORS.includes(body.timing_anchor) ? body.timing_anchor : 'CLOSING';
+  const calendar_nickname = body.calendar_nickname != null
+    ? String(body.calendar_nickname).trim()
+    : deriveNickname(title);
   return {
     title,
     timing_value: body.timing_value != null && body.timing_value !== '' ? Number(body.timing_value) : 0,
@@ -44,6 +48,7 @@ function normalizeTaskBody(body, templateId, existingSortOrder) {
     timing_anchor: anchor,
     sort_order,
     default_role: body.default_role?.trim() || resolveTaskRole(title),
+    calendar_nickname,
   };
 }
 
@@ -113,8 +118,8 @@ router.post('/:id/tasks', (req, res) => {
   if (normalized.error) return res.status(400).json({ error: normalized.error });
 
   const result = db.prepare(`
-    INSERT INTO template_tasks (template_id, title, timing_value, timing_direction, timing_anchor, sort_order, default_role)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO template_tasks (template_id, title, timing_value, timing_direction, timing_anchor, sort_order, default_role, calendar_nickname)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     templateId,
     normalized.title,
@@ -123,6 +128,7 @@ router.post('/:id/tasks', (req, res) => {
     normalized.timing_anchor,
     normalized.sort_order,
     normalized.default_role,
+    normalized.calendar_nickname,
   );
 
   const task = db.prepare('SELECT * FROM template_tasks WHERE id = ?').get(result.lastInsertRowid);
@@ -164,12 +170,15 @@ router.put('/:id/tasks/:taskId', (req, res) => {
     : task.timing_anchor;
   const sort_order = req.body.sort_order != null ? Number(req.body.sort_order) : task.sort_order;
   const default_role = req.body.default_role != null
-    ? req.body.default_role
+    ? (req.body.default_role.trim() || resolveTaskRole(title))
     : task.default_role;
+  const calendar_nickname = req.body.calendar_nickname != null
+    ? String(req.body.calendar_nickname).trim()
+    : task.calendar_nickname;
 
   db.prepare(`
     UPDATE template_tasks
-    SET title = ?, timing_value = ?, timing_direction = ?, timing_anchor = ?, sort_order = ?, default_role = ?
+    SET title = ?, timing_value = ?, timing_direction = ?, timing_anchor = ?, sort_order = ?, default_role = ?, calendar_nickname = ?
     WHERE id = ? AND template_id = ?
   `).run(
     title,
@@ -178,6 +187,7 @@ router.put('/:id/tasks/:taskId', (req, res) => {
     timing_anchor,
     sort_order,
     default_role,
+    calendar_nickname,
     taskId,
     templateId,
   );
