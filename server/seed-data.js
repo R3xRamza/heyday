@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import { CHECKLIST_TEMPLATES } from './lib/checklist-templates.js';
 import { resolveTaskRole, reassignAllTasksByRole } from './lib/taskAssignment.js';
+import { deriveNickname } from './lib/deriveNickname.js';
 
 export { CHECKLIST_TEMPLATES };
 
@@ -49,10 +50,11 @@ function syncChecklistTemplates(db) {
       .run(template.name, template.category, ti);
     template.tasks.forEach((task, i) => {
       const defaultRole = resolveTaskRole(task.title);
+      const calendarNickname = deriveNickname(task.title);
       db.prepare(`
-        INSERT INTO template_tasks (template_id, title, timing_value, timing_direction, timing_anchor, sort_order, default_role)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(r.lastInsertRowid, task.title, task.v, task.d, task.anchor, i, defaultRole);
+        INSERT INTO template_tasks (template_id, title, timing_value, timing_direction, timing_anchor, sort_order, default_role, calendar_nickname)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(r.lastInsertRowid, task.title, task.v, task.d, task.anchor, i, defaultRole, calendarNickname);
     });
   });
 

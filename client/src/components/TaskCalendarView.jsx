@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import Icon from './shared/Icon';
+import { displayTaskTitle } from '../utils/taskDisplay.js';
 
 function pad2(n) {
   return String(n).padStart(2, '0');
@@ -52,6 +53,7 @@ function buildMonthCells(year, monthIndex) {
 function TaskChip({ task, onClick }) {
   const isComplete = task.status === 'complete';
   const overdue = !isComplete && task.is_overdue;
+  const label = displayTaskTitle(task);
   return (
     <button
       type="button"
@@ -68,7 +70,7 @@ function TaskChip({ task, onClick }) {
       }`}
       title={task.title}
     >
-      <span className="font-semibold block truncate">{task.title}</span>
+      <span className="font-semibold block truncate">{label}</span>
     </button>
   );
 }

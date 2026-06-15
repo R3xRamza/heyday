@@ -2,7 +2,7 @@
 export default function DayNumber({ day, today, muted }) {
   if (today) {
     return (
-      <span className="inline-flex items-center gap-1.5">
+      <span className="inline-flex items-center gap-1.5 select-none">
         <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-feather text-white font-bold text-sm">
           {day}
         </span>
@@ -12,7 +12,7 @@ export default function DayNumber({ day, today, muted }) {
   }
   return (
     <span
-      className={`inline-block text-sm font-semibold ${
+      className={`inline-block text-sm font-semibold select-none ${
         muted ? 'text-on-surface-variant/50' : 'text-feather'
       }`}
     >

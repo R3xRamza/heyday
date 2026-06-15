@@ -9,9 +9,11 @@ import {
   Building2,
   Megaphone,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import Badge from './shared/Badge';
+import { useSidebar } from '../context/SidebarContext';
 import heydayLogo from '../assets/heyday-logo.png';
 
 const NAV_ITEMS = [
@@ -32,10 +34,14 @@ function getInitials(name) {
     .slice(0, 2) || '?';
 }
 
-function navLinkClasses(isActive, { compact = false } = {}) {
+function navLinkClasses(isActive, { compact = false, collapsed = false } = {}) {
   const state = isActive
     ? 'text-lemon border-lemon bg-feather-alt/40'
     : 'text-sky border-transparent hover:bg-feather-alt/20 hover:text-sky-alt';
+
+  if (collapsed) {
+    return `relative flex items-center justify-center py-3 text-base font-medium transition-colors border-l-4 ${state}`;
+  }
 
   if (compact) {
     return `flex items-center gap-2.5 pl-10 pr-6 py-2.5 text-[15px] font-medium transition-colors border-l-4 ${state}`;
@@ -44,8 +50,20 @@ function navLinkClasses(isActive, { compact = false } = {}) {
   return `flex items-center gap-3 px-6 py-3 text-base font-medium transition-colors border-l-4 ${state}`;
 }
 
+function OverdueBadge({ count, collapsed }) {
+  if (count <= 0) return null;
+
+  const label = count > 99 ? '99+' : count;
+  const classes = collapsed
+    ? 'absolute top-1.5 right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-error text-white text-[10px] font-bold flex items-center justify-center'
+    : 'min-w-[22px] h-5 px-1.5 rounded-full bg-error text-white text-[11px] font-bold flex items-center justify-center';
+
+  return <span className={classes}>{label}</span>;
+}
+
 export default function Sidebar() {
   const { user, logout } = useAuth();
+  const { collapsed, toggleCollapsed, sidebarWidth } = useSidebar();
   const navigate = useNavigate();
   const [overdueCount, setOverdueCount] = useState(0);
 
@@ -63,62 +81,116 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-[260px] bg-feather flex flex-col z-40">
-      <div className="p-6 border-b border-feather-alt/30">
+    <aside
+      className="fixed left-0 top-0 h-screen bg-feather flex flex-col z-40 overflow-hidden transition-[width] duration-200 ease-in-out"
+      style={{ width: sidebarWidth }}
+    >
+      <div
+        className={`flex items-center border-b border-feather-alt/30 shrink-0 ${
+          collapsed ? 'justify-center px-2 py-4' : 'justify-between gap-2 px-4 py-4'
+        }`}
+      >
         <img
           src={heydayLogo}
           alt="HEYDAY"
-          className="w-full max-w-[200px] h-auto object-contain"
+          className={`h-auto object-contain shrink-0 ${
+            collapsed ? 'w-10' : 'w-full max-w-[160px]'
+          }`}
         />
+        {!collapsed && (
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label="Collapse sidebar"
+            className="p-1.5 rounded-md text-sky hover:text-lemon hover:bg-feather-alt/30 transition-colors shrink-0"
+          >
+            <PanelLeftClose size={18} />
+          </button>
+        )}
       </div>
 
-      <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar">
+      {collapsed && (
+        <div className="flex justify-center py-2 border-b border-feather-alt/20">
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label="Expand sidebar"
+            className="p-1.5 rounded-md text-sky hover:text-lemon hover:bg-feather-alt/30 transition-colors"
+          >
+            <PanelLeftOpen size={18} />
+          </button>
+        </div>
+      )}
+
+      <nav className="flex-1 py-2 overflow-y-auto custom-scrollbar">
         {NAV_ITEMS.map(({ to, label, icon: Icon, taskHub }) => (
           <div key={to}>
             <NavLink
               to={to}
-              className={({ isActive }) => navLinkClasses(isActive)}
+              end={taskHub}
+              title={collapsed ? label : undefined}
+              className={({ isActive }) => navLinkClasses(isActive, { collapsed })}
             >
-              <Icon size={20} />
-              <span className="flex-1">{label}</span>
-              {taskHub && overdueCount > 0 && (
-                <span className="min-w-[22px] h-5 px-1.5 rounded-full bg-error text-white text-[11px] font-bold flex items-center justify-center">
-                  {overdueCount > 99 ? '99+' : overdueCount}
-                </span>
-              )}
+              <Icon size={20} className="shrink-0" />
+              {!collapsed && <span className="flex-1">{label}</span>}
+              {taskHub && <OverdueBadge count={overdueCount} collapsed={collapsed} />}
             </NavLink>
             {taskHub && user?.id && (
               <NavLink
                 to={`/tasks/${user.id}`}
-                className={({ isActive }) => navLinkClasses(isActive, { compact: true })}
+                title={collapsed ? 'My tasks' : undefined}
+                className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
               >
-                <ListTodo size={18} className="shrink-0" />
-                <span>My tasks</span>
+                <ListTodo size={collapsed ? 20 : 18} className="shrink-0" />
+                {!collapsed && <span>My tasks</span>}
               </NavLink>
             )}
           </div>
         ))}
       </nav>
 
-      <div className="p-4 border-t border-feather-alt/30">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-9 h-9 rounded-full bg-feather-alt flex items-center justify-center text-white text-xs font-bold">
-            {getInitials(user?.name)}
+      <div className="border-t border-feather-alt/30 shrink-0">
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-2 py-3 px-2">
+            <div
+              className="w-8 h-8 rounded-full bg-feather-alt flex items-center justify-center text-white text-[11px] font-bold"
+              title={user?.name}
+            >
+              {getInitials(user?.name)}
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Logout"
+              title="Logout"
+              className="p-1.5 rounded-md text-sky hover:text-lemon hover:bg-feather-alt/30 transition-colors"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-white text-base font-semibold truncate">{user?.name}</p>
-            <Badge status={user?.role === 'admin' ? 'high' : 'prospect'} className="mt-1 text-[11px]">
-              {user?.role}
-            </Badge>
+        ) : (
+          <div className="px-4 py-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-feather-alt flex items-center justify-center text-white text-[11px] font-bold shrink-0">
+                {getInitials(user?.name)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate leading-tight">{user?.name}</p>
+                <p className="text-xs text-sky/70 truncate lowercase leading-tight mt-0.5">
+                  {user?.role?.replace(/_/g, ' ')}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mt-2 flex items-center gap-1 text-xs text-sky hover:text-lemon py-0.5 transition-colors"
+            >
+              <LogOut size={14} />
+              Logout
+            </button>
           </div>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-base text-sky hover:text-lemon hover:bg-feather-alt/30 rounded transition-colors"
-        >
-          <LogOut size={18} />
-          Logout
-        </button>
+        )}
       </div>
     </aside>
   );

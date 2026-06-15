@@ -5,6 +5,10 @@ import { buildMonthCells, MARKETING_POST_DRAG_TYPE } from './calendarUtils';
 
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
+function isInteractiveEventTarget(target) {
+  return Boolean(target.closest('button, a'));
+}
+
 function DayCell({
   cell,
   events,
@@ -14,7 +18,7 @@ function DayCell({
   onEditPost,
   onTaskClick,
   onDropPost,
-  onDragOverDate,
+  onNewPostForDate,
 }) {
   const dayEvents = events[cell.dateStr] || [];
   const isSelected = selectedDate === cell.dateStr;
@@ -22,6 +26,11 @@ function DayCell({
 
   function handleSelect() {
     onSelectDate?.(cell.dateStr);
+  }
+
+  function handleDoubleClick(e) {
+    if (isInteractiveEventTarget(e.target)) return;
+    onNewPostForDate?.(cell.dateStr);
   }
 
   function handleKeyDown(e) {
@@ -52,6 +61,7 @@ function DayCell({
       aria-selected={isSelected}
       aria-label={`Select ${cell.dateStr}`}
       onClick={handleSelect}
+      onDoubleClick={handleDoubleClick}
       onKeyDown={handleKeyDown}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
@@ -61,13 +71,18 @@ function DayCell({
         isSelected ? 'marketing-calendar-cell--selected' : ''
       } ${isDropTarget ? 'marketing-calendar-cell--drop-target' : ''}`}
     >
-      <div className="shrink-0 mb-2">
+      <div className="shrink-0 mb-2" data-day-cell-header>
         <DayNumber day={cell.day} today={cell.today} muted={cell.muted} />
       </div>
       {dayEvents.length > 0 && (
         <div
           className="flex-1 min-h-0 overflow-hidden flex flex-col"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            if (isInteractiveEventTarget(e.target)) e.stopPropagation();
+          }}
+          onDoubleClick={(e) => {
+            if (isInteractiveEventTarget(e.target)) e.stopPropagation();
+          }}
           onKeyDown={(e) => e.stopPropagation()}
         >
           <MarketingDayEvents
@@ -89,6 +104,7 @@ export default function MarketingMonthView({
   onEditPost,
   onTaskClick,
   onDropPost,
+  onNewPostForDate,
 }) {
   const cells = buildMonthCells(viewDate.getFullYear(), viewDate.getMonth());
   const [dragOverDate, setDragOverDate] = useState(null);
@@ -123,6 +139,7 @@ export default function MarketingMonthView({
             onTaskClick={onTaskClick}
             onDropPost={onDropPost}
             onDragOverDate={setDragOverDate}
+            onNewPostForDate={onNewPostForDate}
           />
         ))}
       </div>

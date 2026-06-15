@@ -7,6 +7,7 @@ alwaysApply: false
 # HEYDAY server
 
 - ESM (`import`/`export`); default export `db` from `server/db.js`
+- DB path: `process.env.DATABASE_PATH` or default `heyday.db` at repo root (Railway: `/data/heyday.db` on mounted volume)
 - New tables/columns: add to `runMigrations()` in `server/lib/migrate.js` idempotently
 - Routes: `server/routes/*.js`, mounted in `server/index.js` under `/api/*`
 - Protected routes use `authMiddleware`; `req.user` available after auth

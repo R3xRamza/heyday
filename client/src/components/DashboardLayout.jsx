@@ -1,5 +1,6 @@
 import Sidebar from './Sidebar';
 import TopNav from './TopNav';
+import { useSidebar } from '../context/SidebarContext';
 
 export default function DashboardLayout({
   title,
@@ -9,13 +10,16 @@ export default function DashboardLayout({
   headerRight,
   fillViewport,
 }) {
+  const { sidebarWidth } = useSidebar();
+
   return (
     <div className="min-h-screen bg-surface">
       <Sidebar />
       <div
-        className={`ml-[260px] flex flex-col ${
+        className={`flex flex-col transition-[margin] duration-200 ease-in-out ${
           fillViewport ? 'h-screen overflow-hidden' : 'min-h-screen'
         }`}
+        style={{ marginLeft: sidebarWidth }}
       >
         <TopNav title={title} subtitle={subtitle} headerRight={headerRight} />
         <main

@@ -8,8 +8,20 @@ import MarketingMonthView from '../components/marketing/MarketingMonthView';
 import MarketingWeekView from '../components/marketing/MarketingWeekView';
 import MarketingPostModal from '../components/marketing/MarketingPostModal';
 import MarketingTaskModal from '../components/marketing/MarketingTaskModal';
+import MonthBirthdaysModal from '../components/marketing/MonthBirthdaysModal';
 import CreateContentFab from '../components/marketing/CreateContentFab';
-import { groupEventsByDate, monthRange, weekRange, currentWeekRange, previousWeekRange } from '../components/marketing/calendarUtils';
+import { displayTaskTitle } from '../utils/taskDisplay.js';
+import {
+  groupEventsByDate,
+  monthRange,
+  weekRange,
+  currentWeekRange,
+  previousWeekRange,
+  fridayCelebrationFetchEnd,
+  monthKeyFromDate,
+  monthKeyFromStr,
+  monthsInDateRange,
+} from '../components/marketing/calendarUtils';
 import { mergeQuotaPosts } from '../components/marketing/quotaUtils';
 import { shortAddress } from '../utils/format';
 import { findAdamMember } from '../constants/marketingTasks';
@@ -80,7 +92,15 @@ function mergeFilterPlatforms(barPlatforms, posts) {
   return merged;
 }
 
-function normalizeEvents({ posts, tasks, celebrations, categories, selectedPlatforms, allPlatforms }) {
+function normalizeEvents({
+  posts,
+  tasks,
+  celebrations,
+  categories,
+  selectedPlatforms,
+  allPlatforms,
+  birthdayPinSets,
+}) {
   const today = todayStr();
   const events = [];
   const activePlatforms = selectedPlatforms ?? allPlatforms ?? [];
@@ -107,7 +127,7 @@ function normalizeEvents({ posts, tasks, celebrations, categories, selectedPlatf
         key: `task-${t.id}`,
         kind: 'task',
         date: t.due_date,
-        title: t.title,
+        title: displayTaskTitle(t),
         subtitle: shortAddress(t.transaction_address),
         taskId: t.id,
         transactionId: t.transaction_id,
@@ -119,6 +139,11 @@ function normalizeEvents({ posts, tasks, celebrations, categories, selectedPlatf
   if (categories.celebrations) {
     for (const e of celebrations) {
       if (e.date === today) continue;
+      if (e.type === 'birthday') {
+        const month = monthKeyFromStr(e.date);
+        const pins = birthdayPinSets[month];
+        if (!pins?.has(e.contact_id)) continue;
+      }
       events.push({
         key: `${e.type}-${e.contact_id}-${e.date}`,
         kind: e.type,
@@ -141,7 +166,10 @@ export default function MarketingCalendar() {
   const [lastWeekPosts, setLastWeekPosts] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [celebrations, setCelebrations] = useState([]);
+  const [monthBirthdayEvents, setMonthBirthdayEvents] = useState([]);
   const [todayCelebrations, setTodayCelebrations] = useState([]);
+  const [birthdayPinsByMonth, setBirthdayPinsByMonth] = useState({});
+  const [monthBirthdaysOpen, setMonthBirthdaysOpen] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState(null);
@@ -168,6 +196,18 @@ export default function MarketingCalendar() {
     [viewDate, viewMode],
   );
 
+  const viewedMonthKey = useMemo(() => monthKeyFromDate(viewDate), [viewDate]);
+
+  const birthdayPinSets = useMemo(() => {
+    const out = {};
+    for (const [month, ids] of Object.entries(birthdayPinsByMonth)) {
+      out[month] = new Set(ids);
+    }
+    return out;
+  }, [birthdayPinsByMonth]);
+
+  const pinnedCount = birthdayPinsByMonth[viewedMonthKey]?.length ?? 0;
+
   const periodLabel = useMemo(() => {
     if (viewMode === 'week') {
       const start = new Date(`${range.start}T12:00:00`);
@@ -187,9 +227,11 @@ export default function MarketingCalendar() {
 
   const fetchCalendarData = useCallback(async () => {
     const { start, end } = range;
+    const plannerMonth = monthRange(viewDate);
     const week = currentWeekRange();
     const lastWeek = previousWeekRange();
     const today = todayStr();
+    const todayCelebrationEnd = fridayCelebrationFetchEnd(today);
 
     const adamUserId = await fetchAdamUserId();
 
@@ -197,12 +239,13 @@ export default function MarketingCalendar() {
       ? `/api/tasks?include_completed=false&transaction_only=true&assigned_to=${adamUserId}&due_after=${start}&due_before=${end}`
       : null;
 
-    const [calRes, weekRes, lastWeekRes, bdayRes, todayBdayRes, taskRes] = await Promise.all([
+    const [calRes, weekRes, lastWeekRes, bdayRes, monthBdayRes, todayBdayRes, taskRes] = await Promise.all([
       fetch(`/api/marketing/calendar?start=${start}&end=${end}`, { credentials: 'include' }),
       fetch(`/api/marketing/calendar?start=${week.start}&end=${week.end}`, { credentials: 'include' }),
       fetch(`/api/marketing/calendar?start=${lastWeek.start}&end=${lastWeek.end}`, { credentials: 'include' }),
       fetch(`/api/marketing/birthdays?start=${start}&end=${end}`, { credentials: 'include' }),
-      fetch(`/api/marketing/birthdays?start=${today}&end=${today}`, { credentials: 'include' }),
+      fetch(`/api/marketing/birthdays?start=${plannerMonth.start}&end=${plannerMonth.end}`, { credentials: 'include' }),
+      fetch(`/api/marketing/birthdays?start=${today}&end=${todayCelebrationEnd}`, { credentials: 'include' }),
       taskUrl
         ? fetch(taskUrl, { credentials: 'include' })
         : Promise.resolve({ ok: true, json: async () => ({ tasks: [] }) }),
@@ -224,6 +267,10 @@ export default function MarketingCalendar() {
       const json = await bdayRes.json();
       setCelebrations(json.events || []);
     }
+    if (monthBdayRes.ok) {
+      const json = await monthBdayRes.json();
+      setMonthBirthdayEvents((json.events || []).filter((e) => e.type === 'birthday'));
+    }
     if (todayBdayRes.ok) {
       const json = await todayBdayRes.json();
       setTodayCelebrations(json.events || []);
@@ -236,7 +283,25 @@ export default function MarketingCalendar() {
     }
 
     setInitialLoading(false);
-  }, [range]);
+  }, [range, viewDate]);
+
+  const fetchBirthdayPins = useCallback(async () => {
+    const months = [...new Set([viewedMonthKey, ...monthsInDateRange(range.start, range.end)])];
+    const results = await Promise.all(
+      months.map(async (month) => {
+        const res = await fetch(`/api/marketing/birthday-pins?month=${month}`, { credentials: 'include' });
+        if (!res.ok) return { month, contact_ids: [] };
+        return res.json();
+      }),
+    );
+    setBirthdayPinsByMonth((prev) => {
+      const next = { ...prev };
+      for (const row of results) {
+        if (row.month) next[row.month] = row.contact_ids || [];
+      }
+      return next;
+    });
+  }, [viewedMonthKey, range.start, range.end]);
 
   useEffect(() => {
     fetchGoals();
@@ -245,6 +310,10 @@ export default function MarketingCalendar() {
   useEffect(() => {
     fetchCalendarData();
   }, [fetchCalendarData]);
+
+  useEffect(() => {
+    fetchBirthdayPins();
+  }, [fetchBirthdayPins]);
 
   useEffect(() => {
     localStorage.setItem(LS_CATEGORIES, JSON.stringify(categories));
@@ -283,9 +352,59 @@ export default function MarketingCalendar() {
       categories,
       selectedPlatforms,
       allPlatforms: filterPlatforms,
+      birthdayPinSets,
     });
     return groupEventsByDate(events);
-  }, [posts, tasks, celebrations, categories, selectedPlatforms, filterPlatforms]);
+  }, [posts, tasks, celebrations, categories, selectedPlatforms, filterPlatforms, birthdayPinSets]);
+
+  async function saveBirthdayPins(contactIds, { firstPin = false } = {}) {
+    const month = viewedMonthKey;
+    const snapshot = birthdayPinsByMonth[month] ?? [];
+
+    setBirthdayPinsByMonth((prev) => ({ ...prev, [month]: contactIds }));
+    if (firstPin && !categories.celebrations) {
+      setCategories((c) => ({ ...c, celebrations: true }));
+    }
+
+    const res = await fetch('/api/marketing/birthday-pins', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ month, contact_ids: contactIds }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setBirthdayPinsByMonth((prev) => ({ ...prev, [month]: snapshot }));
+      throw new Error(json.error || 'Save failed');
+    }
+    setBirthdayPinsByMonth((prev) => ({ ...prev, [month]: json.contact_ids || [] }));
+  }
+
+  async function addContactBirthday({ contactId, day }) {
+    const y = viewDate.getFullYear();
+    const m = String(viewDate.getMonth() + 1).padStart(2, '0');
+    const d = String(day).padStart(2, '0');
+    const birthday = `${y}-${m}-${d}`;
+
+    const res = await fetch(`/api/crm/${contactId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ birthday }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Could not save birthday');
+
+    await fetchCalendarData();
+
+    const month = viewedMonthKey;
+    const currentPins = birthdayPinsByMonth[month] ?? [];
+    if (!currentPins.includes(contactId)) {
+      await saveBirthdayPins([...currentPins, contactId], {
+        firstPin: currentPins.length === 0,
+      });
+    }
+  }
 
   function togglePlatform(platform) {
     setSelectedPlatforms((prev) => {
@@ -325,6 +444,12 @@ export default function MarketingCalendar() {
   }
 
   function openNewPost() {
+    setEditingPost(null);
+    setModalOpen(true);
+  }
+
+  function openNewPostForDate(dateStr) {
+    setSelectedDate(dateStr);
     setEditingPost(null);
     setModalOpen(true);
   }
@@ -389,6 +514,26 @@ export default function MarketingCalendar() {
       throw new Error(json.error || 'Delete failed');
     }
     await fetchCalendarData();
+  }
+
+  async function patchPostStatus(id, status) {
+    const res = await fetch(`/api/marketing/posts/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ status }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Update failed');
+    await fetchCalendarData();
+  }
+
+  async function completePost(id) {
+    await patchPostStatus(id, 'done');
+  }
+
+  async function markPostActive(id) {
+    await patchPostStatus(id, 'posting');
   }
 
   function updatePostDateInList(list, postId, newDate) {
@@ -472,8 +617,8 @@ export default function MarketingCalendar() {
   }
 
   return (
-    <DashboardLayout title="Marketing" className="px-6 md:px-8 py-3 bg-off-white w-full max-w-none">
-      <div className="flex flex-col w-full">
+    <DashboardLayout title="Marketing Calendar" className="px-6 md:px-8 py-3 bg-off-white w-full max-w-none">
+      <div className="flex flex-col w-full select-none [&_input]:select-text [&_textarea]:select-text">
         <MarketingCalendarHeader
           viewMode={viewMode}
           onViewModeChange={setViewMode}
@@ -503,6 +648,10 @@ export default function MarketingCalendar() {
           onClearAllPlatforms={clearAllPlatforms}
           goals={goals}
           todayCelebrations={todayCelebrations}
+          viewDate={viewDate}
+          pinnedCount={pinnedCount}
+          totalBirthdaysInMonth={monthBirthdayEvents.length}
+          onOpenMonthBirthdays={() => setMonthBirthdaysOpen(true)}
         />
 
         <div className="w-full">
@@ -517,6 +666,7 @@ export default function MarketingCalendar() {
               onEditPost={openEditPost}
               onTaskClick={openTaskModal}
               onDropPost={reschedulePost}
+              onNewPostForDate={openNewPostForDate}
             />
           ) : (
             <MarketingMonthView
@@ -527,6 +677,7 @@ export default function MarketingCalendar() {
               onEditPost={openEditPost}
               onTaskClick={openTaskModal}
               onDropPost={reschedulePost}
+              onNewPostForDate={openNewPostForDate}
             />
           )}
         </div>
@@ -540,6 +691,8 @@ export default function MarketingCalendar() {
         onClose={() => setModalOpen(false)}
         onSave={savePost}
         onDelete={deletePost}
+        onComplete={completePost}
+        onMarkActive={markPostActive}
       />
 
       <MarketingTaskModal
@@ -548,6 +701,16 @@ export default function MarketingCalendar() {
         onClose={() => setTaskModalTask(null)}
         onComplete={completeTask}
         onMarkPending={markTaskPending}
+      />
+
+      <MonthBirthdaysModal
+        open={monthBirthdaysOpen}
+        viewDate={viewDate}
+        events={monthBirthdayEvents}
+        pinnedIds={birthdayPinsByMonth[viewedMonthKey] ?? []}
+        onClose={() => setMonthBirthdaysOpen(false)}
+        onSavePins={saveBirthdayPins}
+        onAddBirthday={addContactBirthday}
       />
 
       <CreateContentFab onClick={openNewPost} />

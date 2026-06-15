@@ -5,6 +5,10 @@ import { buildWeekCells, MARKETING_POST_DRAG_TYPE } from './calendarUtils';
 
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
+function isInteractiveEventTarget(target) {
+  return Boolean(target.closest('button, a'));
+}
+
 export default function MarketingWeekView({
   viewDate,
   eventsByDate,
@@ -13,6 +17,7 @@ export default function MarketingWeekView({
   onEditPost,
   onTaskClick,
   onDropPost,
+  onNewPostForDate,
 }) {
   const cells = buildWeekCells(viewDate);
   const [dragOverDate, setDragOverDate] = useState(null);
@@ -44,6 +49,11 @@ export default function MarketingWeekView({
             onSelectDate?.(cell.dateStr);
           }
 
+          function handleDoubleClick(e) {
+            if (isInteractiveEventTarget(e.target)) return;
+            onNewPostForDate?.(cell.dateStr);
+          }
+
           function handleKeyDown(e) {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -73,6 +83,7 @@ export default function MarketingWeekView({
               aria-selected={isSelected}
               aria-label={`Select ${cell.dateStr}`}
               onClick={handleSelect}
+              onDoubleClick={handleDoubleClick}
               onKeyDown={handleKeyDown}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
@@ -82,12 +93,17 @@ export default function MarketingWeekView({
                 isDropTarget ? 'marketing-calendar-cell--drop-target' : ''
               }`}
             >
-              <div className="shrink-0 mb-2">
+              <div className="shrink-0 mb-2" data-day-cell-header>
                 <DayNumber day={cell.day} today={cell.today} muted={false} />
               </div>
               <div
                 className="flex-1 min-h-0 overflow-hidden flex flex-col"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  if (isInteractiveEventTarget(e.target)) e.stopPropagation();
+                }}
+                onDoubleClick={(e) => {
+                  if (isInteractiveEventTarget(e.target)) e.stopPropagation();
+                }}
                 onKeyDown={(e) => e.stopPropagation()}
               >
                 <MarketingDayEvents

@@ -14,15 +14,15 @@ export default function MarketingDayEvents({ events, onEditPost, onTaskClick }) 
   if (!sorted.length) return null;
 
   const sectionLabelClass =
-    'text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/60';
+    'text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/60 select-none';
 
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-1.5">
-        {tasks.length > 0 && (
+        {social.length > 0 && (
           <>
-            <p className={sectionLabelClass}>Tasks ({tasks.length})</p>
-            {tasks.map((ev) => (
+            <p className={sectionLabelClass}>Social ({social.length})</p>
+            {social.map((ev) => (
               <MarketingEventChip
                 key={ev.key}
                 event={ev}
@@ -32,12 +32,12 @@ export default function MarketingDayEvents({ events, onEditPost, onTaskClick }) 
             ))}
           </>
         )}
-        {social.length > 0 && (
+        {tasks.length > 0 && (
           <>
-            <p className={`${sectionLabelClass}${tasks.length > 0 ? ' pt-0.5' : ''}`}>
-              Social ({social.length})
+            <p className={`${sectionLabelClass}${social.length > 0 ? ' pt-0.5' : ''}`}>
+              Tasks ({tasks.length})
             </p>
-            {social.map((ev) => (
+            {tasks.map((ev) => (
               <MarketingEventChip
                 key={ev.key}
                 event={ev}

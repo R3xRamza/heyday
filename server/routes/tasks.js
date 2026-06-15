@@ -9,7 +9,7 @@ const router = Router();
 const TASK_SELECT = `
   SELECT t.*, u.name as user_name, tx.address as transaction_address,
     tt.timing_value, tt.timing_direction, tt.timing_anchor,
-    tt.template_id, ct.name AS template_name
+    tt.calendar_nickname, tt.template_id, ct.name AS template_name
   FROM tasks t
   LEFT JOIN users u ON u.id = t.assigned_to
   LEFT JOIN transactions tx ON tx.id = t.transaction_id

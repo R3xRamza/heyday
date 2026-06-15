@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../shared/Icon';
 import { colorForPlatform } from './platformColors';
+import { partitionFridayCelebrations } from './calendarUtils';
 
 const CATEGORY_PILLS = [
   { key: 'social', label: 'Social' },
@@ -114,8 +115,65 @@ function PlatformFilterPopover({
   );
 }
 
-function MilestonesPopover({ events }) {
+function CelebrationRow({ event, onClose }) {
+  return (
+    <Link
+      to={`/crm/${event.contact_id}`}
+      onClick={onClose}
+      className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-feather hover:bg-off-white"
+    >
+      <Icon
+        name={event.type === 'birthday' ? 'cake' : 'home'}
+        className="!text-[14px] text-purple/70 shrink-0"
+      />
+      <span className="truncate">{event.name}</span>
+      <span className="text-[10px] text-on-surface-variant ml-auto shrink-0">
+        {event.type === 'birthday' ? 'Birthday' : 'Anniversary'}
+      </span>
+    </Link>
+  );
+}
+
+function MonthBirthdaysMenuRow({ viewDate, pinnedCount, totalInMonth, onOpen, onClose }) {
+  const monthShort = viewDate.toLocaleDateString('en-US', { month: 'short' });
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onClose();
+        onOpen();
+      }}
+      className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-purple hover:bg-purple/5 transition-colors"
+    >
+      <Icon name="calendar_month" className="!text-[16px] shrink-0" />
+      <span className="flex-1 text-left">
+        Plan {monthShort} birthdays
+      </span>
+      {totalInMonth > 0 && (
+        <span className="rounded-full bg-purple/15 px-1.5 py-px text-[10px] font-bold text-purple shrink-0">
+          {pinnedCount}/{totalInMonth}
+        </span>
+      )}
+      <Icon name="chevron_right" className="!text-[16px] text-purple/60 shrink-0" />
+    </button>
+  );
+}
+
+function MilestonesPopover({
+  events,
+  viewDate,
+  pinnedCount,
+  totalBirthdaysInMonth,
+  onOpenMonthBirthdays,
+}) {
   const { open, setOpen, rootRef } = usePopover();
+  const today = new Date().toISOString().slice(0, 10);
+  const isFriday = new Date(`${today}T12:00:00`).getDay() === 5;
+  const { friday, weekend } = isFriday
+    ? partitionFridayCelebrations(events, today)
+    : { friday: events, weekend: [] };
+  const showDivider = isFriday && friday.length > 0 && weekend.length > 0;
 
   return (
     <div ref={rootRef} className="relative shrink-0">
@@ -127,29 +185,49 @@ function MilestonesPopover({ events }) {
         className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold text-purple border border-purple/20 bg-purple/5 hover:bg-purple/10 whitespace-nowrap"
       >
         <Icon name="cake" className="!text-[14px]" />
-        {events.length} today
+        Birthdays
         <Icon name={open ? 'expand_less' : 'expand_more'} className="!text-[16px]" />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-56 bg-white border border-outline-variant/15 rounded-xl shadow-lg py-1 max-h-48 overflow-y-auto custom-scrollbar">
-          {events.map((e) => (
-            <Link
-              key={`${e.type}-${e.contact_id}`}
-              to={`/crm/${e.contact_id}`}
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-feather hover:bg-off-white"
-            >
-              <Icon
-                name={e.type === 'birthday' ? 'cake' : 'home'}
-                className="!text-[14px] text-purple/70 shrink-0"
-              />
-              <span className="truncate">{e.name}</span>
-              <span className="text-[10px] text-on-surface-variant ml-auto shrink-0">
-                {e.type === 'birthday' ? 'Birthday' : 'Anniversary'}
-              </span>
-            </Link>
-          ))}
+        <div className="absolute right-0 top-full mt-1 z-50 w-60 bg-white border border-outline-variant/15 rounded-xl shadow-lg overflow-hidden">
+          <div className="px-3 py-2 border-b border-outline-variant/10 bg-purple/5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-purple/80">
+              {isFriday ? 'Upcoming' : 'Today'} · {events.length}
+            </p>
+          </div>
+          <div className="py-1 max-h-44 overflow-y-auto custom-scrollbar">
+            {events.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-on-surface-variant">
+                {isFriday
+                  ? 'No birthdays or anniversaries this weekend'
+                  : 'No birthdays or anniversaries today'}
+              </p>
+            ) : isFriday ? (
+              <>
+                {friday.map((e) => (
+                  <CelebrationRow key={`${e.type}-${e.contact_id}-${e.date}`} event={e} onClose={() => setOpen(false)} />
+                ))}
+                {showDivider && <div className="border-t border-outline-variant/10 my-1" />}
+                {weekend.map((e) => (
+                  <CelebrationRow key={`${e.type}-${e.contact_id}-${e.date}`} event={e} onClose={() => setOpen(false)} />
+                ))}
+              </>
+            ) : (
+              events.map((e) => (
+                <CelebrationRow key={`${e.type}-${e.contact_id}-${e.date}`} event={e} onClose={() => setOpen(false)} />
+              ))
+            )}
+          </div>
+          <div className="border-t border-outline-variant/10 bg-off-white/80">
+            <MonthBirthdaysMenuRow
+              viewDate={viewDate}
+              pinnedCount={pinnedCount}
+              totalInMonth={totalBirthdaysInMonth}
+              onOpen={onOpenMonthBirthdays}
+              onClose={() => setOpen(false)}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -170,6 +248,10 @@ export default function MarketingCalendarToolbar({
   onClearAllPlatforms,
   goals,
   todayCelebrations,
+  viewDate,
+  pinnedCount,
+  totalBirthdaysInMonth,
+  onOpenMonthBirthdays,
 }) {
   return (
     <div className="bg-white border border-outline-variant/15 rounded-xl px-3 py-1.5 mb-2 shrink-0 flex items-center justify-between gap-3 h-11 overflow-visible">
@@ -234,9 +316,13 @@ export default function MarketingCalendarToolbar({
             goals={goals}
           />
         )}
-        {todayCelebrations?.length > 0 && (
-          <MilestonesPopover events={todayCelebrations} />
-        )}
+        <MilestonesPopover
+          events={todayCelebrations ?? []}
+          viewDate={viewDate}
+          pinnedCount={pinnedCount}
+          totalBirthdaysInMonth={totalBirthdaysInMonth}
+          onOpenMonthBirthdays={onOpenMonthBirthdays}
+        />
       </div>
     </div>
   );

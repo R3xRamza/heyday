@@ -1,5 +1,6 @@
 import { parseLegacyCityLine } from './address.js';
 import { backfillTransactionChecklists } from './transactionChecklists.js';
+import { deriveNickname } from './deriveNickname.js';
 
 export function addColumnIfMissing(db, table, column, definition) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
@@ -52,6 +53,12 @@ export function runMigrations(db) {
   addColumnIfMissing(db, 'tasks', 'template_task_id', 'INTEGER REFERENCES template_tasks(id)');
   addColumnIfMissing(db, 'tasks', 'completed_at', 'DATETIME');
   addColumnIfMissing(db, 'template_tasks', 'default_role', 'TEXT');
+  addColumnIfMissing(db, 'template_tasks', 'calendar_nickname', 'TEXT');
+  backfillTemplateTaskNicknames(db);
+  migrateTemplateNicknamesV2(db);
+  migrateTemplateNicknamesV3(db);
+  migrateTemplateNicknamesV4(db);
+  migrateTemplateNicknamesV5(db);
 
   addColumnIfMissing(db, 'transactions', 'transaction_name', 'TEXT');
   addColumnIfMissing(db, 'transactions', 'sale_type', "TEXT DEFAULT 'Traditional sale'");
@@ -99,6 +106,131 @@ export function runMigrations(db) {
   migrateContactsTable(db);
   migrateCrmActivityAndGmail(db);
   migrateMarketingTables(db);
+  migrateBirthdayPinsTable(db);
+}
+
+function backfillTemplateTaskNicknames(db) {
+  const rows = db.prepare(`
+    SELECT id, title FROM template_tasks
+    WHERE calendar_nickname IS NULL OR calendar_nickname = ''
+       OR calendar_nickname LIKE '%…%'
+  `).all();
+  if (rows.length === 0) return;
+
+  const update = db.prepare('UPDATE template_tasks SET calendar_nickname = ? WHERE id = ?');
+  db.transaction(() => {
+    for (const row of rows) {
+      update.run(deriveNickname(row.title), row.id);
+    }
+  })();
+}
+
+function migrateTemplateNicknamesV2(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS _migrations (
+      name TEXT PRIMARY KEY,
+      applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  if (db.prepare("SELECT 1 FROM _migrations WHERE name = 'template_nicknames_v2'").get()) return;
+
+  const rows = db.prepare('SELECT id, title FROM template_tasks').all();
+  const update = db.prepare('UPDATE template_tasks SET calendar_nickname = ? WHERE id = ?');
+  db.transaction(() => {
+    for (const row of rows) {
+      update.run(deriveNickname(row.title), row.id);
+    }
+  })();
+
+  db.prepare("INSERT INTO _migrations (name) VALUES ('template_nicknames_v2')").run();
+}
+
+function migrateTemplateNicknamesV3(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS _migrations (
+      name TEXT PRIMARY KEY,
+      applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  if (db.prepare("SELECT 1 FROM _migrations WHERE name = 'template_nicknames_v3'").get()) return;
+
+  const rows = db.prepare(`
+    SELECT id, title FROM template_tasks
+    WHERE title LIKE 'MARKETING PREP:%'
+       OR calendar_nickname LIKE 'MARKETING PREP:%'
+  `).all();
+  const update = db.prepare('UPDATE template_tasks SET calendar_nickname = ? WHERE id = ?');
+  db.transaction(() => {
+    for (const row of rows) {
+      update.run(deriveNickname(row.title), row.id);
+    }
+  })();
+
+  db.prepare("INSERT INTO _migrations (name) VALUES ('template_nicknames_v3')").run();
+}
+
+function migrateTemplateNicknamesV4(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS _migrations (
+      name TEXT PRIMARY KEY,
+      applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  if (db.prepare("SELECT 1 FROM _migrations WHERE name = 'template_nicknames_v4'").get()) return;
+
+  const rows = db.prepare(`
+    SELECT id, title FROM template_tasks
+    WHERE title LIKE 'MARKETING:%'
+       OR title LIKE 'MARKETING PREP:%'
+       OR calendar_nickname LIKE '%MARKETING%'
+       OR calendar_nickname LIKE '%Marketing%'
+  `).all();
+  const update = db.prepare('UPDATE template_tasks SET calendar_nickname = ? WHERE id = ?');
+  db.transaction(() => {
+    for (const row of rows) {
+      update.run(deriveNickname(row.title), row.id);
+    }
+  })();
+
+  db.prepare("INSERT INTO _migrations (name) VALUES ('template_nicknames_v4')").run();
+}
+
+function migrateTemplateNicknamesV5(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS _migrations (
+      name TEXT PRIMARY KEY,
+      applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  if (db.prepare("SELECT 1 FROM _migrations WHERE name = 'template_nicknames_v5'").get()) return;
+
+  const rows = db.prepare(`
+    SELECT id, title FROM template_tasks
+    WHERE title LIKE 'MARKETING:%'
+       OR title LIKE 'MARKETING PREP:%'
+       OR calendar_nickname LIKE '%MARKETING%'
+       OR calendar_nickname LIKE '%Marketing%'
+  `).all();
+  const update = db.prepare('UPDATE template_tasks SET calendar_nickname = ? WHERE id = ?');
+  db.transaction(() => {
+    for (const row of rows) {
+      update.run(deriveNickname(row.title), row.id);
+    }
+  })();
+
+  db.prepare("INSERT INTO _migrations (name) VALUES ('template_nicknames_v5')").run();
+}
+
+function migrateBirthdayPinsTable(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS marketing_birthday_pins (
+      month TEXT NOT NULL,
+      contact_id INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+      PRIMARY KEY (month, contact_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_marketing_birthday_pins_month ON marketing_birthday_pins(month);
+  `);
 }
 
 const DEFAULT_PLATFORM_GOALS = [

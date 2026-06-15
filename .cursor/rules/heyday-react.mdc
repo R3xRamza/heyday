@@ -13,3 +13,15 @@ alwaysApply: false
 - Avoid `overflow-hidden` on calendar wrapper if it clips the Saturday column
 
 Add new routes in `App.jsx` and nav in `Sidebar.jsx` when creating pages.
+
+## Sidebar (2026-06-15)
+
+- `SidebarContext` — `collapsed`, `toggleCollapsed`, `sidebarWidth` (260 | 72); `sidebar-collapsed-v1` in localStorage
+- `DashboardLayout` — `style={{ marginLeft: sidebarWidth }}` with transition; do not hardcode `ml-[260px]`
+- Task Hub `NavLink` has `end={taskHub}` so `/tasks/:userId` only highlights “My tasks”
+- Footer: compact user + small logout; collapsed = avatar + icon logout
+
+## Marketing calendar
+
+- `MarketingDayEvents` section order: Social → Tasks → Milestones
+- `fridayCelebrationFetchEnd` / `partitionFridayCelebrations` in `calendarUtils.js` for toolbar popover
