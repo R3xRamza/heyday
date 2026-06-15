@@ -1,0 +1,16 @@
+---
+description: Express API and SQLite patterns for HEYDAY
+globs: server/**/*
+alwaysApply: false
+---
+
+# HEYDAY server
+
+- ESM (`import`/`export`); default export `db` from `server/db.js`
+- New tables/columns: add to `runMigrations()` in `server/lib/migrate.js` idempotently
+- Routes: `server/routes/*.js`, mounted in `server/index.js` under `/api/*`
+- Protected routes use `authMiddleware`; `req.user` available after auth
+- Use `db.transaction()` for multi-step deletes; respect FK order with `foreign_keys ON`
+- Activity: `logActivity()` from `server/lib/activity.js`
+
+When adding endpoints, match existing JSON shapes and error `{ error: string }` pattern.
