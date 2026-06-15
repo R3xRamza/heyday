@@ -1,0 +1,50 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,jsx}'],
+  theme: {
+    extend: {
+      colors: {
+        feather: 'var(--feather)',
+        'feather-alt': 'var(--feather-alt)',
+        sky: 'var(--sky)',
+        'sky-alt': 'var(--sky-alt)',
+        lemon: 'var(--lemon)',
+        'off-white': 'var(--off-white)',
+        purple: 'var(--purple)',
+        'light-pink': 'var(--light-pink)',
+        primary: '#002727',
+        'primary-container': '#053e3f',
+        secondary: '#2d6768',
+        'secondary-container': '#b0eaea',
+        'secondary-fixed': '#b3eded',
+        tertiary: '#371439',
+        'tertiary-container': '#4f2a50',
+        surface: '#f8faf7',
+        'surface-container-low': '#f2f4f1',
+        'surface-container-lowest': '#ffffff',
+        'surface-container-high': '#e7e9e6',
+        'surface-container-highest': '#e1e3e0',
+        'surface-container': '#eceeeb',
+        'on-surface': '#191c1b',
+        'on-surface-variant': '#404848',
+        'outline-variant': '#c0c8c8',
+        outline: '#707978',
+        error: '#ba1a1a',
+        accent: '#E9E84A',
+      },
+      fontFamily: {
+        sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+        display: ['"Playfair Display"', 'Georgia', 'serif'],
+        body: ['"DM Sans"', 'system-ui', 'sans-serif'],
+      },
+      boxShadow: {
+        executive: '0 4px 16px rgba(5, 62, 63, 0.12)',
+        command: '0 2px 8px rgba(5, 62, 63, 0.08)',
+      },
+      spacing: {
+        gutter: '24px',
+      },
+    },
+  },
+  plugins: [],
+};

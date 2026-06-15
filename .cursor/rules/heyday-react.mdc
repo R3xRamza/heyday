@@ -1,0 +1,15 @@
+---
+description: React client patterns for HEYDAY
+globs: client/src/**/*.{jsx,js,css}
+alwaysApply: false
+---
+
+# HEYDAY client
+
+- Pages in `client/src/pages/`; feature components in `client/src/components/`
+- Wrap authenticated screens in `ProtectedRoute`; use `DashboardLayout` for app shell
+- Shared: `Icon` (Material Symbols), `DateText`, `format.js` helpers
+- Calendar grids: `.calendar-grid` in `index.css` — `grid-template-columns: repeat(7, 1fr)`; header row must also be 7 columns (`grid-cols-7`)
+- Avoid `overflow-hidden` on calendar wrapper if it clips the Saturday column
+
+Add new routes in `App.jsx` and nav in `Sidebar.jsx` when creating pages.

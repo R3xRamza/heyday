@@ -1,0 +1,119 @@
+---
+description: HEYDAY project context — read before any task
+alwaysApply: true
+---
+
+# HEYDAY project context
+
+**GOAL** — You are working on HEYDAY, a real estate operations platform (Express/SQLite API + React/Vite SPA). Path: `/Users/rexramza/Desktop/heyday`. User requirements are acceptance criteria, not nice-to-haves. Match mockups/screenshots exactly when provided.
+
+## STACK
+
+- Monorepo root: `package.json` runs `npm run dev` (nodemon API :3001 + Vite client :5173)
+- Server: Node ESM, Express, better-sqlite3 (`heyday.db`), JWT auth via cookie, `foreign_keys ON`
+- Client: React 18, React Router, Tailwind, Vite proxy `/api` → localhost:3001
+- Build: `npm run build` (client only). No commits unless user asks.
+
+## DEV
+
+- `npm run dev` from heyday root
+- Default login seeded: `admin@heyday.com` / `admin123`
+- Scripts: `clear-transactions`, `import-crm`, `seed-sample-transactions`
+
+## REPO LAYOUT
+
+- `server/index.js` — app entry, mounts `/api/*` routes with `authMiddleware`
+- `server/routes/` — auth, crm, tasks, transactions, marketing, checklists, team, revenue, gmail
+- `server/lib/` — migrate.js, business logic (transactionParties, applyChecklists, marketingCalendar, activity, etc.)
+- `server/db.js` — SQLite init + `runMigrations()`
+- `client/src/App.jsx` — all routes
+- `client/src/pages/` — screen-level components
+- `client/src/components/` — shared UI (Sidebar, DashboardLayout, TopNav, marketing/*, etc.)
+- `client/src/utils/format.js` — formatDate, formatCurrency, shortAddress, DateText pattern
+- `client/src/index.css` — global + `.calendar-grid` (7 cols), `.marketing-calendar-*` styles
+
+## ROUTES (client)
+
+- `/login`, `/crm`, `/crm/:id` (contacts)
+- `/tasks`, `/tasks/:userId` (team + per-user task dashboards, calendar view)
+- `/transactions`, `/transactions/:id` (list + TransactionManager workspace)
+- `/marketing` (Marketing Calendar)
+- `/checklists` (template editor)
+- `/revenue`, `/team-ops`
+
+## API (server; all except `/api/auth` need session cookie)
+
+- `/api/crm` — contacts (FUB import fields: birthday, anniversary, etc.)
+- `/api/tasks` — team tasks; query: `assigned_to`, `transaction_id`, `due_after`, `due_before`, `transaction_only`
+- `/api/transactions` — CRUD, parties, activity, checklists, DELETE (delete activity before tasks — FK)
+- `/api/marketing` — calendar posts, platform-goals, birthdays range
+- `/api/checklists` — template + template_tasks CRUD
+
+## AUTH
+
+- Client fetch: always `credentials: 'include'`
+- `ProtectedRoute` wraps authenticated pages
+- `DashboardLayout` = Sidebar (260px) + TopNav + main; `compactHeader` hides title/search for full-bleed pages (marketing)
+
+## DESIGN SYSTEM
+
+- Brand: feather (#134041), feather-alt, sky, lemon, off-white bg
+- Tailwind tokens: primary-container, secondary, surface-*, on-surface-variant
+- `html` font-size 18px (`index.css`)
+- Logo: import from `client/src/assets/heyday-logo.png` (NOT `/public` path alone)
+- Sidebar width 260px; main `ml-[260px]`
+- Icons: `shared/Icon.jsx` (Material Symbols) + lucide in Sidebar
+- Reuse `DashboardLayout`, `DateText` for non-wrapping dates
+
+## DOMAIN — Transactions
+
+- Representing types: seller, buyer, landlord, tenant, seller_and_buyer
+- Parties: counterparty model (not separate client/seller rows)
+- TransactionWorkspace views: details (timeline + parties), checklist, activity
+- Checklists applied per transaction; tasks tied to template_tasks
+- `workflow_status`: setup flow via TransactionSetup until active
+
+## DOMAIN — Tasks
+
+- Statuses: pending, complete; `due_date`; `transaction_id` optional
+- UserTaskDashboard: list + calendar (`TaskCalendarView.jsx`)
+
+## DOMAIN — CRM
+
+- `contacts` table with birthday, anniversary (recurring month-day)
+- Contact detail at `/crm/:id`
+
+## DOMAIN — Marketing Calendar (DONE)
+
+- Page: `/marketing` — `MarketingCalendar.jsx` + `client/src/components/marketing/*`
+- Layout: slim header, collapsible weekly goals (`PlatformQuotasRow`), single-row toolbar, hero month/week calendar grid
+- Weekly goals: 5 platform quota slots, LAST WK counts, current-week progress, NEXT post title
+- Calendar: Sun–Sat grid; social post drag-and-drop reschedule; platform filter; category pills (Social | Tasks | Milestones)
+- Social posts: platform-colored chips; `PATCH /api/marketing/posts/:id` for date moves
+- Tasks: Adam-assigned transaction tasks only; grey task chips; complete via `MarketingTaskModal`
+- Data: `marketing_posts`, `marketing_platform_goals`, CRM birthdays/anniversaries, `GET /api/tasks` (assigned_to + date range)
+- localStorage: `marketing-categories-v4`, `marketing-platform-filter-v1`, `marketing-quota-slots-v1`, `marketing-goals-collapsed-v1`
+
+## CODE CONVENTIONS
+
+- Minimal diff; match surrounding style; no over-engineering
+- ESM imports (.js server, .jsx client)
+- Migrations in `server/lib/migrate.js` (add tables/columns idempotently)
+- Activity logging via `server/lib/activity.js`
+- When user asks for "agent prompt", use detailed spec: GOAL, REFERENCE, LAYOUT, COMPONENTS, DATA, INTERACTIONS, DO NOT, ACCEPTANCE [ ], VERIFY
+
+## DO NOT
+
+- Skip stated requirements to ship faster
+- Treat mockup match as polish pass
+- Mon–Sat or Mon-first week grids
+- Duplicate TopNav title on marketing-style pages without reason
+- Commit unless explicitly asked
+- Force push, amend commits, or update git config
+
+## VERIFY
+
+- `npm run build` must pass
+- For UI: confirm layout against acceptance criteria
+
+When uncertain about product intent, ask once — do not silently drop features.

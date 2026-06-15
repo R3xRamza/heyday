@@ -1,0 +1,40 @@
+---
+description: How to work with the user on HEYDAY tasks and agent prompts
+alwaysApply: true
+---
+
+# HEYDAY workflow
+
+## Requirements
+
+- Everything the user states in a task is **acceptance criteria**, not nice-to-have
+- Mockups/screenshots are the **acceptance test**, not inspiration
+- If ambiguous, ask once — do not silently drop scope
+
+## Agent prompts (when user asks for one)
+
+Use a copy-paste block with:
+
+GOAL · REFERENCE · LAYOUT (numbered) · COMPONENTS (path → duty) · DATA (fields + formulas) · INTERACTIONS · DO NOT · ACCEPTANCE [ ] · VERIFY
+
+Use **behavior-level bullets**, not vague labels. Example quality:
+
+```
+Weekly quota cards (PlatformQuotasRow.jsx):
+- 5 cards: Marketing Status | Instagram | LinkedIn | TikTok | Newsletters
+- Fraction count/target, progress bar, footer NEXT: {title or —}
+- GOAL MET if count >= target; ATTENTION REQUIRED if count === 0 and weekday >= Wed
+- Target: first integer in platform_goals.frequency, else 2
+```
+
+End with: `npm run build must pass. No commit unless asked.`
+
+## UI pages
+
+- Marketing calendar (done): weekly quota cards + hero calendar grid — see `client/src/components/marketing/`
+- `DashboardLayout compactHeader` for full-bleed pages (no duplicate TopNav title/search)
+- Full width main content — no `max-w` caps that leave dead right margin
+
+## Session handoff
+
+Prefer one slice per agent session (single feature/fix). User may start new chats with this rules folder loaded — do not assume prior chat memory.

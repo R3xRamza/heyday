@@ -1,0 +1,725 @@
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import Icon from './shared/Icon';
+import EditTaskModal from './EditTaskModal';
+import PartiesToTransaction from './PartiesToTransaction';
+import DateText from './shared/DateText';
+import { formatCurrency, formatDate, parseTransactionAddress } from '../utils/format';
+import {
+  REPRESENTING_OPTIONS,
+  normalizeRepresenting,
+  representingLabel,
+  showsOptionEndDate,
+  getTimelineSteps,
+  getTimelineDateKeys,
+  datesToClearOnRepresentingChange,
+  SALE_TYPE_OPTIONS,
+  saleTypeForRepresenting,
+  normalizeSaleType,
+} from '../constants/transactionForm';
+
+const ASSET_VIEWS = [
+  { key: 'details', label: 'Transaction details', icon: 'info' },
+  { key: 'checklist', label: 'Checklist', icon: 'checklist' },
+  { key: 'activity', label: 'Activity', icon: 'history' },
+];
+
+const EXTRA_FIELDS = [
+  { key: 'created_at', label: 'Created', type: 'readonly-date' },
+  { key: 'representing', label: 'Representing', type: 'select', options: REPRESENTING_OPTIONS },
+  { key: 'sale_type', label: 'Type of sale', type: 'select', options: SALE_TYPE_OPTIONS },
+  { key: 'stage', label: 'Status', type: 'select', options: ['active', 'pending', 'closed'] },
+  { key: 'address', label: 'Address', type: 'text' },
+  { key: 'city', label: 'City', type: 'text' },
+  { key: 'state', label: 'State', type: 'text' },
+  { key: 'zip', label: 'ZIP', type: 'text' },
+];
+
+function shortDue(d) {
+  if (!d) return '—';
+  const date = new Date(`${d}T12:00:00`);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+}
+
+function activityLabel(type) {
+  const map = {
+    transaction_created: 'Transaction created',
+    transaction_updated: 'Transaction updated',
+    deadlines_changed: 'Deadlines changed',
+    task_complete: 'Task complete',
+    task_updated: 'Task updated',
+    task_deleted: 'Task deleted',
+    task_created: 'Task added',
+    checklist_added: 'Checklist added',
+    comment: 'Comment',
+  };
+  return map[type] || type;
+}
+
+function stageBadge(stage) {
+  if (stage === 'pending') return 'PRE-LISTING';
+  if (stage === 'closed') return 'CLOSED';
+  return 'ACTIVE ESCROW';
+}
+
+function timelineProgress(form, representing) {
+  const keys = getTimelineDateKeys(representing);
+  const set = keys.filter((k) => form[k]).length;
+  return keys.length ? Math.round((set / keys.length) * 100) : 0;
+}
+
+function nextDeadlineLabel(tasks, transaction) {
+  const open = tasks.filter((t) => t.status !== 'complete' && t.due_date);
+  if (open.length === 0) {
+    if (showsOptionEndDate(transaction.representing) && transaction.option_end_date) {
+      return `Option: ${formatDate(transaction.option_end_date)}`;
+    }
+    if (transaction.important_date) return `Expires: ${formatDate(transaction.important_date)}`;
+    return '—';
+  }
+  open.sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const next = open[0];
+  if (next.is_overdue) return `Overdue: ${next.title.slice(0, 28)}…`;
+  return `Due ${formatDate(next.due_date)}`;
+}
+
+function EditableField({ field, form, transaction, onChange, onBlur }) {
+  const key = field.key;
+  if (field.type === 'readonly-date') {
+    return (
+      <div className="space-y-1">
+        <label className="text-[11px] font-semibold uppercase tracking-widest text-on-surface-variant">{field.label}</label>
+        <DateText value={transaction.created_at?.slice(0, 10)} className="text-sm font-semibold text-primary" />
+      </div>
+    );
+  }
+  if (field.type === 'select') {
+    return (
+      <div className="space-y-1">
+        <label className="text-[11px] font-semibold uppercase tracking-widest text-on-surface-variant">{field.label}</label>
+        <select
+          value={form[key] || ''}
+          onChange={(e) => onChange(key, e.target.value)}
+          className="w-full text-sm font-semibold text-primary bg-surface-container-low border border-outline-variant/20 rounded-lg px-3 py-2 focus:ring-2 focus:ring-secondary/30 outline-none"
+        >
+          {field.options.map((o) => {
+            const val = typeof o === 'object' ? o.value : o;
+            const label = typeof o === 'object' ? o.label : o;
+            return <option key={val} value={val}>{label}</option>;
+          })}
+        </select>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-1">
+      <label className="text-[11px] font-semibold uppercase tracking-widest text-on-surface-variant">{field.label}</label>
+      <div className="flex items-center gap-1 bg-surface-container-low border border-outline-variant/20 rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-secondary/30">
+        {field.prefix && <span className="text-sm font-semibold text-primary">{field.prefix}</span>}
+        <input
+          type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+          value={form[key] ?? ''}
+          onChange={(e) => onChange(key, field.type === 'number' ? e.target.value : e.target.value)}
+          onBlur={(e) => onBlur(key, field.type === 'number' ? (e.target.value ? Number(e.target.value) : null) : e.target.value)}
+          className="flex-1 text-sm font-semibold text-primary bg-transparent outline-none min-w-0"
+        />
+      </div>
+    </div>
+  );
+}
+
+export default function TransactionWorkspace({
+  transaction,
+  checklists = [],
+  parties: partiesProp = [],
+  tasks,
+  activities,
+  users,
+  onSaveTransaction,
+  onSaveParties,
+  onTaskUpdate,
+  onTaskDelete,
+  onAddComment,
+  onRefreshActivities,
+  onDeleteTransaction,
+}) {
+  const [view, setView] = useState('details');
+  const [activeChecklistId, setActiveChecklistId] = useState(null);
+  const [form, setForm] = useState({ ...transaction });
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [editTask, setEditTask] = useState(null);
+  const [comment, setComment] = useState('');
+  const [savingTx, setSavingTx] = useState(false);
+  const [savedMsg, setSavedMsg] = useState('');
+
+  useEffect(() => {
+    const representing = normalizeRepresenting(transaction.representing);
+    setForm({
+      ...transaction,
+      representing,
+      sale_type: normalizeSaleType(transaction.sale_type, representing),
+    });
+  }, [transaction]);
+
+  const sidebarChecklists = checklists.length > 0
+    ? checklists
+    : (transaction.template_name && transaction.checklist_template_id
+      ? [{ id: transaction.checklist_template_id, name: transaction.template_name }]
+      : []);
+
+  useEffect(() => {
+    const lists = checklists.length > 0
+      ? checklists
+      : (transaction.template_name && transaction.checklist_template_id
+        ? [{ id: transaction.checklist_template_id, name: transaction.template_name }]
+        : []);
+    setActiveChecklistId((prev) => {
+      if (prev && lists.some((c) => Number(c.id) === Number(prev))) return prev;
+      return lists[0]?.id ?? null;
+    });
+  }, [checklists, transaction.checklist_template_id, transaction.template_name]);
+
+  const checklistTasks = tasks.filter((t) => {
+    if (!activeChecklistId) return true;
+    if (t.template_id == null) return sidebarChecklists.length <= 1;
+    return Number(t.template_id) === Number(activeChecklistId);
+  });
+
+  const activeChecklistName = sidebarChecklists.find((c) => Number(c.id) === Number(activeChecklistId))?.name
+    || transaction.template_name
+    || 'Tasks';
+
+  useEffect(() => {
+    if (view !== 'checklist') return;
+    if (checklistTasks.length && !selectedTask) setSelectedTask(checklistTasks[0]);
+    if (selectedTask && !checklistTasks.find((t) => t.id === selectedTask.id)) {
+      setSelectedTask(checklistTasks[0] || null);
+    }
+  }, [checklistTasks, selectedTask, view]);
+
+  async function saveTransaction(updates) {
+    setSavingTx(true);
+    setSavedMsg('');
+    const payload = { ...form, ...updates };
+    const result = await onSaveTransaction(payload);
+    setSavingTx(false);
+    if (result?.tasksRecalculated) {
+      setSavedMsg(`Saved · ${result.tasksRecalculated} task due dates updated`);
+    } else {
+      setSavedMsg('Saved');
+    }
+    setTimeout(() => setSavedMsg(''), 4000);
+  }
+
+  function handleFieldChange(key, value) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleFieldBlur(key, value) {
+    if (transaction[key] === value || (transaction[key] == null && value === '')) return;
+    saveTransaction({ [key]: value === '' ? null : value });
+  }
+
+  function handleSelectChange(key, value) {
+    if (key === 'representing') {
+      const normalized = normalizeRepresenting(value);
+      const { updates, patch } = datesToClearOnRepresentingChange(form, normalized);
+      const sale_type = saleTypeForRepresenting(normalized);
+      const payload = { [key]: value, sale_type, ...updates };
+      setForm((prev) => ({ ...prev, [key]: value, sale_type, ...patch }));
+      saveTransaction(payload);
+      return;
+    }
+    setForm((prev) => ({ ...prev, [key]: value }));
+    saveTransaction({ [key]: value });
+  }
+
+  async function toggleTask(task) {
+    const updated = await onTaskUpdate(task.id, {
+      status: task.status === 'complete' ? 'pending' : 'complete',
+    });
+    if (updated) setSelectedTask(updated);
+    onRefreshActivities();
+  }
+
+  async function saveTaskEdit(data) {
+    const updated = await onTaskUpdate(editTask.id, data);
+    setEditTask(null);
+    if (updated) setSelectedTask(updated);
+    onRefreshActivities();
+  }
+
+  async function submitComment(e) {
+    e.preventDefault();
+    if (!comment.trim()) return;
+    await onAddComment(comment.trim());
+    setComment('');
+    onRefreshActivities();
+  }
+
+  const doneCount = checklistTasks.filter((t) => t.status === 'complete').length;
+  const progressPct = checklistTasks.length ? Math.round((doneCount / checklistTasks.length) * 100) : 0;
+  const { street, cityLine } = parseTransactionAddress({
+    address: form.address,
+    city: form.city,
+    state: form.state,
+    zip: form.zip,
+  });
+  const openTasks = tasks.filter((t) => t.status !== 'complete').length;
+  const timelineDates = getTimelineSteps(form.representing);
+  const timelineKeySet = new Set(getTimelineDateKeys(form.representing));
+  const visibleExtraFields = EXTRA_FIELDS.filter((f) => !timelineKeySet.has(f.key));
+  const txProgress = timelineProgress(form, form.representing);
+  const representingDisplay = representingLabel(form.representing);
+
+  const dashboardHeader = (
+    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-2">
+      <div>
+        <div className="flex items-center gap-2 text-xs text-on-surface-variant mb-1 uppercase tracking-widest font-semibold">
+          <Link to="/transactions" className="hover:text-secondary">Transactions</Link>
+          <Icon name="chevron_right" className="!text-[14px]" />
+          <span className="text-secondary font-bold">{street?.toUpperCase()}</span>
+        </div>
+        <h2 className="text-3xl font-semibold text-primary tracking-tight">Transaction Dashboard</h2>
+        {savedMsg && <p className="text-xs text-secondary mt-1 font-semibold">{savedMsg}</p>}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <span className="px-3 py-1 bg-secondary-container/30 text-secondary border border-secondary/20 rounded-full text-xs font-semibold uppercase tracking-wide">
+          {stageBadge(transaction.stage)}
+        </span>
+        {openTasks > 0 && (
+          <span className="px-3 py-1 bg-primary-container text-white rounded-full text-xs font-semibold uppercase tracking-wide">
+            {openTasks} OPEN TASKS
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-1 min-h-0 overflow-hidden bg-surface">
+      <aside className="w-56 shrink-0 bg-surface-container-lowest border-r border-outline-variant/10 flex flex-col overflow-y-auto custom-scrollbar">
+        <div className="p-4 border-b border-outline-variant/10">
+          <Link to="/transactions" className="text-xs font-bold text-secondary hover:underline flex items-center gap-1 mb-4">
+            <Icon name="arrow_back" className="!text-[14px]" /> BACK
+          </Link>
+          <p className="text-sm font-semibold text-primary leading-snug">{street}</p>
+          {cityLine && <p className="text-xs text-on-surface-variant mt-0.5">{cityLine}</p>}
+          <span className="inline-block mt-2 px-2 py-0.5 text-[10px] font-bold uppercase bg-secondary-container/40 text-secondary rounded-full">
+            {transaction.stage || 'active'}
+          </span>
+        </div>
+
+        <div className="p-3">
+          <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest px-2 mb-2">Checklists</p>
+          {sidebarChecklists.length > 0 ? (
+            <div className="space-y-1">
+              {sidebarChecklists.map((cl) => (
+                <button
+                  key={cl.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveChecklistId(cl.id);
+                    setView('checklist');
+                  }}
+                  className={`w-full text-left px-2 py-2 text-sm rounded truncate ${
+                    view === 'checklist' && Number(activeChecklistId) === Number(cl.id)
+                      ? 'bg-primary-container text-white font-semibold'
+                      : 'text-primary hover:bg-surface-container-low'
+                  }`}
+                >
+                  {cl.name}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-on-surface-variant px-2">No checklist applied</p>
+          )}
+        </div>
+
+        <div className="p-3 border-t border-outline-variant/10 mt-auto flex flex-col gap-3">
+          <div>
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest px-2 mb-2">Assets</p>
+            {ASSET_VIEWS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setView(item.key)}
+                className={`w-full flex items-center gap-2 px-2 py-2 text-sm rounded ${view === item.key ? 'bg-primary-container text-white font-semibold' : 'text-on-surface-variant hover:bg-surface-container-low hover:text-primary'}`}
+              >
+                <Icon name={item.icon} className="!text-[16px]" />
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[9px] text-on-surface-variant/35 px-2 pb-1 tabular-nums">
+            TR-{transaction.id}
+          </p>
+        </div>
+      </aside>
+
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {view === 'details' && (
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
+            {dashboardHeader}
+
+            <div className="grid grid-cols-12 gap-6 items-start">
+              <div className="col-span-12 lg:col-span-5 space-y-5">
+                <div className="rounded-xl overflow-hidden shadow-executive border border-secondary/20 bg-gradient-to-br from-primary-container via-primary-container to-secondary/90 text-white">
+                  <div className="p-6">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-secondary/90 mb-1">
+                      {representingDisplay}
+                    </p>
+                    <p className="text-xl font-semibold leading-snug">{street || '—'}</p>
+                    {cityLine && <p className="text-white/75 text-sm mt-1">{cityLine}</p>}
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase bg-white/15 rounded-full">
+                        {stageBadge(transaction.stage)}
+                      </span>
+                      {txProgress > 0 && (
+                        <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase bg-secondary/30 text-white rounded-full">
+                          {txProgress}% dates set
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive border-l-4 border-l-secondary">
+                  <div className="flex items-center justify-between gap-2 mb-5">
+                    <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                      Critical Dates Timeline
+                    </h3>
+                    <span className="text-[10px] font-bold text-secondary tabular-nums">{txProgress}%</span>
+                  </div>
+                  <div className="relative pl-1">
+                    <div
+                      className="absolute left-[19px] top-3 bottom-3 w-0.5 bg-outline-variant/25 rounded-full"
+                      aria-hidden
+                    />
+                    <div
+                      className="absolute left-[19px] top-3 w-0.5 bg-secondary rounded-full transition-all duration-300"
+                      style={{ height: `${txProgress}%` }}
+                      aria-hidden
+                    />
+                    <ul className="space-y-5 relative z-10">
+                      {timelineDates.map((item, i) => {
+                        const hasDate = Boolean(form[item.key]);
+                        const stepDone = hasDate && txProgress >= Math.round(((i + 1) / timelineDates.length) * 100);
+                        return (
+                          <li key={item.key} className="flex gap-4 items-start">
+                            <div
+                              className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center border-2 shadow-sm ${
+                                hasDate
+                                  ? stepDone
+                                    ? 'bg-secondary border-secondary text-white'
+                                    : 'bg-secondary/20 border-secondary text-secondary'
+                                  : 'bg-surface border-outline-variant/40 text-outline-variant'
+                              }`}
+                            >
+                              <Icon name={item.icon} className="!text-[18px]" />
+                            </div>
+                            <div className="flex-1 min-w-0 pt-0.5">
+                              <p className="text-xs font-bold text-primary leading-snug">{item.label}</p>
+                              <input
+                                type="date"
+                                value={form[item.key] || ''}
+                                onChange={(e) => handleFieldChange(item.key, e.target.value)}
+                                onBlur={(e) => handleFieldBlur(item.key, e.target.value || null)}
+                                className="mt-1.5 w-full text-sm text-primary bg-surface-container-low border border-outline-variant/20 rounded-lg px-3 py-2 focus:ring-2 focus:ring-secondary/30 outline-none"
+                              />
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-span-12 lg:col-span-7">
+                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive h-full">
+                  <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-6">
+                    Transaction Details
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    {visibleExtraFields.map((field) => (
+                      <EditableField
+                        key={field.key}
+                        field={field}
+                        form={form}
+                        transaction={transaction}
+                        onChange={field.type === 'select' ? handleSelectChange : handleFieldChange}
+                        onBlur={handleFieldBlur}
+                      />
+                    ))}
+                  </div>
+                  {savingTx && <p className="text-xs text-on-surface-variant mt-4">Saving…</p>}
+
+                  <div className="mt-8 pt-8 border-t border-outline-variant/15">
+                    <PartiesToTransaction
+                      parties={partiesProp}
+                      transaction={transaction}
+                      onSave={onSaveParties}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-span-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-tertiary-container/10 text-tertiary rounded-full flex items-center justify-center">
+                      <Icon name="description" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold">Checklist Tasks</p>
+                      <p className="text-xl font-semibold text-primary">{checklistTasks.length} Total</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-secondary/10 text-secondary rounded-full flex items-center justify-center">
+                      <Icon name="speed" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold">Progress</p>
+                      <p className="text-xl font-semibold text-primary">{progressPct}% Complete</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6 bg-primary-container text-white rounded-xl shadow-executive">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                      <Icon name="notifications_active" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-white/70 uppercase tracking-widest font-semibold">Next Deadline</p>
+                      <p className="text-lg font-semibold leading-snug whitespace-nowrap">{nextDeadlineLabel(tasks, transaction)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {view === 'checklist' && (
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-6">
+            {dashboardHeader}
+            <div className="grid grid-cols-12 gap-6">
+              <div className="col-span-12 lg:col-span-8">
+                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive flex flex-col max-h-[calc(100vh-280px)]">
+                  <div className="p-6 border-b border-outline-variant/10 flex justify-between items-center shrink-0">
+                    <div>
+                      <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                        Checklist: {activeChecklistName}
+                      </h3>
+                      <p className="text-[11px] text-on-surface-variant mt-1">{doneCount} of {checklistTasks.length} Tasks Completed</p>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar min-h-0">
+                    {checklistTasks.length === 0 ? (
+                      <p className="text-sm text-on-surface-variant text-center py-8">No tasks on this checklist.</p>
+                    ) : (
+                      checklistTasks.map((task) => {
+                        const isComplete = task.status === 'complete';
+                        const isOverdue = task.is_overdue && !isComplete;
+                        const isActive = selectedTask?.id === task.id;
+                        return (
+                          <div
+                            key={task.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setSelectedTask(task)}
+                            onKeyDown={(e) => e.key === 'Enter' && setSelectedTask(task)}
+                            className={`flex items-center gap-4 p-4 rounded-lg border transition-colors group cursor-pointer ${
+                              isActive
+                                ? 'bg-primary-container/[0.03] border-primary-container/10'
+                                : isOverdue
+                                  ? 'bg-red-50/50 border-red-200'
+                                  : 'hover:bg-surface-container-low border-outline-variant/5'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isComplete}
+                              onChange={(e) => { e.stopPropagation(); toggleTask(task); }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-5 h-5 rounded text-secondary focus:ring-secondary border-outline-variant shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-bold ${isComplete ? 'line-through opacity-50' : 'text-on-surface'} ${isOverdue ? 'text-red-600' : ''}`}>
+                                {task.title}
+                              </p>
+                              <div className="flex flex-nowrap items-center gap-2 mt-1 overflow-hidden">
+                                {task.due_date && (
+                                  <span className={`text-[10px] flex items-center gap-1 whitespace-nowrap shrink-0 ${isOverdue ? 'text-red-600 font-bold' : 'text-on-surface-variant'}`}>
+                                    <Icon name="calendar_month" className="!text-[12px]" />
+                                    {isOverdue ? 'Overdue · ' : 'Due '}
+                                    <DateText value={task.due_date} />
+                                  </span>
+                                )}
+                                {task.user_name && (
+                                  <span className="text-[10px] text-on-surface-variant">Assigned: {task.user_name}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setEditTask(task); }}
+                                className="p-1 hover:bg-surface-container-highest rounded"
+                              >
+                                <Icon name="edit" className="!text-[18px]" />
+                              </button>
+                            </div>
+                            {isComplete && (
+                              <p className="text-[11px] text-on-surface-variant font-bold uppercase shrink-0">Completed</p>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {selectedTask && (
+                <aside className="col-span-12 lg:col-span-4">
+                  <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive sticky top-0">
+                    <h3 className="text-base font-bold text-primary leading-snug">{selectedTask.title}</h3>
+                    <dl className="mt-4 space-y-3 text-sm">
+                      <div>
+                        <dt className="text-xs text-on-surface-variant uppercase tracking-wide">Assigned to</dt>
+                        <dd className="font-semibold mt-0.5">{selectedTask.user_name || 'Unassigned'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-on-surface-variant uppercase tracking-wide">Due</dt>
+                        <dd className="font-semibold mt-0.5">
+                          <DateText value={selectedTask.due_date} />
+                        </dd>
+                      </div>
+                    </dl>
+                    <div className="flex flex-wrap gap-2 mt-6">
+                      <button
+                        type="button"
+                        onClick={() => toggleTask(selectedTask)}
+                        className="px-3 py-1.5 text-xs font-bold border border-outline-variant/30 rounded-lg hover:bg-surface-container-low"
+                      >
+                        {selectedTask.status === 'complete' ? 'Mark pending' : 'Mark completed'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditTask(selectedTask)}
+                        className="px-3 py-1.5 text-xs font-bold border border-outline-variant/30 rounded-lg hover:bg-surface-container-low"
+                      >
+                        Edit task
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (window.confirm('Delete this task?')) {
+                            await onTaskDelete(selectedTask.id);
+                            setSelectedTask(null);
+                          }
+                        }}
+                        className="px-3 py-1.5 text-xs font-bold text-error border border-error/30 rounded-lg hover:bg-error/5"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </aside>
+              )}
+            </div>
+          </div>
+        )}
+
+        {view === 'activity' && (
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-6">
+            {dashboardHeader}
+            <div className="grid grid-cols-12 gap-6">
+              <div className="col-span-12 lg:col-span-8">
+                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">Transaction Activity</h3>
+                  </div>
+                  <div className="space-y-6">
+                    {activities.length === 0 ? (
+                      <p className="text-sm text-on-surface-variant">No activity yet.</p>
+                    ) : (
+                      activities.map((a) => (
+                        <div key={a.id} className="border-b border-outline-variant/10 pb-4 last:border-0">
+                          <p className="text-sm">
+                            <span className="font-bold text-primary">{a.user_name || 'System'}</span>
+                            {' '}{activityLabel(a.event_type).toLowerCase()}
+                          </p>
+                          <DateText value={a.created_at?.slice(0, 10)} className="text-xs text-on-surface-variant mt-1 block" />
+                          {a.detail && (
+                            <p className="text-sm text-on-surface-variant mt-2 whitespace-pre-wrap bg-surface-container-low rounded-lg p-3">
+                              {a.detail}
+                            </p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+              <aside className="col-span-12 lg:col-span-4">
+                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive">
+                  <form onSubmit={submitComment}>
+                    <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Comments</label>
+                    <textarea
+                      id="tx-comment"
+                      rows={5}
+                      value={comment}
+                      onChange={(e) => setComment(e.target.value)}
+                      placeholder="Type comment here…"
+                      className="w-full mt-2 px-3 py-2 text-sm border border-outline-variant/30 rounded-lg resize-none focus:ring-2 focus:ring-secondary/30 outline-none"
+                    />
+                    <button type="submit" className="mt-3 w-full py-2.5 text-xs font-bold bg-primary-container text-white rounded-lg hover:brightness-110">
+                      Post comment
+                    </button>
+                  </form>
+
+                  {onDeleteTransaction && (
+                    <div className="mt-6 pt-6 border-t border-error/20">
+                      <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3">
+                        Danger zone
+                      </p>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const label = street || transaction.address || 'this transaction';
+                          if (!window.confirm(
+                            `Remove ${label}? All tasks and activity for this transaction will be permanently deleted.`,
+                          )) return;
+                          await onDeleteTransaction();
+                        }}
+                        className="w-full py-2.5 text-xs font-bold text-error border border-error/30 rounded-lg hover:bg-error/5 transition-colors"
+                      >
+                        Remove transaction
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </aside>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {editTask && (
+        <EditTaskModal
+          task={editTask}
+          users={users}
+          onClose={() => setEditTask(null)}
+          onSave={saveTaskEdit}
+        />
+      )}
+    </div>
+  );
+}
