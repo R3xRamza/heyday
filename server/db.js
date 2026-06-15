@@ -7,7 +7,7 @@ import { seedBrokermintData } from './seed-data.js';
 import { splitCombinedAddresses } from './lib/address.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, '..', 'heyday.db');
+const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'heyday.db');
 
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
