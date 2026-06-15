@@ -5,7 +5,7 @@ Real estate operations platform — Express/SQLite API + React/Vite SPA.
 ## Status (updated 2026-06-15)
 
 **Production:** Live on [Railway](https://railway.app) at `https://heyday-production-ce72.up.railway.app`  
-**Source:** [github.com/R3xRamza/heyday](https://github.com/R3xRamza/heyday)  
+**Source:** [github.com/R3xRamza/heyday](https://github.com/R3xRamza/heyday) (`main` synced)  
 **Stage:** Team is starting real use. Persistent DB via Railway Volume + `DATABASE_PATH`.
 
 ### What works
@@ -13,9 +13,10 @@ Real estate operations platform — Express/SQLite API + React/Vite SPA.
 | Area | Status |
 |------|--------|
 | Auth (JWT cookie) | ✅ |
-| CRM / contacts | ✅ |
-| Tasks (team + per-user) | ✅ |
+| CRM / contacts (birthday, anniversary) | ✅ |
+| Tasks (team + per-user + calendar) | ✅ |
 | Transactions + checklists | ✅ |
+| Checklist template editor (nicknames, assignees) | ✅ |
 | Marketing Calendar | ✅ |
 | Revenue / Team ops | ✅ |
 | Gmail CRM sync | Optional (OAuth env vars) |
@@ -80,9 +81,9 @@ SQLite defaults to `heyday.db` in the project root locally. On Railway, attach a
 ## Changelog — 2026-06-15
 
 ### Deploy & infrastructure
-- Pushed repo to GitHub (`R3xRamza/heyday`)
-- Added `railway.toml` for consistent Railway builds
-- Added `DATABASE_PATH` env support in `server/db.js` for persistent SQLite on volumes
+- Repo on GitHub (`R3xRamza/heyday`); `main` includes latest features
+- `railway.toml` for consistent Railway builds
+- `DATABASE_PATH` env support in `server/db.js` for persistent SQLite on volumes
 
 ### Sidebar & layout
 - Collapsible sidebar (260px ↔ 72px) with `SidebarContext` + `localStorage` (`sidebar-collapsed-v1`)
@@ -90,9 +91,23 @@ SQLite defaults to `heyday.db` in the project root locally. On Railway, attach a
 - Task Hub `NavLink` uses `end` so “My tasks” (`/tasks/:userId`) does not also highlight Task Hub
 - Sidebar nav label: **Marketing**; page TopNav title: **Marketing Calendar**
 
+### Checklist template editor (`/checklists`)
+- Multi-line **Full title** textarea per template task
+- **Calendar nickname** field — short labels for calendar chips (auto-generated on migrate via `deriveNickname.js`)
+- **Default assignee** dropdown per task (Tessa/Adam/Margaret/Meredith by role → `default_role`)
+- Nicknames display on Marketing Calendar and Task Hub calendar via `template_tasks.calendar_nickname` join
+
 ### Marketing Calendar
-- Day cells render **Social → Tasks → Milestones** (was Tasks → Social)
-- Friday toolbar milestones popover: fetches Fri–Sun; Friday items, separator, then weekend; button “{n} upcoming” on Fridays
+- Day cells render **Social → Tasks → Milestones**
+- Friday toolbar milestones popover: Fri celebrations, separator, weekend; **Birthdays** button with empty state
+- **Month birthday planner** (`MonthBirthdaysModal`): pin which CRM birthdays show on grid; add birthday from CRM search
+- `marketing_birthday_pins` table + `GET/PUT /api/marketing/birthday-pins`
+- Double-click empty day cell → new post modal with date pre-filled
+- Social post **done** status (crossed-out chips in grid)
+- Task chips use calendar nickname when set
+
+### CRM
+- `PATCH /api/crm/:id` accepts `birthday` and `anniversary` for contact edits from marketing modals
 
 ## Project layout
 

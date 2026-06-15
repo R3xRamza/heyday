@@ -38,6 +38,7 @@ alwaysApply: true
 - `client/src/pages/` — screen-level components
 - `client/src/components/` — shared UI (Sidebar, DashboardLayout, TopNav, marketing/*, etc.)
 - `client/src/context/SidebarContext.jsx` — collapsible sidebar state (`sidebar-collapsed-v1`)
+- `client/src/utils/taskDisplay.js` — `displayTaskTitle(task)` (calendar nickname || title)
 - `client/src/utils/format.js` — formatDate, formatCurrency, shortAddress, DateText pattern
 - `client/src/index.css` — global + `.calendar-grid` (7 cols), `.marketing-calendar-*` styles
 
@@ -55,8 +56,8 @@ alwaysApply: true
 - `/api/crm` — contacts (FUB import fields: birthday, anniversary, etc.)
 - `/api/tasks` — team tasks; query: `assigned_to`, `transaction_id`, `due_after`, `due_before`, `transaction_only`
 - `/api/transactions` — CRUD, parties, activity, checklists, DELETE (delete activity before tasks — FK)
-- `/api/marketing` — calendar posts, platform-goals, birthdays range
-- `/api/checklists` — template + template_tasks CRUD
+- `/api/marketing` — calendar posts, platform-goals, birthdays range, birthday-pins
+- `/api/checklists` — template + template_tasks CRUD (`calendar_nickname`, `default_role`)
 
 ## AUTH
 
@@ -95,6 +96,14 @@ alwaysApply: true
 - `contacts` table with birthday, anniversary (recurring month-day)
 - Contact detail at `/crm/:id`
 
+## DOMAIN — Checklists
+
+- Page: `/checklists` — `ChecklistEditor.jsx`
+- `template_tasks`: title, timing_*, `default_role`, `calendar_nickname`, sort_order
+- UI: multi-line title, nickname input, default assignee select (team roles), timing row (days / before|after / anchor)
+- `server/lib/deriveNickname.js` — auto-generates short nicknames from titles on migrate/seed
+- Applied tasks inherit assignee via `applyChecklists.js` + `default_role`; calendar display joins nickname from `template_tasks`
+
 ## DOMAIN — Marketing Calendar (DONE)
 
 - Page: `/marketing` — `MarketingCalendar.jsx` + `client/src/components/marketing/*`
@@ -103,16 +112,20 @@ alwaysApply: true
 - Calendar: Sun–Sat grid; social post drag-and-drop reschedule; platform filter; category pills (Social | Tasks | Milestones)
 - Day cell order: **Social → Tasks → Milestones** (`MarketingDayEvents.jsx`)
 - Friday toolbar milestones popover: Fri celebrations, separator, Sat+Sun (`partitionFridayCelebrations`, fetch through Sunday)
-- Social posts: platform-colored chips; `PATCH /api/marketing/posts/:id` for date moves
-- Tasks: Adam-assigned transaction tasks only; grey task chips; complete via `MarketingTaskModal`
-- Data: `marketing_posts`, `marketing_platform_goals`, CRM birthdays/anniversaries, `GET /api/tasks` (assigned_to + date range)
+- **Birthdays** toolbar button always visible; empty state when none today; **Plan {Mon} birthdays** opens `MonthBirthdaysModal`
+- Birthday pins: `marketing_birthday_pins` (month + contact_id); only pinned CRM birthdays render on grid when Milestones on
+- Double-click day cell → `MarketingPostModal` (new post, date pre-filled)
+- Social posts: platform-colored chips; `status: done` shows crossed-out; `PATCH /api/marketing/posts/:id` for date/status
+- Tasks: Adam-assigned transaction tasks; grey chips; nickname via `displayTaskTitle`; complete via `MarketingTaskModal`
+- Data: `marketing_posts`, `marketing_platform_goals`, `marketing_birthday_pins`, CRM birthdays/anniversaries, `GET /api/tasks` (assigned_to + date range)
 - localStorage: `marketing-categories-v4`, `marketing-platform-filter-v1`, `marketing-quota-slots-v1`, `marketing-goals-collapsed-v1`, `sidebar-collapsed-v1`
 
 ## RECENT (2026-06-15)
 
-- Railway deploy + GitHub; `railway.toml`; `DATABASE_PATH` for volume persistence
+- `main` on GitHub synced with production deploy
+- Checklist editor: nicknames, default assignee, multi-line titles
+- Marketing: birthday planner/pins, double-click new post, social done chips, task nicknames on calendar
 - Collapsible sidebar + compact footer/logout
-- Marketing calendar: social-first day cells; Friday milestone popover grouping
 - Team logins: admin `admin123`; team `heyday123` (see README.md)
 
 ## CODE CONVENTIONS
