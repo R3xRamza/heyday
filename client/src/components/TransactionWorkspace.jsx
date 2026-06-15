@@ -4,12 +4,11 @@ import Icon from './shared/Icon';
 import EditTaskModal from './EditTaskModal';
 import PartiesToTransaction from './PartiesToTransaction';
 import DateText from './shared/DateText';
-import { formatCurrency, formatDate, parseTransactionAddress } from '../utils/format';
+import { formatCurrency, parseTransactionAddress } from '../utils/format';
 import {
   REPRESENTING_OPTIONS,
   normalizeRepresenting,
   representingLabel,
-  showsOptionEndDate,
   getTimelineSteps,
   getTimelineDateKeys,
   datesToClearOnRepresentingChange,
@@ -62,34 +61,13 @@ function stageBadge(stage) {
   return 'ACTIVE ESCROW';
 }
 
-function timelineProgress(form, representing) {
-  const keys = getTimelineDateKeys(representing);
-  const set = keys.filter((k) => form[k]).length;
-  return keys.length ? Math.round((set / keys.length) * 100) : 0;
-}
-
-function nextDeadlineLabel(tasks, transaction) {
-  const open = tasks.filter((t) => t.status !== 'complete' && t.due_date);
-  if (open.length === 0) {
-    if (showsOptionEndDate(transaction.representing) && transaction.option_end_date) {
-      return `Option: ${formatDate(transaction.option_end_date)}`;
-    }
-    if (transaction.important_date) return `Expires: ${formatDate(transaction.important_date)}`;
-    return '—';
-  }
-  open.sort((a, b) => a.due_date.localeCompare(b.due_date));
-  const next = open[0];
-  if (next.is_overdue) return `Overdue: ${next.title.slice(0, 28)}…`;
-  return `Due ${formatDate(next.due_date)}`;
-}
-
 function EditableField({ field, form, transaction, onChange, onBlur }) {
   const key = field.key;
   if (field.type === 'readonly-date') {
     return (
-      <div className="space-y-1">
-        <label className="text-[11px] font-semibold uppercase tracking-widest text-on-surface-variant">{field.label}</label>
-        <DateText value={transaction.created_at?.slice(0, 10)} className="text-sm font-semibold text-primary" />
+      <div className="flex flex-col gap-1.5">
+        <label className="block text-[11px] font-semibold uppercase tracking-widest text-on-surface-variant">{field.label}</label>
+        <DateText value={transaction.created_at?.slice(0, 10)} className="block text-sm font-semibold text-primary" />
       </div>
     );
   }
@@ -269,7 +247,6 @@ export default function TransactionWorkspace({
   const timelineDates = getTimelineSteps(form.representing);
   const timelineKeySet = new Set(getTimelineDateKeys(form.representing));
   const visibleExtraFields = EXTRA_FIELDS.filter((f) => !timelineKeySet.has(f.key));
-  const txProgress = timelineProgress(form, form.representing);
   const representingDisplay = representingLabel(form.representing);
 
   const dashboardHeader = (
@@ -376,48 +353,32 @@ export default function TransactionWorkspace({
                       <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase bg-white/15 rounded-full">
                         {stageBadge(transaction.stage)}
                       </span>
-                      {txProgress > 0 && (
-                        <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase bg-secondary/30 text-white rounded-full">
-                          {txProgress}% dates set
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive border-l-4 border-l-secondary">
-                  <div className="flex items-center justify-between gap-2 mb-5">
-                    <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
-                      Critical Dates Timeline
-                    </h3>
-                    <span className="text-[10px] font-bold text-secondary tabular-nums">{txProgress}%</span>
-                  </div>
+                  <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-5">
+                    Critical Dates Timeline
+                  </h3>
                   <div className="relative pl-1">
                     <div
-                      className="absolute left-[19px] top-3 bottom-3 w-0.5 bg-outline-variant/25 rounded-full"
-                      aria-hidden
-                    />
-                    <div
-                      className="absolute left-[19px] top-3 w-0.5 bg-secondary rounded-full transition-all duration-300"
-                      style={{ height: `${txProgress}%` }}
+                      className="absolute left-[19px] top-5 bottom-5 w-0.5 bg-outline-variant/25 rounded-full"
                       aria-hidden
                     />
                     <ul className="space-y-5 relative z-10">
-                      {timelineDates.map((item, i) => {
+                      {timelineDates.map((item) => {
                         const hasDate = Boolean(form[item.key]);
-                        const stepDone = hasDate && txProgress >= Math.round(((i + 1) / timelineDates.length) * 100);
                         return (
                           <li key={item.key} className="flex gap-4 items-start">
                             <div
                               className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center border-2 shadow-sm ${
                                 hasDate
-                                  ? stepDone
-                                    ? 'bg-secondary border-secondary text-white'
-                                    : 'bg-secondary/20 border-secondary text-secondary'
+                                  ? 'bg-secondary border-secondary text-white'
                                   : 'bg-surface border-outline-variant/40 text-outline-variant'
                               }`}
                             >
-                              <Icon name={item.icon} className="!text-[18px]" />
+                              <Icon name={item.icon} filled={hasDate} className="!text-[18px]" />
                             </div>
                             <div className="flex-1 min-w-0 pt-0.5">
                               <p className="text-xs font-bold text-primary leading-snug">{item.label}</p>
@@ -444,14 +405,15 @@ export default function TransactionWorkspace({
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     {visibleExtraFields.map((field) => (
-                      <EditableField
-                        key={field.key}
-                        field={field}
-                        form={form}
-                        transaction={transaction}
-                        onChange={field.type === 'select' ? handleSelectChange : handleFieldChange}
-                        onBlur={handleFieldBlur}
-                      />
+                      <div key={field.key} className={field.key === 'created_at' ? 'sm:col-span-2' : undefined}>
+                        <EditableField
+                          field={field}
+                          form={form}
+                          transaction={transaction}
+                          onChange={field.type === 'select' ? handleSelectChange : handleFieldChange}
+                          onBlur={handleFieldBlur}
+                        />
+                      </div>
                     ))}
                   </div>
                   {savingTx && <p className="text-xs text-on-surface-variant mt-4">Saving…</p>}
@@ -466,7 +428,7 @@ export default function TransactionWorkspace({
                 </div>
               </div>
 
-              <div className="col-span-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-tertiary-container/10 text-tertiary rounded-full flex items-center justify-center">
@@ -486,17 +448,6 @@ export default function TransactionWorkspace({
                     <div>
                       <p className="text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold">Progress</p>
                       <p className="text-xl font-semibold text-primary">{progressPct}% Complete</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-6 bg-primary-container text-white rounded-xl shadow-executive">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                      <Icon name="notifications_active" />
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-white/70 uppercase tracking-widest font-semibold">Next Deadline</p>
-                      <p className="text-lg font-semibold leading-snug whitespace-nowrap">{nextDeadlineLabel(tasks, transaction)}</p>
                     </div>
                   </div>
                 </div>

@@ -9,6 +9,7 @@ alwaysApply: false
 - Pages in `client/src/pages/`; feature components in `client/src/components/`
 - Wrap authenticated screens in `ProtectedRoute`; use `DashboardLayout` for app shell
 - Shared: `Icon` (Material Symbols), `DateText`, `format.js` helpers
+- Task calendar labels: `displayTaskTitle()` from `client/src/utils/taskDisplay.js` (nickname || title)
 - Calendar grids: `.calendar-grid` in `index.css` — `grid-template-columns: repeat(7, 1fr)`; header row must also be 7 columns (`grid-cols-7`)
 - Avoid `overflow-hidden` on calendar wrapper if it clips the Saturday column
 
@@ -21,7 +22,16 @@ Add new routes in `App.jsx` and nav in `Sidebar.jsx` when creating pages.
 - Task Hub `NavLink` has `end={taskHub}` so `/tasks/:userId` only highlights “My tasks”
 - Footer: compact user + small logout; collapsed = avatar + icon logout
 
+## Checklist editor (`ChecklistEditor.jsx`)
+
+- Task card: textarea full title, nickname input, default assignee select, timing row (days / when / anchor)
+- Timing grid: `sm:grid-cols-12` — nickname 3, assignee 3, days 1, when 2, anchor 3
+- Save sends `calendar_nickname` + `default_role` to checklists API
+
 ## Marketing calendar
 
 - `MarketingDayEvents` section order: Social → Tasks → Milestones
 - `fridayCelebrationFetchEnd` / `partitionFridayCelebrations` in `calendarUtils.js` for toolbar popover
+- `MonthBirthdaysModal` — pin CRM birthdays per month; add birthday via CRM search + `PATCH /api/crm/:id`
+- Double-click day cell (empty area) → new post modal; chips stop propagation on buttons/links only
+- Marketing page wrapper: `select-none` with `[&_input]:select-text` exception

@@ -15,3 +15,15 @@ alwaysApply: false
 - Activity: `logActivity()` from `server/lib/activity.js`
 
 When adding endpoints, match existing JSON shapes and error `{ error: string }` pattern.
+
+## Checklist templates
+
+- `template_tasks` columns: title, timing_*, sort_order, `default_role`, `calendar_nickname`
+- `server/lib/deriveNickname.js` — short nicknames from titles; backfill via `_migrations` in migrate.js
+- `checklists.js` — CRUD includes nickname + default_role on task POST/PUT
+- `tasks.js` TASK_SELECT joins `tt.calendar_nickname` for calendar display
+
+## Marketing
+
+- `marketing_birthday_pins` — `(month, contact_id)` PK; `GET/PUT /api/marketing/birthday-pins`
+- `PATCH /api/crm/:id` — `birthday`, `anniversary` in PATCH_FIELDS for contact edits from UI
