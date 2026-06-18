@@ -4,6 +4,7 @@ import {
   Users,
   CheckSquare,
   ListTodo,
+  FolderKanban,
   BookUser,
   BarChart2,
   Building2,
@@ -136,14 +137,25 @@ export default function Sidebar() {
               {taskHub && <OverdueBadge count={overdueCount} collapsed={collapsed} />}
             </NavLink>
             {taskHub && user?.id && (
-              <NavLink
-                to={`/tasks/${user.id}`}
-                title={collapsed ? 'My tasks' : undefined}
-                className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
-              >
-                <ListTodo size={collapsed ? 20 : 18} className="shrink-0" />
-                {!collapsed && <span>My tasks</span>}
-              </NavLink>
+              <>
+                <NavLink
+                  to={`/tasks/${user.id}`}
+                  end
+                  title={collapsed ? 'My tasks' : undefined}
+                  className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
+                >
+                  <ListTodo size={collapsed ? 20 : 18} className="shrink-0" />
+                  {!collapsed && <span>My tasks</span>}
+                </NavLink>
+                <NavLink
+                  to={`/tasks/${user.id}/projects`}
+                  title={collapsed ? 'My projects' : undefined}
+                  className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
+                >
+                  <FolderKanban size={collapsed ? 20 : 18} className="shrink-0" />
+                  {!collapsed && <span>My projects</span>}
+                </NavLink>
+              </>
             )}
           </div>
         ))}

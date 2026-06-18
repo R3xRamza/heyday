@@ -176,6 +176,13 @@ export default function TeamTaskOverview() {
                           <div className={`text-[9px] uppercase font-bold ${stats.overdue > 0 ? 'text-error' : 'text-on-surface-variant'}`}>Overdue</div>
                         </div>
                       </div>
+                      <Link
+                        to={`/tasks/${member.id}/projects`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-4 text-sm font-semibold text-secondary hover:underline inline-block"
+                      >
+                        Projects →
+                      </Link>
                     </button>
                   );
                 })}

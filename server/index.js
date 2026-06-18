@@ -17,6 +17,8 @@ import transactionsRoutes from './routes/transactions.js';
 import marketingRoutes from './routes/marketing.js';
 import teamRoutes from './routes/team.js';
 import checklistsRoutes from './routes/checklists.js';
+import projectsRoutes from './routes/projects.js';
+import userTodosRoutes from './routes/user-todos.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -43,6 +45,8 @@ app.use('/api/transactions', authMiddleware, transactionsRoutes);
 app.use('/api/marketing', authMiddleware, marketingRoutes);
 app.use('/api/team', authMiddleware, teamRoutes);
 app.use('/api/checklists', authMiddleware, checklistsRoutes);
+app.use('/api/projects', authMiddleware, projectsRoutes);
+app.use('/api/user-todos', authMiddleware, userTodosRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, '..', 'client', 'dist');

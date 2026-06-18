@@ -107,6 +107,55 @@ export function runMigrations(db) {
   migrateCrmActivityAndGmail(db);
   migrateMarketingTables(db);
   migrateBirthdayPinsTable(db);
+  migrateProjectsTables(db);
+  migrateUserTodosTable(db);
+}
+
+function migrateProjectsTables(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      sort_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS project_checklist_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      notes TEXT,
+      due_date DATE,
+      is_complete INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER DEFAULT 0,
+      completed_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
+    CREATE INDEX IF NOT EXISTS idx_project_checklist_items_project ON project_checklist_items(project_id);
+  `);
+}
+
+function migrateUserTodosTable(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_todos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      notes TEXT,
+      is_complete INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER DEFAULT 0,
+      completed_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_user_todos_user_id ON user_todos(user_id);
+  `);
 }
 
 function backfillTemplateTaskNicknames(db) {

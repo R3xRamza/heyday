@@ -7,6 +7,7 @@ import CreateTaskModal from '../components/CreateTaskModal';
 import { getTeamProfile } from '../data/teamProfiles';
 import TaskCalendarView from '../components/TaskCalendarView';
 import DateText from '../components/shared/DateText';
+import TaskHubPersonHeader from '../components/TaskHubPersonHeader';
 import { shortAddress } from '../utils/format';
 
 const FILTERS = [
@@ -232,22 +233,19 @@ export default function UserTaskDashboard() {
 
   return (
     <DashboardLayout
-      title={member ? `${member.name}'s Tasks` : 'Daily Task Dashboard'}
+      title={member ? `${member.name}'s Task Hub` : 'Task Hub'}
       fillViewport
       className="p-0 overflow-hidden flex flex-col"
     >
-      <section className="bg-surface px-10 py-6 border-b border-outline-variant/20 shrink-0">
-        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-          <div>
-            <Link to="/tasks" className="text-sm text-secondary hover:underline mb-1 inline-block">← Back to Team Overview</Link>
-            <h2 className="text-3xl font-semibold text-primary">Daily Task Dashboard</h2>
-            {member && (
-              <p className="text-on-surface-variant text-sm mt-1">
-                {member.name} · {profile?.role}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
+      <div className="bg-surface border-b border-outline-variant/20 shrink-0">
+        <TaskHubPersonHeader
+          userId={userId}
+          title="Daily Task Dashboard"
+          member={member}
+          profile={profile}
+          showBorder={false}
+        >
+          <div className="flex items-center gap-2 flex-wrap mb-6">
             {FILTERS.map((f) => (
               <button
                 key={f.key}
@@ -267,9 +265,9 @@ export default function UserTaskDashboard() {
               </button>
             ))}
           </div>
-        </div>
+        </TaskHubPersonHeader>
 
-        <div className="grid grid-cols-3 gap-6">
+        <div className="px-10 pb-6 grid grid-cols-3 gap-6">
           {statCards.map((card) => {
             const active = summaryFilter === card.key;
             return (
@@ -292,7 +290,7 @@ export default function UserTaskDashboard() {
             );
           })}
         </div>
-      </section>
+      </div>
 
       <div className="flex-1 flex overflow-hidden min-h-0">
         <section className="flex-1 overflow-y-auto custom-scrollbar bg-surface-container-lowest">
@@ -325,20 +323,21 @@ export default function UserTaskDashboard() {
               </button>
             </div>
           ) : (
+            <div className="m-6 bg-white border border-outline-variant/20 rounded-xl shadow-executive overflow-hidden">
             <table className="w-full text-left border-separate border-spacing-0">
-              <thead className="sticky top-0 bg-surface/95 backdrop-blur-sm z-10">
+              <thead className="sticky top-0 bg-surface-container-low z-10">
                 <tr>
                   {['', 'Task Description', 'Context / Property', 'Due Date', ''].map((h, i) => (
                     <th
                       key={h || 'actions'}
-                      className={`${i === 0 ? 'pl-10 pr-4' : i === 4 ? 'pl-4 pr-10 text-right' : i === 3 ? 'px-4 min-w-[9.5rem] w-[9.5rem]' : 'px-4'} py-4 text-[11px] text-on-surface-variant/60 uppercase tracking-widest font-semibold border-b border-outline-variant/20`}
+                      className={`${i === 0 ? 'pl-10 pr-4' : i === 4 ? 'pl-4 pr-10 text-right' : i === 3 ? 'px-4 min-w-[9.5rem] w-[9.5rem]' : 'px-4'} py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30`}
                     >
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-outline-variant/10">
+              <tbody className="divide-y divide-outline-variant/20">
                 {displayedTasks.map((task) => {
                   const isComplete = task.status === 'complete';
                   const dueLabel = renderDueLabel(task);
@@ -347,8 +346,8 @@ export default function UserTaskDashboard() {
                     <Fragment key={task.id}>
                       <tr
                         onClick={() => setEditTask(task)}
-                        className={`hover:bg-surface-container-low/30 transition-colors group cursor-pointer ${
-                          isComplete ? 'opacity-40 hover:opacity-100 bg-surface-container-low/10' : ''
+                        className={`hover:bg-surface-container-low/60 transition-colors group cursor-pointer ${
+                          isComplete ? 'opacity-65 hover:opacity-100 bg-surface-container-low/20' : 'bg-white'
                         }`}
                       >
                         <td className={`pl-10 pr-4 ${rowPad}`} onClick={(e) => e.stopPropagation()}>
@@ -429,6 +428,7 @@ export default function UserTaskDashboard() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </section>
 
