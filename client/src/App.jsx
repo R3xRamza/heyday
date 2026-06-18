@@ -7,6 +7,7 @@ import CRMHub from './pages/CRMHub';
 import ContactDetail from './pages/ContactDetail';
 import TeamTaskOverview from './pages/TeamTaskOverview';
 import UserTaskDashboard from './pages/UserTaskDashboard';
+import UserProjectDashboard from './pages/UserProjectDashboard';
 import MarketingCalendar from './pages/MarketingCalendar';
 import RevenueAnalytics from './pages/RevenueAnalytics';
 import TransactionManager from './pages/TransactionManager';
@@ -35,6 +36,7 @@ export default function App() {
           </Route>
           <Route path="/tasks">
             <Route index element={<ProtectedRoute><TeamTaskOverview /></ProtectedRoute>} />
+            <Route path=":userId/projects" element={<ProtectedRoute><UserProjectDashboard /></ProtectedRoute>} />
             <Route path=":userId" element={<ProtectedRoute><UserTaskDashboard /></ProtectedRoute>} />
           </Route>
           <Route path="/marketing" element={<ProtectedRoute><MarketingCalendar /></ProtectedRoute>} />
