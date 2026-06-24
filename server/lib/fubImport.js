@@ -9,6 +9,9 @@ const TEAM_NAME_MAP = {
   'lisa harrell': null,
 };
 
+const PARTNER_RELATIONSHIP_TYPES = /^(spouse|partner|wife|husband|fiance|girlfriend)$/i;
+const NON_PARTNER_RELATIONSHIP_TYPES = /^(child|son|daughter|daugther|dad|mom|father|mother|parent|mil|fil|brother)$/i;
+
 function trim(v) {
   if (v == null) return null;
   const s = String(v).trim();
@@ -37,6 +40,20 @@ function parsePrice(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+function relationshipName(row, index) {
+  const name = [
+    trim(row[`Relationship ${index} First Name`]),
+    trim(row[`Relationship ${index} Last Name`]),
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return name || null;
+}
+
+function hasPartnerBirthday(row) {
+  return !!(parseDate(row['Birthday - Partner']) || trim(row['Birthday - Partner']));
+}
+
 export function resolveAssignedUserId(assignedName, usersByName) {
   const name = trim(assignedName);
   if (!name || name.includes('\n') || name.length > 80) return null;
@@ -47,6 +64,37 @@ export function resolveAssignedUserId(assignedName, usersByName) {
     if (n.toLowerCase() === key) return id;
   }
   return null;
+}
+
+export function derivePartnerName(row) {
+  for (let i = 1; i <= 4; i++) {
+    const type = trim(row[`Relationship ${i} Type`]);
+    if (!type || !PARTNER_RELATIONSHIP_TYPES.test(type)) continue;
+    const name = relationshipName(row, i);
+    if (name) return name;
+  }
+
+  if (!hasPartnerBirthday(row)) return null;
+
+  for (let i = 1; i <= 4; i++) {
+    const type = trim(row[`Relationship ${i} Type`]) || '';
+    if (type && NON_PARTNER_RELATIONSHIP_TYPES.test(type)) continue;
+    if (type && !PARTNER_RELATIONSHIP_TYPES.test(type)) continue;
+    const name = relationshipName(row, i);
+    if (name) return name;
+  }
+
+  for (let i = 1; i <= 4; i++) {
+    const name = relationshipName(row, i);
+    if (name) return name;
+  }
+
+  return null;
+}
+
+function derivePersonType(row) {
+  const stage = trim(row.Stage) || '';
+  return /kids of closed clients/i.test(stage) ? 'child' : 'contact';
 }
 
 export function mapFubRow(row, usersByName = {}) {
@@ -84,8 +132,13 @@ export function mapFubRow(row, usersByName = {}) {
     property_mls: trim(row['Property MLS Number']),
     property_price: parsePrice(row['Property Price']),
     last_contacted: parseDate(row['Last Contacted']),
-    birthday: trim(row.Birthday),
-    anniversary: trim(row.Anniversary),
+    birthday: trim(row.Birthday) || parseDate(row.Birthday),
+    anniversary: trim(row.Anniversary) || parseDate(row.Anniversary),
+    partner_birthday: parseDate(row['Birthday - Partner']) || trim(row['Birthday - Partner']),
+    partner_name: derivePartnerName(row),
+    kids_names: trim(row['Kids Names']),
+    person_type: derivePersonType(row),
+    home_anniversary: parseDate(row['Primary Home Purchase Date']) || trim(row['Primary Home Purchase Date']),
     company: trim(row.Company),
     sphere_source: trim(row['Sphere Source']),
     referred_by: trim(row['Referred By']),
@@ -103,6 +156,7 @@ export const CONTACT_COLUMNS = [
   'assigned_to_name', 'last_assigned', 'is_contacted', 'listing_price', 'tags', 'timeframe',
   'email', 'email_2', 'phone', 'phone_2', 'street', 'city', 'state', 'zip', 'country',
   'property_address', 'property_city', 'property_state', 'property_zip', 'property_mls',
-  'property_price', 'last_contacted', 'birthday', 'anniversary', 'company', 'sphere_source',
+  'property_price', 'last_contacted', 'birthday', 'anniversary', 'partner_birthday', 'partner_name',
+  'kids_names', 'person_type', 'home_anniversary', 'company', 'sphere_source',
   'referred_by', 'message', 'description', 'notes', 'assigned_to', 'status', 'raw_json',
 ];

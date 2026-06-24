@@ -31,6 +31,7 @@ function hydrateForm(transaction) {
     sale_type: normalizeSaleType(transaction.sale_type, representing),
     state: transaction.state || '',
     zip: transaction.zip || '',
+    agent_id: transaction.agent_id ?? '',
   };
 }
 
@@ -64,6 +65,34 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
     fetch('/api/checklists', { credentials: 'include' }).then((r) => r.json()).then((d) => setTemplates(d.templates || []));
     fetch('/api/team', { credentials: 'include' }).then((r) => r.json()).then((d) => setUsers(d.members || []));
   }, []);
+
+  useEffect(() => {
+    if (step !== 'details' || users.length === 0) return;
+    setForm((prev) => {
+      if (prev.agent_id) return prev;
+      const meredith = users.find((u) => u.email === 'meredith@heyday.com');
+      const defaultId = meredith?.id ?? users[0]?.id;
+      return defaultId ? { ...prev, agent_id: defaultId } : prev;
+    });
+  }, [users, step]);
+
+  function agentSelect() {
+    return (
+      <div>
+        <label className="text-xs font-semibold text-on-surface-variant">Agent</label>
+        <select
+          value={String(form.agent_id || '')}
+          onChange={(e) => setForm({ ...form, agent_id: e.target.value ? Number(e.target.value) : '' })}
+          className="w-full mt-1 px-3 py-2 border rounded text-sm"
+        >
+          <option value="">Select agent…</option>
+          {users.map((u) => (
+            <option key={u.id} value={String(u.id)}>{u.name}</option>
+          ))}
+        </select>
+      </div>
+    );
+  }
 
   async function loadAssignStepData(members) {
     const [tasksRes, checklistsRes] = await Promise.all([
@@ -117,6 +146,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
       body: JSON.stringify({
         ...form,
         value: form.value != null && form.value !== '' ? Number(form.value) : null,
+        agent_id: form.agent_id ? Number(form.agent_id) : null,
         workflow_status: 'template',
       }),
     });
@@ -313,7 +343,8 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                     className="w-full mt-1 px-3 py-2 border rounded text-sm"
                   />
                 </div>
-                <div>
+                {agentSelect()}
+                <div className="col-span-2">
                   <label className="text-xs font-semibold text-on-surface-variant">Buyer name</label>
                   <input
                     value={form.buyer_party_name ?? ''}
@@ -323,16 +354,19 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                 </div>
               </>
             ) : (
-              <div>
-                <label className="text-xs font-semibold text-on-surface-variant">
-                  {counterpartyNameLabel(form.representing)}
-                </label>
-                <input
-                  value={form.client_name || form.owner_name || ''}
-                  onChange={(e) => setForm({ ...form, client_name: e.target.value, owner_name: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border rounded text-sm"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="text-xs font-semibold text-on-surface-variant">
+                    {counterpartyNameLabel(form.representing)}
+                  </label>
+                  <input
+                    value={form.client_name || form.owner_name || ''}
+                    onChange={(e) => setForm({ ...form, client_name: e.target.value, owner_name: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                {agentSelect()}
+              </>
             )}
             <div className="col-span-2">
               <label className="text-xs font-semibold text-on-surface-variant">Representing</label>

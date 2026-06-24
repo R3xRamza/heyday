@@ -1,15 +1,26 @@
 import { useState } from 'react';
 import Icon from '../shared/Icon';
+import DateText from '../shared/DateText';
+
+function isOverdue(dueDate, isComplete) {
+  if (!dueDate || isComplete) return false;
+  return dueDate < new Date().toISOString().slice(0, 10);
+}
 
 export default function TodoCard({ item, onToggle, onUpdate, onDelete, readOnly }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(item.title);
   const [notes, setNotes] = useState(item.notes || '');
+  const [dueDate, setDueDate] = useState(item.due_date || '');
 
   async function saveEdit() {
     const t = title.trim();
     if (!t) return;
-    await onUpdate(item.id, { title: t, notes: notes.trim() || null });
+    await onUpdate(item.id, {
+      title: t,
+      notes: notes.trim() || null,
+      due_date: dueDate || null,
+    });
     setEditing(false);
   }
 
@@ -34,6 +45,13 @@ export default function TodoCard({ item, onToggle, onUpdate, onDelete, readOnly 
           placeholder="Description (optional)"
           className="w-full px-2 py-1.5 text-xs border border-outline-variant/30 rounded-lg"
         />
+        <input
+          type="date"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+          aria-label="Due date (optional)"
+          className="w-full px-2 py-1.5 text-xs border border-outline-variant/30 rounded-lg"
+        />
         <div className="flex gap-2 justify-end">
           <button type="button" onClick={() => setEditing(false)} className="text-xs text-on-surface-variant">Cancel</button>
           <button type="button" onClick={saveEdit} className="text-xs font-bold text-secondary">Save</button>
@@ -43,6 +61,7 @@ export default function TodoCard({ item, onToggle, onUpdate, onDelete, readOnly 
   }
 
   const isComplete = item.is_complete;
+  const overdue = isOverdue(item.due_date, isComplete);
 
   return (
     <div className="bg-white rounded-xl shadow-executive px-4 py-3 flex gap-3 items-start group">
@@ -66,6 +85,7 @@ export default function TodoCard({ item, onToggle, onUpdate, onDelete, readOnly 
         onClick={() => {
           setTitle(item.title);
           setNotes(item.notes || '');
+          setDueDate(item.due_date || '');
           setEditing(true);
         }}
         className="flex-1 min-w-0 text-left"
@@ -75,6 +95,12 @@ export default function TodoCard({ item, onToggle, onUpdate, onDelete, readOnly 
         </p>
         {item.notes && (
           <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">{item.notes}</p>
+        )}
+        {item.due_date && (
+          <p className={`text-xs mt-1 ${overdue ? 'text-error font-semibold' : 'text-on-surface-variant'}`}>
+            Due <DateText value={item.due_date} />
+            {overdue ? ' · Overdue' : ''}
+          </p>
         )}
       </button>
 

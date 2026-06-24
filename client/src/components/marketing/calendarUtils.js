@@ -171,3 +171,28 @@ export function partitionFridayCelebrations(events, todayStr) {
   }
   return { friday, weekend };
 }
+
+export function celebrationEventKey(event) {
+  const subtype = event.subtype || 'contact';
+  return `${event.type}-${subtype}-${event.contact_id}-${event.date}`;
+}
+
+export function celebrationTypeLabel(event) {
+  if (event.type === 'anniversary' && event.subtype === 'home') return 'Home Anniversary';
+  if (event.type === 'anniversary') return 'Anniversary';
+  if (event.subtype === 'child') return 'Birthday · Kid';
+  if (event.subtype === 'partner') return 'Birthday · Partner';
+  return 'Birthday';
+}
+
+export function celebrationDisplayName(event) {
+  if (event.type === 'anniversary') return event.name;
+  if (event.subtype === 'partner') return `${event.name} (partner)`;
+  return event.name;
+}
+
+export function celebrationChipPrefix(event) {
+  if (event.type === 'anniversary' && event.subtype === 'home') return 'Home Anniversary';
+  if (event.type === 'anniversary') return 'Anniversary';
+  return 'Birthday';
+}

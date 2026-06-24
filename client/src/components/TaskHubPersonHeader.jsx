@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import TaskHubTabs from './TaskHubTabs';
+import TeamAvatar from './TeamAvatar';
 
 export default function TaskHubPersonHeader({ userId, title, member, profile, children, showBorder = true }) {
   return (
@@ -16,10 +17,22 @@ export default function TaskHubPersonHeader({ userId, title, member, profile, ch
         <Link to="/tasks" className="text-sm text-secondary hover:underline mb-1 inline-block">
           ← Back to Team Overview
         </Link>
-        <h2 className="text-3xl font-semibold text-primary">{title}</h2>
-        <p className="text-on-surface-variant text-sm mt-1 min-h-[1.25rem]">
-          {member ? `${member.name} · ${profile?.role}` : '\u00a0'}
-        </p>
+        <div className="flex items-center gap-4">
+          {member && (
+            <TeamAvatar
+              email={member.email}
+              name={member.name}
+              size="lg"
+              borderClassName="border-2 border-surface-container"
+            />
+          )}
+          <div>
+            <h2 className="text-3xl font-semibold text-primary">{title}</h2>
+            <p className="text-on-surface-variant text-sm mt-1 min-h-[1.25rem]">
+              {member ? `${member.name} · ${profile?.role}` : '\u00a0'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {children}

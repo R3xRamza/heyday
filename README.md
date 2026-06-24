@@ -2,7 +2,7 @@
 
 Real estate operations platform — Express/SQLite API + React/Vite SPA.
 
-## Status (updated 2026-06-15)
+## Status (updated 2026-06-18)
 
 **Production:** Live on [Railway](https://railway.app) at `https://heyday-production-ce72.up.railway.app`  
 **Source:** [github.com/R3xRamza/heyday](https://github.com/R3xRamza/heyday) (`main` synced)  
@@ -15,6 +15,9 @@ Real estate operations platform — Express/SQLite API + React/Vite SPA.
 | Auth (JWT cookie) | ✅ |
 | CRM / contacts (birthday, anniversary) | ✅ |
 | Tasks (team + per-user + calendar) | ✅ |
+| Project Dashboard (per-user projects + personal todos) | ✅ |
+| Task Hub tabs + shared person header | ✅ |
+| Team profile photos | ✅ |
 | Transactions + checklists | ✅ |
 | Checklist template editor (nicknames, assignees) | ✅ |
 | Marketing Calendar | ✅ |
@@ -78,6 +81,25 @@ Optional Gmail: see `server/README-gmail.md`.
 
 SQLite defaults to `heyday.db` in the project root locally. On Railway, attach a **Volume** at `/data` and set `DATABASE_PATH=/data/heyday.db` so data survives redeploys.
 
+## Changelog — 2026-06-18
+
+### Project Dashboard (`/tasks/:userId/projects`)
+- Split layout: projects list (left) + personal todo kanban Pending | Done (right)
+- Independent data models: `projects` table (notes-only) and `user_todos` (completed items purge after 7 days)
+- APIs: `/api/projects`, `/api/user-todos` (read: any auth user; write: owner or admin)
+- Components under `client/src/components/projects/`
+
+### Task Hub
+- **Tasks | Projects** tabs (`TaskHubTabs.jsx`) on per-person dashboards
+- Shared header (`TaskHubPersonHeader.jsx`) on Daily Task Dashboard and Project Dashboard
+- Sidebar links: **My tasks**, **My projects**
+- Team overview cards link to person dashboards; team list ordered Tessa → Adam → Margaret → Meredith
+- **Team avatars** (`TeamAvatar.jsx`) in sidebar, top nav, team cards, task assignees, person headers
+- Profile photos: `client/src/assets/team/*.jpg` via `client/src/data/teamProfiles.js`
+
+### Marketing Calendar
+- **New Content** post modal platform dropdown matches toolbar filter (`filterPlatforms`) — includes Podcast, IG Grid, IG Story, Blog, Pop By when configured
+
 ## Changelog — 2026-06-15
 
 ### Deploy & infrastructure
@@ -113,9 +135,21 @@ SQLite defaults to `heyday.db` in the project root locally. On Railway, attach a
 
 ```
 heyday/
-├── client/          React SPA (Vite + Tailwind)
-├── server/          Express API + SQLite
-├── railway.toml     Railway deploy config
-├── heyday.db        Local SQLite (gitignored)
-└── .cursor/rules/   Agent/project context
+├── client/
+│   ├── src/
+│   │   ├── assets/team/       Profile photos (tessa, adam, margaret, meredith .jpg)
+│   │   ├── components/
+│   │   │   ├── projects/      Project Dashboard UI
+│   │   │   ├── TaskHubTabs.jsx, TaskHubPersonHeader.jsx, TeamAvatar.jsx
+│   │   │   └── marketing/     Marketing Calendar components
+│   │   ├── data/teamProfiles.js
+│   │   └── pages/
+│   │       ├── UserTaskDashboard.jsx
+│   │       └── UserProjectDashboard.jsx
+├── server/
+│   ├── routes/projects.js, user-todos.js
+│   └── lib/migrate.js         projects + user_todos tables
+├── railway.toml               Railway deploy config
+├── heyday.db                  Local SQLite (gitignored)
+└── .cursor/rules/             Agent/project context
 ```

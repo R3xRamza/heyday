@@ -19,7 +19,7 @@ import { FullScreenSkeleton } from './components/shared/Skeleton';
 function RootRedirect() {
   const { user, loading } = useAuth();
   if (loading) return <FullScreenSkeleton />;
-  return <Navigate to={user ? '/crm' : '/login'} replace />;
+  return <Navigate to={user ? '/tasks' : '/login'} replace />;
 }
 
 export default function App() {

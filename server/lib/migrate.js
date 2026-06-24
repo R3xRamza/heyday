@@ -104,11 +104,20 @@ export function runMigrations(db) {
   backfillTransactionChecklists(db);
 
   migrateContactsTable(db);
+  addColumnIfMissing(db, 'contacts', 'partner_birthday', 'TEXT');
+  addColumnIfMissing(db, 'contacts', 'partner_name', 'TEXT');
+  addColumnIfMissing(db, 'contacts', 'kids_names', 'TEXT');
+  addColumnIfMissing(db, 'contacts', 'person_type', "TEXT DEFAULT 'contact'");
+  addColumnIfMissing(db, 'contacts', 'home_anniversary', 'TEXT');
+  addColumnIfMissing(db, 'tasks', 'timing_value', 'INTEGER');
+  addColumnIfMissing(db, 'tasks', 'timing_direction', 'TEXT');
+  addColumnIfMissing(db, 'tasks', 'timing_anchor', 'TEXT');
   migrateCrmActivityAndGmail(db);
   migrateMarketingTables(db);
   migrateBirthdayPinsTable(db);
   migrateProjectsTables(db);
   migrateUserTodosTable(db);
+  addColumnIfMissing(db, 'user_todos', 'due_date', 'DATE');
 }
 
 function migrateProjectsTables(db) {

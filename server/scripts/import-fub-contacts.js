@@ -11,7 +11,7 @@ import { runMigrations } from '../lib/migrate.js';
 import { mapFubRow, CONTACT_COLUMNS } from '../lib/fubImport.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const defaultPath = '/Users/rexramza/Downloads/all-people-2026-06-04.csv';
+const defaultPath = '/Users/rexramza/Downloads/all-people-2026-06-15.csv';
 const csvPath = process.argv[2] || defaultPath;
 
 runMigrations(db);
@@ -53,6 +53,12 @@ async function main() {
   console.log('Reading CSV:', csvPath);
   const rawRows = await loadRows();
   console.log('Parsed rows:', rawRows.length);
+
+  const beforeCount = db.prepare('SELECT COUNT(*) as c FROM contacts').get().c;
+  db.transaction(() => {
+    db.prepare('DELETE FROM contacts').run();
+  })();
+  console.log(`Cleared ${beforeCount} existing contact(s) before import`);
 
   let inserted = 0;
   let skipped = 0;

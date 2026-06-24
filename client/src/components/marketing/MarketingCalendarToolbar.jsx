@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../shared/Icon';
 import { colorForPlatform } from './platformColors';
-import { partitionFridayCelebrations } from './calendarUtils';
+import { partitionFridayCelebrations, celebrationDisplayName, celebrationTypeLabel, celebrationEventKey, celebrationChipPrefix } from './calendarUtils';
 
 const CATEGORY_PILLS = [
   { key: 'social', label: 'Social' },
   { key: 'tasks', label: 'Tasks' },
-  { key: 'celebrations', label: 'Milestones' },
+  { key: 'celebrations', label: 'Celebrations' },
 ];
 
 function usePopover() {
@@ -116,6 +116,9 @@ function PlatformFilterPopover({
 }
 
 function CelebrationRow({ event, onClose }) {
+  const isChild = event.subtype === 'child';
+  const displayName = celebrationDisplayName(event);
+
   return (
     <Link
       to={`/crm/${event.contact_id}`}
@@ -126,9 +129,14 @@ function CelebrationRow({ event, onClose }) {
         name={event.type === 'birthday' ? 'cake' : 'home'}
         className="!text-[14px] text-purple/70 shrink-0"
       />
-      <span className="truncate">{event.name}</span>
+      <span className="truncate min-w-0 flex-1">{displayName}</span>
+      {isChild && (
+        <span className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-purple/15 text-[9px] font-bold text-purple">
+          K
+        </span>
+      )}
       <span className="text-[10px] text-on-surface-variant ml-auto shrink-0">
-        {event.type === 'birthday' ? 'Birthday' : 'Anniversary'}
+        {event.type === 'birthday' ? celebrationChipPrefix(event) : celebrationTypeLabel(event)}
       </span>
     </Link>
   );
@@ -206,16 +214,16 @@ function MilestonesPopover({
             ) : isFriday ? (
               <>
                 {friday.map((e) => (
-                  <CelebrationRow key={`${e.type}-${e.contact_id}-${e.date}`} event={e} onClose={() => setOpen(false)} />
+                  <CelebrationRow key={celebrationEventKey(e)} event={e} onClose={() => setOpen(false)} />
                 ))}
                 {showDivider && <div className="border-t border-outline-variant/10 my-1" />}
                 {weekend.map((e) => (
-                  <CelebrationRow key={`${e.type}-${e.contact_id}-${e.date}`} event={e} onClose={() => setOpen(false)} />
+                  <CelebrationRow key={celebrationEventKey(e)} event={e} onClose={() => setOpen(false)} />
                 ))}
               </>
             ) : (
               events.map((e) => (
-                <CelebrationRow key={`${e.type}-${e.contact_id}-${e.date}`} event={e} onClose={() => setOpen(false)} />
+                <CelebrationRow key={celebrationEventKey(e)} event={e} onClose={() => setOpen(false)} />
               ))
             )}
           </div>

@@ -5,6 +5,7 @@ export function AddTaskRow({ onAdd, autoFocus, readOnly }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
+  const [dueDate, setDueDate] = useState('');
   const [saving, setSaving] = useState(false);
   const inputRef = useRef(null);
 
@@ -17,9 +18,10 @@ export function AddTaskRow({ onAdd, autoFocus, readOnly }) {
     if (!t || saving) return;
     setSaving(true);
     try {
-      await onAdd({ title: t, notes: notes.trim() || null });
+      await onAdd({ title: t, notes: notes.trim() || null, due_date: dueDate || null });
       setTitle('');
       setNotes('');
+      setDueDate('');
       setOpen(false);
     } finally {
       setSaving(false);
@@ -59,6 +61,17 @@ export function AddTaskRow({ onAdd, autoFocus, readOnly }) {
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         placeholder="Description (optional)"
+        className="w-full px-2 py-1.5 text-xs border border-outline-variant/30 rounded-lg"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') submit();
+          if (e.key === 'Escape') setOpen(false);
+        }}
+      />
+      <input
+        type="date"
+        value={dueDate}
+        onChange={(e) => setDueDate(e.target.value)}
+        aria-label="Due date (optional)"
         className="w-full px-2 py-1.5 text-xs border border-outline-variant/30 rounded-lg"
         onKeyDown={(e) => {
           if (e.key === 'Enter') submit();

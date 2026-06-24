@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from './shared/Icon';
 import EditTaskModal from './EditTaskModal';
+import CreateTaskModal from './CreateTaskModal';
 import PartiesToTransaction from './PartiesToTransaction';
 import DateText from './shared/DateText';
 import { formatCurrency, parseTransactionAddress } from '../utils/format';
@@ -12,6 +13,7 @@ import {
   getTimelineSteps,
   getTimelineDateKeys,
   datesToClearOnRepresentingChange,
+  transactionStageLabel,
   SALE_TYPE_OPTIONS,
   saleTypeForRepresenting,
   normalizeSaleType,
@@ -56,9 +58,7 @@ function activityLabel(type) {
 }
 
 function stageBadge(stage) {
-  if (stage === 'pending') return 'PRE-LISTING';
-  if (stage === 'closed') return 'CLOSED';
-  return 'ACTIVE ESCROW';
+  return transactionStageLabel(stage).toUpperCase();
 }
 
 function EditableField({ field, form, transaction, onChange, onBlur }) {
@@ -117,6 +117,7 @@ export default function TransactionWorkspace({
   onSaveParties,
   onTaskUpdate,
   onTaskDelete,
+  onTaskCreate,
   onAddComment,
   onRefreshActivities,
   onDeleteTransaction,
@@ -126,6 +127,7 @@ export default function TransactionWorkspace({
   const [form, setForm] = useState({ ...transaction });
   const [selectedTask, setSelectedTask] = useState(null);
   const [editTask, setEditTask] = useState(null);
+  const [showCreateTask, setShowCreateTask] = useState(false);
   const [comment, setComment] = useState('');
   const [savingTx, setSavingTx] = useState(false);
   const [savedMsg, setSavedMsg] = useState('');
@@ -158,8 +160,8 @@ export default function TransactionWorkspace({
   }, [checklists, transaction.checklist_template_id, transaction.template_name]);
 
   const checklistTasks = tasks.filter((t) => {
+    if (t.template_task_id == null) return true;
     if (!activeChecklistId) return true;
-    if (t.template_id == null) return sidebarChecklists.length <= 1;
     return Number(t.template_id) === Number(activeChecklistId);
   });
 
@@ -225,6 +227,16 @@ export default function TransactionWorkspace({
     setEditTask(null);
     if (updated) setSelectedTask(updated);
     onRefreshActivities();
+  }
+
+  async function handleCreateTask(formData) {
+    const created = await onTaskCreate(formData);
+    if (created) {
+      setShowCreateTask(false);
+      setView('checklist');
+      setSelectedTask(created);
+      onRefreshActivities();
+    }
   }
 
   async function submitComment(e) {
@@ -462,17 +474,34 @@ export default function TransactionWorkspace({
             <div className="grid grid-cols-12 gap-6">
               <div className="col-span-12 lg:col-span-8">
                 <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive flex flex-col max-h-[calc(100vh-280px)]">
-                  <div className="p-6 border-b border-outline-variant/10 flex justify-between items-center shrink-0">
+                  <div className="p-6 border-b border-outline-variant/10 flex justify-between items-center shrink-0 gap-4">
                     <div>
                       <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
                         Checklist: {activeChecklistName}
                       </h3>
                       <p className="text-[11px] text-on-surface-variant mt-1">{doneCount} of {checklistTasks.length} Tasks Completed</p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateTask(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-primary-container rounded-lg hover:brightness-110 shrink-0"
+                    >
+                      <Icon name="add" className="!text-[16px]" />
+                      Add task
+                    </button>
                   </div>
                   <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar min-h-0">
                     {checklistTasks.length === 0 ? (
-                      <p className="text-sm text-on-surface-variant text-center py-8">No tasks on this checklist.</p>
+                      <div className="text-center py-8">
+                        <p className="text-sm text-on-surface-variant">No tasks on this checklist.</p>
+                        <button
+                          type="button"
+                          onClick={() => setShowCreateTask(true)}
+                          className="mt-3 text-sm font-semibold text-secondary hover:underline"
+                        >
+                          Add task
+                        </button>
+                      </div>
                     ) : (
                       checklistTasks.map((task) => {
                         const isComplete = task.status === 'complete';
@@ -667,8 +696,20 @@ export default function TransactionWorkspace({
         <EditTaskModal
           task={editTask}
           users={users}
+          transaction={transaction}
           onClose={() => setEditTask(null)}
           onSave={saveTaskEdit}
+        />
+      )}
+
+      {showCreateTask && (
+        <CreateTaskModal
+          users={users}
+          defaultTransactionId={transaction.id}
+          lockTransaction
+          transaction={transaction}
+          onClose={() => setShowCreateTask(false)}
+          onSave={handleCreateTask}
         />
       )}
     </div>

@@ -19,7 +19,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       await login(email, password);
-      navigate('/crm');
+      navigate('/tasks');
     } catch (err) {
       setError(err.message);
     } finally {
