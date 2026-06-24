@@ -45,31 +45,80 @@ export function eachDateInRange(startStr, endStr, fn) {
   }
 }
 
+function pushCelebration(events, byKey, { type, subtype, contactId, name, dateStr }) {
+  const key = `${type}:${subtype || 'default'}:${contactId}:${dateStr}`;
+  if (byKey.has(key)) return;
+  byKey.set(key, true);
+  events.push({
+    type,
+    subtype: subtype || null,
+    contact_id: contactId,
+    name,
+    date: dateStr,
+  });
+}
+
+function pushMonthDayEvents(startStr, endStr, events, byKey, {
+  type,
+  subtype,
+  contactId,
+  name,
+  rawDate,
+}) {
+  const md = parseMonthDay(rawDate);
+  if (!md) return;
+  eachDateInRange(startStr, endStr, (dateStr, d) => {
+    if (d.getMonth() + 1 === md.month && d.getDate() === md.day) {
+      pushCelebration(events, byKey, { type, subtype, contactId, name, dateStr });
+    }
+  });
+}
+
 /** Recurring month-day events (birthdays, anniversaries) in [start, end]. */
 export function celebrationsInRange(contacts, startStr, endStr) {
   const events = [];
   const byKey = new Map();
 
   for (const c of contacts) {
-    const pairs = [
-      { type: 'birthday', raw: c.birthday },
-      { type: 'anniversary', raw: c.anniversary },
-    ];
-    for (const { type, raw } of pairs) {
-      const md = parseMonthDay(raw);
-      if (!md) continue;
-      eachDateInRange(startStr, endStr, (dateStr, d) => {
-        if (d.getMonth() + 1 === md.month && d.getDate() === md.day) {
-          const key = `${type}:${c.id}:${dateStr}`;
-          if (byKey.has(key)) return;
-          byKey.set(key, true);
-          events.push({
-            type,
-            contact_id: c.id,
-            name: c.name,
-            date: dateStr,
-          });
-        }
+    const isChild = c.person_type === 'child';
+
+    if (c.birthday?.trim()) {
+      pushMonthDayEvents(startStr, endStr, events, byKey, {
+        type: 'birthday',
+        subtype: isChild ? 'child' : 'contact',
+        contactId: c.id,
+        name: c.name,
+        rawDate: c.birthday,
+      });
+    }
+
+    if (!isChild && c.partner_birthday?.trim()) {
+      pushMonthDayEvents(startStr, endStr, events, byKey, {
+        type: 'birthday',
+        subtype: 'partner',
+        contactId: c.id,
+        name: c.partner_name?.trim() || 'Partner',
+        rawDate: c.partner_birthday,
+      });
+    }
+
+    if (!isChild && c.anniversary?.trim()) {
+      pushMonthDayEvents(startStr, endStr, events, byKey, {
+        type: 'anniversary',
+        subtype: 'contact',
+        contactId: c.id,
+        name: c.name,
+        rawDate: c.anniversary,
+      });
+    }
+
+    if (!isChild && c.home_anniversary?.trim()) {
+      pushMonthDayEvents(startStr, endStr, events, byKey, {
+        type: 'anniversary',
+        subtype: 'home',
+        contactId: c.id,
+        name: c.name,
+        rawDate: c.home_anniversary,
       });
     }
   }

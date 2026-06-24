@@ -1,6 +1,11 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../shared/Icon';
+import {
+  celebrationDisplayName,
+  celebrationEventKey,
+  celebrationTypeLabel,
+} from './calendarUtils';
 
 function formatDayHeader(dateStr) {
   const d = new Date(`${dateStr}T12:00:00`);
@@ -294,7 +299,7 @@ export default function MonthBirthdaysModal({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return events;
-    return events.filter((e) => e.name?.toLowerCase().includes(q));
+    return events.filter((e) => celebrationDisplayName(e).toLowerCase().includes(q));
   }, [events, search]);
 
   const grouped = useMemo(() => groupByDate(filtered), [filtered]);
@@ -366,7 +371,7 @@ export default function MonthBirthdaysModal({
                 <Icon name="cake" className="!text-[22px] text-purple" />
                 {monthTitle} Birthdays
               </h2>
-              <p className="text-xs text-on-surface-variant mt-1">Choose clients to show on the calendar</p>
+              <p className="text-xs text-on-surface-variant mt-1">Birthdays, partner birthdays, kids, and home anniversaries</p>
             </div>
             <button
               type="button"
@@ -465,8 +470,10 @@ export default function MonthBirthdaysModal({
                     <ul className="space-y-0.5 pb-2">
                       {dayEvents.map((event) => {
                         const checked = localPinned.has(event.contact_id);
+                        const displayName = celebrationDisplayName(event);
+                        const typeLabel = celebrationTypeLabel(event);
                         return (
-                          <li key={`${event.contact_id}-${event.date}`}>
+                          <li key={celebrationEventKey(event)}>
                             <label
                               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${
                                 checked ? 'bg-purple/8 hover:bg-purple/12' : 'hover:bg-off-white'
@@ -480,8 +487,17 @@ export default function MonthBirthdaysModal({
                                 className="w-4 h-4 rounded border-outline-variant/40 text-purple focus:ring-purple/30 shrink-0"
                               />
                               <span className="flex-1 min-w-0">
-                                <span className="block text-sm font-medium text-feather truncate">{event.name}</span>
-                                <span className="block text-[11px] text-on-surface-variant">{formatWeekdayDate(event.date)}</span>
+                                <span className="flex items-center gap-1.5">
+                                  <span className="block text-sm font-medium text-feather truncate">{displayName}</span>
+                                  {event.subtype === 'child' && (
+                                    <span className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-purple/15 text-[9px] font-bold text-purple">
+                                      K
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="block text-[11px] text-on-surface-variant">
+                                  {formatWeekdayDate(event.date)} · {typeLabel}
+                                </span>
                               </span>
                               <Link
                                 to={`/crm/${event.contact_id}`}

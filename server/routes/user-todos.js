@@ -70,9 +70,15 @@ router.post('/', (req, res) => {
   ).get(userId);
 
   const result = db.prepare(`
-    INSERT INTO user_todos (user_id, title, notes, sort_order)
-    VALUES (?, ?, ?, ?)
-  `).run(userId, title, req.body.notes?.trim() || null, maxOrder.m + 1);
+    INSERT INTO user_todos (user_id, title, notes, due_date, sort_order)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    userId,
+    title,
+    req.body.notes?.trim() || null,
+    req.body.due_date?.trim() || null,
+    maxOrder.m + 1,
+  );
 
   const item = getItems(userId).find((i) => i.id === result.lastInsertRowid);
   res.status(201).json({ item, updated_at: latestUpdatedAt(userId) });
@@ -90,6 +96,10 @@ router.patch('/:id', (req, res) => {
 
   const notes = req.body.notes != null ? (req.body.notes.trim() || null) : todo.notes;
 
+  const due_date = req.body.due_date !== undefined
+    ? (req.body.due_date?.trim() || null)
+    : todo.due_date;
+
   let is_complete = todo.is_complete;
   let completed_at = todo.completed_at;
   if (req.body.is_complete !== undefined) {
@@ -99,9 +109,9 @@ router.patch('/:id', (req, res) => {
 
   db.prepare(`
     UPDATE user_todos
-    SET title = ?, notes = ?, is_complete = ?, completed_at = ?
+    SET title = ?, notes = ?, due_date = ?, is_complete = ?, completed_at = ?
     WHERE id = ?
-  `).run(title, notes, is_complete, completed_at, todo.id);
+  `).run(title, notes, due_date, is_complete, completed_at, todo.id);
 
   purgeOldCompleted(todo.user_id);
   const item = getItems(todo.user_id).find((i) => i.id === todo.id);

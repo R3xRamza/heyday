@@ -55,10 +55,12 @@ router.get('/birthdays', (req, res) => {
   if (!start || !end) return res.status(400).json({ error: 'start and end are required' });
 
   const contacts = db.prepare(`
-    SELECT id, name, birthday, anniversary
+    SELECT id, name, birthday, anniversary, partner_birthday, partner_name, person_type, stage, home_anniversary
     FROM contacts
     WHERE (birthday IS NOT NULL AND TRIM(birthday) != '')
        OR (anniversary IS NOT NULL AND TRIM(anniversary) != '')
+       OR (partner_birthday IS NOT NULL AND TRIM(partner_birthday) != '')
+       OR (home_anniversary IS NOT NULL AND TRIM(home_anniversary) != '')
   `).all();
 
   const events = celebrationsInRange(contacts, start, end);

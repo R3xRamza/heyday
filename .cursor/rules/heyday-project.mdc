@@ -31,12 +31,14 @@ alwaysApply: true
 ## REPO LAYOUT
 
 - `server/index.js` — app entry, mounts `/api/*` routes with `authMiddleware`
-- `server/routes/` — auth, crm, tasks, transactions, marketing, checklists, team, revenue, gmail
+- `server/routes/` — auth, crm, tasks, transactions, marketing, checklists, team, revenue, gmail, **projects**, **user-todos**
 - `server/lib/` — migrate.js, business logic (transactionParties, applyChecklists, marketingCalendar, activity, etc.)
 - `server/db.js` — SQLite init + `runMigrations()`; `DATABASE_PATH` env overrides default `heyday.db` path
 - `client/src/App.jsx` — all routes
 - `client/src/pages/` — screen-level components
-- `client/src/components/` — shared UI (Sidebar, DashboardLayout, TopNav, marketing/*, etc.)
+- `client/src/components/` — shared UI (Sidebar, DashboardLayout, TopNav, **TaskHubTabs**, **TaskHubPersonHeader**, **TeamAvatar**, marketing/*, projects/*, etc.)
+- `client/src/data/teamProfiles.js` — per-email role + profile photo paths
+- `client/src/assets/team/` — team profile photos (.jpg)
 - `client/src/context/SidebarContext.jsx` — collapsible sidebar state (`sidebar-collapsed-v1`)
 - `client/src/utils/taskDisplay.js` — `displayTaskTitle(task)` (calendar nickname || title)
 - `client/src/utils/format.js` — formatDate, formatCurrency, shortAddress, DateText pattern
@@ -45,7 +47,8 @@ alwaysApply: true
 ## ROUTES (client)
 
 - `/login`, `/crm`, `/crm/:id` (contacts)
-- `/tasks`, `/tasks/:userId` (team + per-user task dashboards, calendar view)
+- `/tasks`, `/tasks/:userId` (team overview + per-user Daily Task Dashboard, calendar view)
+- `/tasks/:userId/projects` (per-user **Project Dashboard** — projects + personal todos)
 - `/transactions`, `/transactions/:id` (list + TransactionManager workspace)
 - `/marketing` (Marketing Calendar)
 - `/checklists` (template editor)
@@ -58,6 +61,9 @@ alwaysApply: true
 - `/api/transactions` — CRUD, parties, activity, checklists, DELETE (delete activity before tasks — FK)
 - `/api/marketing` — calendar posts, platform-goals, birthdays range, birthday-pins
 - `/api/checklists` — template + template_tasks CRUD (`calendar_nickname`, `default_role`)
+- `/api/projects` — per-user projects CRUD (`?user_id=`); title + description only
+- `/api/user-todos` — per-user personal todos CRUD; GET purges completed items older than 7 days
+- `/api/team` — members + stats; list ordered Tessa → Adam → Margaret → Meredith
 
 ## AUTH
 
@@ -89,7 +95,24 @@ alwaysApply: true
 ## DOMAIN — Tasks
 
 - Statuses: pending, complete; `due_date`; `transaction_id` optional
-- UserTaskDashboard: list + calendar (`TaskCalendarView.jsx`)
+- **TeamTaskOverview** (`/tasks`) — team workload cards, priority tasks, closing milestones
+- **UserTaskDashboard** (`/tasks/:userId`) — filters, stats, task table + calendar (`TaskCalendarView.jsx`)
+- **TaskHubTabs** — toggle Tasks | Projects on person dashboards
+- **TaskHubPersonHeader** — shared back link, title, avatar, subtitle, optional children (filters)
+
+## DOMAIN — Project Dashboard
+
+- Page: `/tasks/:userId/projects` — `UserProjectDashboard.jsx`
+- Layout: 3-column grid — projects list | Pending todos | Done todos
+- **Projects** (`/api/projects`): independent of transactions; expand/edit on click/double-click
+- **User todos** (`/api/user-todos`): personal kanban; separate from transaction tasks
+- Write access: owning user or `admin`
+- Components: `client/src/components/projects/*` (`ProjectListPanel`, `ProjectTodoBoard`, etc.)
+
+## DOMAIN — Team profiles
+
+- `teamProfiles.js` maps `email` → `{ role, img }`
+- `TeamAvatar.jsx` — circular photo or initials fallback; used in Sidebar, TopNav, Task Hub
 
 ## DOMAIN — CRM
 
@@ -114,11 +137,19 @@ alwaysApply: true
 - Friday toolbar milestones popover: Fri celebrations, separator, Sat+Sun (`partitionFridayCelebrations`, fetch through Sunday)
 - **Birthdays** toolbar button always visible; empty state when none today; **Plan {Mon} birthdays** opens `MonthBirthdaysModal`
 - Birthday pins: `marketing_birthday_pins` (month + contact_id); only pinned CRM birthdays render on grid when Milestones on
-- Double-click day cell → `MarketingPostModal` (new post, date pre-filled)
+- Double-click day cell → `MarketingPostModal` (new post, date pre-filled); **platform dropdown uses `filterPlatforms`** (same as toolbar — TikTok, Instagram, Facebook, LinkedIn, YouTube, Podcast, IG Grid, IG Story, Blog, Pop By)
 - Social posts: platform-colored chips; `status: done` shows crossed-out; `PATCH /api/marketing/posts/:id` for date/status
 - Tasks: Adam-assigned transaction tasks; grey chips; nickname via `displayTaskTitle`; complete via `MarketingTaskModal`
 - Data: `marketing_posts`, `marketing_platform_goals`, `marketing_birthday_pins`, CRM birthdays/anniversaries, `GET /api/tasks` (assigned_to + date range)
 - localStorage: `marketing-categories-v4`, `marketing-platform-filter-v1`, `marketing-quota-slots-v1`, `marketing-goals-collapsed-v1`, `sidebar-collapsed-v1`
+
+## RECENT (2026-06-18)
+
+- **Project Dashboard** at `/tasks/:userId/projects` with `projects` + `user_todos` APIs
+- **Task Hub**: `TaskHubTabs`, `TaskHubPersonHeader`, sidebar My tasks / My projects
+- **Team avatars** + local photos in `client/src/assets/team/`
+- Marketing post modal platforms aligned with toolbar filter
+- Team overview order: Tessa first
 
 ## RECENT (2026-06-15)
 

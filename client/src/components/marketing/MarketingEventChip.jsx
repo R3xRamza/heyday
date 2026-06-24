@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../shared/Icon';
 import { chipStyleForPlatform } from './platformColors';
-import { MARKETING_POST_DRAG_TYPE } from './calendarUtils';
+import { MARKETING_POST_DRAG_TYPE, celebrationDisplayName, celebrationChipPrefix } from './calendarUtils';
 
 function PostChip({ event, onEditPost }) {
   const { bg, text, border, icon } = chipStyleForPlatform(event.platform);
@@ -90,15 +90,31 @@ export default function MarketingEventChip({ event, onEditPost, onTaskClick }) {
   }
 
   const isBirthday = event.kind === 'birthday';
+  const displayName = isBirthday
+    ? celebrationDisplayName({ type: 'birthday', subtype: event.subtype, name: event.title })
+    : celebrationDisplayName({ type: 'anniversary', subtype: event.subtype, name: event.title });
+  const chipPrefix = isBirthday
+    ? 'Birthday'
+    : celebrationChipPrefix({ type: 'anniversary', subtype: event.subtype });
+  const isChild = event.subtype === 'child';
+
   return (
     <Link
       to={`/crm/${event.contactId}`}
       className="block w-full text-left px-2 py-1.5 text-[11px] font-semibold rounded-md bg-purple/10 text-purple truncate hover:bg-purple/15 transition-colors flex items-center gap-1.5 select-none"
     >
       <Icon name={isBirthday ? 'cake' : 'home'} className="!text-[14px] shrink-0" />
-      <span className="truncate">
-        {isBirthday ? 'Birthday' : 'Anniversary'}: {event.title}
+      <span className="truncate min-w-0 flex-1">
+        {chipPrefix}: {displayName}
       </span>
+      {isChild && (
+        <span
+          className="shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-full bg-purple/20 text-[9px] font-bold leading-none"
+          title="Kid"
+        >
+          K
+        </span>
+      )}
     </Link>
   );
 }

@@ -44,16 +44,16 @@ export default function ChecklistEditor() {
       .filter((role) => byRole[role])
       .map((role) => ({
         value: role,
-        label: `${byRole[role].name} (${ROLE_LABELS[role]})`,
+        label: byRole[role].name,
       }));
   }, [teamMembers]);
 
-  const loadTemplates = useCallback(async (selectId) => {
-    setLoading(true);
+  const loadTemplates = useCallback(async (selectId, { silent = false } = {}) => {
+    if (!silent) setLoading(true);
     setError('');
     const res = await fetch('/api/checklists', { credentials: 'include' });
     const json = await res.json();
-    setLoading(false);
+    if (!silent) setLoading(false);
     if (!res.ok) {
       setError(json.error || 'Failed to load checklists');
       return;
@@ -119,7 +119,7 @@ export default function ChecklistEditor() {
       return;
     }
     setMessage('Template created');
-    await loadTemplates(json.template.id);
+    await loadTemplates(json.template.id, { silent: true });
   }
 
   async function saveTemplateMeta() {
@@ -139,7 +139,7 @@ export default function ChecklistEditor() {
       return;
     }
     setMessage('Template saved');
-    await loadTemplates(draft.id);
+    await loadTemplates(draft.id, { silent: true });
   }
 
   async function saveTask(task) {
@@ -167,7 +167,7 @@ export default function ChecklistEditor() {
       setError(json.error || 'Could not save task');
       return;
     }
-    await loadTemplates(draft.id);
+    await loadTemplates(draft.id, { silent: true });
   }
 
   async function deleteTemplate() {
@@ -187,7 +187,7 @@ export default function ChecklistEditor() {
     setMessage('Template deleted');
     setSelectedId(null);
     setDraft(null);
-    await loadTemplates();
+    await loadTemplates(null, { silent: true });
   }
 
   async function deleteTask(taskId) {
@@ -202,7 +202,7 @@ export default function ChecklistEditor() {
       setError(json.error || 'Could not delete task');
       return;
     }
-    await loadTemplates(draft.id);
+    await loadTemplates(draft.id, { silent: true });
   }
 
   async function reorderTask(index, direction) {
@@ -220,7 +220,7 @@ export default function ChecklistEditor() {
       credentials: 'include',
       body: JSON.stringify({ order }),
     });
-    if (res.ok) await loadTemplates(draft.id);
+    if (res.ok) await loadTemplates(draft.id, { silent: true });
   }
 
   function saveTaskAtIndex(index) {

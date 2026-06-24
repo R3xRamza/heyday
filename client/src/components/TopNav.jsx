@@ -1,14 +1,6 @@
 import { Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-function getInitials(name) {
-  return name
-    ?.split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || '?';
-}
+import TeamAvatar from './TeamAvatar';
 
 export default function TopNav({ title, subtitle, headerRight }) {
   const { user } = useAuth();
@@ -31,9 +23,7 @@ export default function TopNav({ title, subtitle, headerRight }) {
         <button className="p-1.5 text-on-surface-variant hover:text-feather transition-colors" aria-label="Notifications">
           <Bell size={18} />
         </button>
-        <div className="w-9 h-9 rounded-full bg-feather flex items-center justify-center text-white text-xs font-bold">
-          {getInitials(user?.name)}
-        </div>
+        <TeamAvatar email={user?.email} name={user?.name} size="md" />
       </div>
     </header>
   );

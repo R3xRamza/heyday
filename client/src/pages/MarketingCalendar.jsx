@@ -99,9 +99,7 @@ function normalizeEvents({
   categories,
   selectedPlatforms,
   allPlatforms,
-  birthdayPinSets,
 }) {
-  const today = todayStr();
   const events = [];
   const activePlatforms = selectedPlatforms ?? allPlatforms ?? [];
 
@@ -138,15 +136,11 @@ function normalizeEvents({
 
   if (categories.celebrations) {
     for (const e of celebrations) {
-      if (e.date === today) continue;
-      if (e.type === 'birthday') {
-        const month = monthKeyFromStr(e.date);
-        const pins = birthdayPinSets[month];
-        if (!pins?.has(e.contact_id)) continue;
-      }
+      const subtype = e.subtype ?? (e.type === 'anniversary' ? 'contact' : 'contact');
       events.push({
-        key: `${e.type}-${e.contact_id}-${e.date}`,
+        key: `${e.type}-${subtype}-${e.contact_id}-${e.date}`,
         kind: e.type,
+        subtype,
         date: e.date,
         title: e.name,
         contactId: e.contact_id,
@@ -269,7 +263,7 @@ export default function MarketingCalendar() {
     }
     if (monthBdayRes.ok) {
       const json = await monthBdayRes.json();
-      setMonthBirthdayEvents((json.events || []).filter((e) => e.type === 'birthday'));
+      setMonthBirthdayEvents(json.events || []);
     }
     if (todayBdayRes.ok) {
       const json = await todayBdayRes.json();
@@ -352,10 +346,9 @@ export default function MarketingCalendar() {
       categories,
       selectedPlatforms,
       allPlatforms: filterPlatforms,
-      birthdayPinSets,
     });
     return groupEventsByDate(events);
-  }, [posts, tasks, celebrations, categories, selectedPlatforms, filterPlatforms, birthdayPinSets]);
+  }, [posts, tasks, celebrations, categories, selectedPlatforms, filterPlatforms]);
 
   async function saveBirthdayPins(contactIds, { firstPin = false } = {}) {
     const month = viewedMonthKey;
@@ -686,7 +679,7 @@ export default function MarketingCalendar() {
       <MarketingPostModal
         open={modalOpen}
         post={editingPost}
-        platforms={goals}
+        platforms={filterPlatforms}
         defaultScheduledDate={selectedDate}
         onClose={() => setModalOpen(false)}
         onSave={savePost}

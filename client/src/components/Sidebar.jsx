@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSidebar } from '../context/SidebarContext';
+import TeamAvatar from './TeamAvatar';
 import heydayLogo from '../assets/heyday-logo.png';
 
 const NAV_ITEMS = [
@@ -25,15 +26,6 @@ const NAV_ITEMS = [
   { to: '/transactions', label: 'Transactions', icon: Building2 },
   { to: '/marketing', label: 'Marketing', icon: Megaphone },
 ];
-
-function getInitials(name) {
-  return name
-    ?.split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || '?';
-}
 
 function navLinkClasses(isActive, { compact = false, collapsed = false } = {}) {
   const state = isActive
@@ -164,12 +156,7 @@ export default function Sidebar() {
       <div className="border-t border-feather-alt/30 shrink-0">
         {collapsed ? (
           <div className="flex flex-col items-center gap-2 py-3 px-2">
-            <div
-              className="w-8 h-8 rounded-full bg-feather-alt flex items-center justify-center text-white text-[11px] font-bold"
-              title={user?.name}
-            >
-              {getInitials(user?.name)}
-            </div>
+            <TeamAvatar email={user?.email} name={user?.name} size="sm" title={user?.name} />
             <button
               type="button"
               onClick={handleLogout}
@@ -183,9 +170,7 @@ export default function Sidebar() {
         ) : (
           <div className="px-4 py-3">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-feather-alt flex items-center justify-center text-white text-[11px] font-bold shrink-0">
-                {getInitials(user?.name)}
-              </div>
+              <TeamAvatar email={user?.email} name={user?.name} size="sm" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white truncate leading-tight">{user?.name}</p>
                 <p className="text-xs text-sky/70 truncate lowercase leading-tight mt-0.5">

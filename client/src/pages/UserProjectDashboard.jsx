@@ -120,7 +120,12 @@ export default function UserProjectDashboard() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ user_id: numericUserId, title: body.title, notes: body.notes }),
+      body: JSON.stringify({
+        user_id: numericUserId,
+        title: body.title,
+        notes: body.notes,
+        due_date: body.due_date,
+      }),
     });
     if (res.ok) syncTodos(await res.json());
   }

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { isOverdue } from '../lib/timing.js';
+import { isOverdue, computeDueDate, resolveAnchorDate } from '../lib/timing.js';
 import { resolveAssigneeId, resolveTaskRole } from '../lib/taskAssignment.js';
 import { logActivity, formatFieldChange, actorLabel } from '../lib/activity.js';
 
@@ -8,7 +8,10 @@ const router = Router();
 
 const TASK_SELECT = `
   SELECT t.*, u.name as user_name, tx.address as transaction_address,
-    tt.timing_value, tt.timing_direction, tt.timing_anchor,
+    COALESCE(t.timing_value, tt.timing_value) as timing_value,
+    COALESCE(t.timing_direction, tt.timing_direction) as timing_direction,
+    COALESCE(t.timing_anchor, tt.timing_anchor) as timing_anchor,
+    t.timing_anchor as task_timing_anchor,
     tt.calendar_nickname, tt.template_id, ct.name AS template_name
   FROM tasks t
   LEFT JOIN users u ON u.id = t.assigned_to
@@ -16,6 +19,26 @@ const TASK_SELECT = `
   LEFT JOIN template_tasks tt ON tt.id = t.template_task_id
   LEFT JOIN checklist_templates ct ON ct.id = tt.template_id
 `;
+
+function parseTaskTiming(body) {
+  const anchor = body.timing_anchor?.trim() || null;
+  if (!anchor) {
+    return { timing_value: null, timing_direction: null, timing_anchor: null };
+  }
+  return {
+    timing_value: body.timing_value != null ? Number(body.timing_value) : 0,
+    timing_direction: body.timing_direction === 'B' ? 'B' : 'A',
+    timing_anchor: anchor,
+  };
+}
+
+function resolveTaskDueDate(transaction, { due_date, timing_value, timing_direction, timing_anchor }) {
+  if (timing_anchor && transaction) {
+    const anchorDate = resolveAnchorDate(transaction, timing_anchor);
+    return computeDueDate(anchorDate, timing_value ?? 0, timing_direction || 'A');
+  }
+  return due_date || null;
+}
 
 function enrich(task) {
   const role = resolveTaskRole(task.title);
@@ -154,22 +177,33 @@ router.get('/', (req, res) => {
   let sql = baseSql;
   const params = [...baseParams];
 
-  if (!showCompleted) {
-    sql += " AND t.status != 'complete'";
-  }
-
   const today = todayStr();
   const weekEnd = weekEndStr();
 
-  if (filter === 'today') {
-    sql += ' AND t.due_date = ? AND t.status != ?';
-    params.push(today, 'complete');
-  } else if (filter === 'week') {
-    sql += ' AND t.due_date >= ? AND t.due_date <= ? AND t.status != ?';
-    params.push(today, weekEnd, 'complete');
-  } else if (filter === 'overdue') {
-    sql += " AND t.due_date < ? AND t.status != 'complete'";
+  if (filter === 'completed_today') {
+    sql += " AND t.status = 'complete' AND date(t.completed_at) = ?";
     params.push(today);
+  } else {
+    const openOnly = filter === 'active'
+      || filter === 'today'
+      || filter === 'week'
+      || filter === 'overdue'
+      || (!showCompleted && filter === 'all');
+
+    if (openOnly) {
+      sql += " AND t.status != 'complete'";
+    }
+
+    if (filter === 'today') {
+      sql += ' AND t.due_date = ?';
+      params.push(today);
+    } else if (filter === 'week') {
+      sql += ' AND t.due_date >= ? AND t.due_date <= ?';
+      params.push(today, weekEnd);
+    } else if (filter === 'overdue') {
+      sql += ' AND t.due_date < ?';
+      params.push(today);
+    }
   }
 
   sql += ` ORDER BY CASE WHEN t.status = 'complete' THEN 1 ELSE 0 END, t.due_date ASC, t.id ASC`;
@@ -185,15 +219,19 @@ router.post('/', (req, res) => {
     due_date,
     assigned_to,
     transaction_id,
+    timing_value,
+    timing_direction,
+    timing_anchor,
   } = req.body;
 
   if (!title || !String(title).trim()) {
     return res.status(400).json({ error: 'title is required' });
   }
   const txId = transaction_id ? Number(transaction_id) : null;
+  let transaction = null;
   if (txId) {
-    const tx = db.prepare('SELECT id FROM transactions WHERE id = ?').get(txId);
-    if (!tx) return res.status(400).json({ error: 'Invalid transaction_id' });
+    transaction = db.prepare('SELECT * FROM transactions WHERE id = ?').get(txId);
+    if (!transaction) return res.status(400).json({ error: 'Invalid transaction_id' });
   }
 
   const assignee = assigned_to ? Number(assigned_to) : null;
@@ -202,15 +240,28 @@ router.post('/', (req, res) => {
     if (!user) return res.status(400).json({ error: 'Invalid assigned_to' });
   }
 
+  const timing = parseTaskTiming({ timing_value, timing_direction, timing_anchor });
+  const resolvedDueDate = resolveTaskDueDate(transaction, {
+    due_date,
+    ...timing,
+  });
+
   const r = db.prepare(`
-    INSERT INTO tasks (title, description, due_date, assigned_to, transaction_id, priority, status)
-    VALUES (?, ?, ?, ?, ?, ?, 'pending')
+    INSERT INTO tasks (
+      title, description, due_date, assigned_to, transaction_id,
+      timing_value, timing_direction, timing_anchor,
+      priority, status
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
   `).run(
     String(title).trim(),
     description?.trim() || null,
-    due_date || null,
+    resolvedDueDate,
     assignee,
     txId,
+    timing.timing_value,
+    timing.timing_direction,
+    timing.timing_anchor,
     'normal',
   );
 
@@ -253,8 +304,15 @@ router.patch('/:id', (req, res) => {
     title,
     description,
     due_date,
+    timing_value,
+    timing_direction,
+    timing_anchor,
   } = req.body;
   const changes = [];
+
+  const transaction = task.transaction_id
+    ? db.prepare('SELECT * FROM transactions WHERE id = ?').get(task.transaction_id)
+    : null;
 
   if (title !== undefined && title !== task.title) {
     changes.push(formatFieldChange('Task name', task.title, title));
@@ -263,9 +321,50 @@ router.patch('/:id', (req, res) => {
   if (description !== undefined && description !== task.description) {
     db.prepare('UPDATE tasks SET description = ? WHERE id = ?').run(description || null, req.params.id);
   }
-  if (due_date !== undefined && due_date !== task.due_date) {
-    changes.push(formatFieldChange('Deadline', task.due_date, due_date || null));
-    db.prepare('UPDATE tasks SET due_date = ? WHERE id = ?').run(due_date || null, req.params.id);
+
+  const timingTouched = timing_anchor !== undefined
+    || timing_value !== undefined
+    || timing_direction !== undefined;
+
+  if (due_date !== undefined || timingTouched) {
+    const timing = timingTouched
+      ? parseTaskTiming({
+        timing_value: timing_value ?? task.timing_value,
+        timing_direction: timing_direction ?? task.timing_direction,
+        timing_anchor: timing_anchor !== undefined ? timing_anchor : task.timing_anchor,
+      })
+      : {
+        timing_value: task.timing_value,
+        timing_direction: task.timing_direction,
+        timing_anchor: task.timing_anchor,
+      };
+
+    if (task.template_task_id) {
+      const resolvedDueDate = due_date !== undefined ? (due_date || null) : task.due_date;
+      if (resolvedDueDate !== task.due_date) {
+        changes.push(formatFieldChange('Deadline', task.due_date, resolvedDueDate));
+        db.prepare('UPDATE tasks SET due_date = ? WHERE id = ?').run(resolvedDueDate, req.params.id);
+      }
+    } else {
+      const resolvedDueDate = resolveTaskDueDate(transaction, {
+        due_date: due_date !== undefined ? due_date : task.due_date,
+        ...timing,
+      });
+      if (resolvedDueDate !== task.due_date) {
+        changes.push(formatFieldChange('Deadline', task.due_date, resolvedDueDate));
+      }
+      db.prepare(`
+        UPDATE tasks
+        SET due_date = ?, timing_value = ?, timing_direction = ?, timing_anchor = ?
+        WHERE id = ?
+      `).run(
+        resolvedDueDate,
+        timing.timing_value,
+        timing.timing_direction,
+        timing.timing_anchor,
+        req.params.id,
+      );
+    }
   }
   if (assigned_to !== undefined) {
     const beforeName = task.assigned_to

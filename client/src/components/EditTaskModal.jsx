@@ -1,6 +1,17 @@
 import { useState, useEffect } from 'react';
+import TaskDeadlineFields from './TaskDeadlineFields';
 
-export default function EditTaskModal({ task, users, onClose, onSave }) {
+export default function EditTaskModal({ task, users, transaction = null, onClose, onSave }) {
+  const isTemplateTask = Boolean(task.template_task_id);
+  const showLinkedDeadline = Boolean(transaction);
+  const initialMode = (task.task_timing_anchor || (isTemplateTask && task.timing_anchor))
+    ? 'relative'
+    : 'fixed';
+
+  const [deadlineMode, setDeadlineMode] = useState(initialMode);
+  const [timingValue, setTimingValue] = useState(task.timing_value ?? 0);
+  const [timingDirection, setTimingDirection] = useState(task.timing_direction || 'A');
+  const [timingAnchor, setTimingAnchor] = useState(task.timing_anchor || '');
   const [form, setForm] = useState({
     title: task.title,
     description: task.description || '',
@@ -10,6 +21,13 @@ export default function EditTaskModal({ task, users, onClose, onSave }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    const mode = (task.task_timing_anchor || (task.template_task_id && task.timing_anchor))
+      ? 'relative'
+      : 'fixed';
+    setDeadlineMode(mode);
+    setTimingValue(task.timing_value ?? 0);
+    setTimingDirection(task.timing_direction || 'A');
+    setTimingAnchor(task.timing_anchor || '');
     setForm({
       title: task.title,
       description: task.description || '',
@@ -21,12 +39,29 @@ export default function EditTaskModal({ task, users, onClose, onSave }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
-    await onSave({
+    const payload = {
       title: form.title,
       description: form.description,
-      due_date: form.due_date || null,
       assigned_to: form.assigned_to || null,
-    });
+    };
+
+    if (showLinkedDeadline && !isTemplateTask) {
+      if (deadlineMode === 'relative') {
+        payload.timing_value = timingValue;
+        payload.timing_direction = timingDirection;
+        payload.timing_anchor = timingAnchor || null;
+        payload.due_date = null;
+      } else {
+        payload.due_date = form.due_date || null;
+        payload.timing_anchor = null;
+        payload.timing_value = null;
+        payload.timing_direction = null;
+      }
+    } else {
+      payload.due_date = form.due_date || null;
+    }
+
+    await onSave(payload);
     setSaving(false);
   }
 
@@ -55,15 +90,40 @@ export default function EditTaskModal({ task, users, onClose, onSave }) {
               className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm resize-none"
             />
           </div>
-          <div>
-            <label className="text-xs font-semibold text-on-surface-variant uppercase">Deadline</label>
-            <input
-              type="date"
-              value={form.due_date}
-              onChange={(e) => setForm({ ...form, due_date: e.target.value })}
-              className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
-            />
-          </div>
+          {showLinkedDeadline ? (
+            <>
+              {isTemplateTask && task.timing_anchor && (
+                <p className="text-xs text-on-surface-variant bg-surface-container-low/60 border border-outline-variant/20 rounded px-3 py-2">
+                  This checklist task is linked to transaction dates via the checklist template.
+                  You can override the due date below; it will update again if transaction dates change.
+                </p>
+              )}
+              <TaskDeadlineFields
+                transaction={transaction}
+                deadlineMode={deadlineMode}
+                onDeadlineModeChange={setDeadlineMode}
+                dueDate={form.due_date}
+                onDueDateChange={(value) => setForm({ ...form, due_date: value })}
+                timingValue={timingValue}
+                onTimingValueChange={setTimingValue}
+                timingDirection={timingDirection}
+                onTimingDirectionChange={setTimingDirection}
+                timingAnchor={timingAnchor}
+                onTimingAnchorChange={setTimingAnchor}
+                readOnlyRelative={isTemplateTask && Boolean(task.timing_anchor) && deadlineMode === 'relative'}
+              />
+            </>
+          ) : (
+            <div>
+              <label className="text-xs font-semibold text-on-surface-variant uppercase">Deadline</label>
+              <input
+                type="date"
+                value={form.due_date}
+                onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
+              />
+            </div>
+          )}
           <div>
             <label className="text-xs font-semibold text-on-surface-variant uppercase">Assigned to</label>
             <select

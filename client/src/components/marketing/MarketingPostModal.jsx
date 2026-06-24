@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import Icon from '../shared/Icon';
 
-const QUOTA_PLATFORM_KEYS = ['Instagram', 'TikTok', 'YouTube', 'Facebook', 'LinkedIn'];
-
 export default function MarketingPostModal({
   open,
   post,
-  platforms,
+  platforms = [],
   defaultScheduledDate,
   onClose,
   onSave,
@@ -15,11 +13,13 @@ export default function MarketingPostModal({
   onMarkActive,
 }) {
   const platformOptions = useMemo(() => {
-    const filtered = platforms.filter((p) =>
-      QUOTA_PLATFORM_KEYS.some((k) => k.toLowerCase() === (p.platform || '').toLowerCase()),
-    );
-    return filtered.length ? filtered : platforms;
-  }, [platforms]);
+    const names = [...platforms];
+    const existing = post?.platform?.trim();
+    if (existing && !names.some((p) => p.toLowerCase() === existing.toLowerCase())) {
+      names.push(existing);
+    }
+    return names;
+  }, [platforms, post?.platform]);
 
   const [form, setForm] = useState({
     title: '',
@@ -45,7 +45,7 @@ export default function MarketingPostModal({
     } else {
       setForm({
         title: '',
-        platform: platformOptions[0]?.platform || '',
+        platform: platformOptions[0] || '',
         scheduled_date: defaultScheduledDate || new Date().toISOString().slice(0, 10),
         notes: '',
       });
@@ -146,7 +146,7 @@ export default function MarketingPostModal({
               className="w-full mt-1 px-3 py-2 text-sm border border-outline-variant/30 rounded-lg outline-none"
             >
               {platformOptions.map((p) => (
-                <option key={p.platform} value={p.platform}>{p.platform}</option>
+                <option key={p} value={p}>{p}</option>
               ))}
             </select>
           </div>

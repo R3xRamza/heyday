@@ -1,23 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import Icon from '../components/shared/Icon';
+import TeamAvatar from '../components/TeamAvatar';
 import { getTeamProfile } from '../data/teamProfiles';
 import { useAuth } from '../context/AuthContext';
 import DateText from '../components/shared/DateText';
 import { formatTaskDue, shortAddress } from '../utils/format';
-
-const AVATAR_CLASSES = [
-  'bg-secondary-container',
-  'bg-purple/30',
-  'bg-secondary-fixed',
-  'bg-sky/40',
-  'bg-light-pink',
-];
-
-function avatarClass(id) {
-  return AVATAR_CLASSES[(Number(id) || 0) % AVATAR_CLASSES.length];
-}
 
 function taskQueueStatus(task) {
   if (task.is_overdue) {
@@ -84,6 +73,11 @@ export default function TeamTaskOverview() {
     fetchClosings();
   }, [fetchClosings]);
 
+  const emailByUserId = useMemo(
+    () => Object.fromEntries(teamMembers.map((m) => [m.id, m.email])),
+    [teamMembers],
+  );
+
   const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
@@ -141,13 +135,12 @@ export default function TeamTaskOverview() {
                       className="bg-white p-6 rounded-xl border border-primary/10 shadow-executive hover:border-secondary transition-all text-left cursor-pointer"
                     >
                       <div className="flex items-center gap-4 mb-6">
-                        <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-surface-container bg-surface-container-low flex items-center justify-center">
-                          {profile.img ? (
-                            <img alt={member.name} src={profile.img} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-primary font-bold">{member.name[0]}</span>
-                          )}
-                        </div>
+                        <TeamAvatar
+                          email={member.email}
+                          name={member.name}
+                          size="lg"
+                          borderClassName="border-2 border-surface-container"
+                        />
                         <div>
                           <div className="font-bold text-primary text-xl">{member.name}</div>
                           <div className="text-on-surface-variant text-[11px] font-bold uppercase">{profile.role}</div>
@@ -261,9 +254,11 @@ export default function TeamTaskOverview() {
                             <td className={`px-6 py-3.5 align-top whitespace-nowrap min-w-[9.5rem] ${dueDisplayClass(task)}`}>{dueLabel}</td>
                             <td className="px-6 py-3.5 align-top">
                               <div className="flex items-center gap-2">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${avatarClass(task.assigned_to)}`}>
-                                  {task.user_initials || '?'}
-                                </div>
+                                <TeamAvatar
+                                  email={emailByUserId[task.assigned_to]}
+                                  name={task.user_name}
+                                  size="xs"
+                                />
                                 <span className="text-sm">{task.user_name || 'Unassigned'}</span>
                               </div>
                             </td>

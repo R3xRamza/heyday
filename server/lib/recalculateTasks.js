@@ -6,10 +6,14 @@ export function recalculateTransactionTasks(transactionId) {
   if (!transaction) return 0;
 
   const tasks = db.prepare(`
-    SELECT t.id, tt.timing_value, tt.timing_direction, tt.timing_anchor
+    SELECT t.id,
+      COALESCE(t.timing_value, tt.timing_value) AS timing_value,
+      COALESCE(t.timing_direction, tt.timing_direction) AS timing_direction,
+      COALESCE(t.timing_anchor, tt.timing_anchor) AS timing_anchor
     FROM tasks t
-    INNER JOIN template_tasks tt ON tt.id = t.template_task_id
+    LEFT JOIN template_tasks tt ON tt.id = t.template_task_id
     WHERE t.transaction_id = ?
+      AND (t.template_task_id IS NOT NULL OR t.timing_anchor IS NOT NULL)
   `).all(transactionId);
 
   const update = db.prepare('UPDATE tasks SET due_date = ? WHERE id = ?');

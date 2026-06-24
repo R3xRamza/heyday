@@ -21,12 +21,17 @@ import {
 
 const router = Router();
 
+const LISTING_REPRESENTING = "representing IN ('seller','seller_and_buyer','landlord','both','seller_and_client','leasing')";
+const BUYER_REPRESENTING = "representing IN ('buyer','tenant','renting')";
+
 const VIEW_MAP = {
+  active_transactions: "stage IN ('active','pending')",
   all: '1=1',
-  active: "stage = 'active'",
-  pending: "stage = 'pending'",
+  current_listings: `${LISTING_REPRESENTING} AND stage != 'closed' AND listing_date IS NOT NULL AND listing_date <= date('now') AND acceptance_date IS NULL`,
+  all_listings: LISTING_REPRESENTING,
+  closing: "stage = 'active' AND close_date IS NOT NULL AND close_date >= date('now')",
+  buyer: `${BUYER_REPRESENTING} AND stage != 'closed'`,
   closed: "stage = 'closed'",
-  escrow: "stage IN ('active', 'pending')",
 };
 
 const TX_FIELDS = [
@@ -34,7 +39,7 @@ const TX_FIELDS = [
   'important_date', 'important_date_label', 'close_date', 'listing_date',
   'acceptance_date', 'option_end_date', 'workflow_status', 'transaction_name',
   'sale_type', 'gross_commission', 'buyer_agreement_date', 'buyer_expiration_date',
-  'client_name', 'owner_name',
+  'client_name', 'owner_name', 'agent_id',
 ];
 
 function requireField(body, fields) {
@@ -161,6 +166,8 @@ router.post('/', (req, res) => {
 
   const name = (req.body.client_name || req.body.owner_name)?.trim() || null;
   const normalized = normalizeAddressFields(req.body);
+  const meredith = db.prepare("SELECT id FROM users WHERE email = 'meredith@heyday.com'").get();
+  const defaultAgentId = meredith?.id ?? req.user.id;
   const result = db.prepare(`
     INSERT INTO transactions (address, city, state, zip, value, owner_name, client_name, agent_id, workflow_status, stage)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'details', 'active')
@@ -172,7 +179,7 @@ router.post('/', (req, res) => {
     req.body.value ? Number(req.body.value) : null,
     name,
     name,
-    req.user.id,
+    defaultAgentId,
   );
 
   const transaction = db.prepare('SELECT * FROM transactions WHERE id = ?').get(result.lastInsertRowid);
@@ -207,6 +214,12 @@ router.put('/:id', (req, res) => {
     let val = req.body[field];
     if (field === 'value' || field === 'gross_commission') {
       val = val != null && val !== '' ? Number(val) : null;
+    } else if (field === 'agent_id') {
+      val = val != null && val !== '' ? Number(val) : null;
+      if (val) {
+        const agent = db.prepare('SELECT id FROM users WHERE id = ?').get(val);
+        if (!agent) return res.status(400).json({ error: 'Invalid agent_id' });
+      }
     } else if (field === 'client_name' && val != null && val !== '') {
       val = val.trim();
       if (!('owner_name' in req.body)) req.body.owner_name = val;

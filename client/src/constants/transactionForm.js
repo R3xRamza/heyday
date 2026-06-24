@@ -12,6 +12,16 @@ export function representingLabel(value) {
     || (value === 'both' || value === 'seller_and_client' ? 'Seller and Buyer' : value === 'leasing' ? 'Landlord' : value === 'renting' ? 'Tenant' : value);
 }
 
+const TRANSACTION_STAGE_LABELS = {
+  active: 'In contract',
+  pending: 'Pre-listing',
+  closed: 'Closed',
+};
+
+export function transactionStageLabel(stage) {
+  return TRANSACTION_STAGE_LABELS[stage] || stage || 'In contract';
+}
+
 /** Label for counterparty name field(s) in setup / forms */
 export function counterpartyNameLabel(representing) {
   return `${representingLabel(representing)} name`;
@@ -51,6 +61,37 @@ export function normalizeRepresenting(value) {
   if (value === 'leasing') return 'landlord';
   if (value === 'renting') return 'tenant';
   return value || 'seller';
+}
+
+function portfolioTodayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Portfolio table type — distinct from transactionStageLabel (detail view). */
+export function transactionPortfolioType(tx) {
+  if (!tx) return 'Active';
+  if (tx.stage === 'closed') return 'Closed';
+
+  const today = portfolioTodayStr();
+  if (tx.stage === 'active' && tx.close_date && tx.close_date >= today) {
+    return 'Closing';
+  }
+
+  const representing = normalizeRepresenting(tx.representing);
+  if ((representing === 'buyer' || representing === 'tenant') && tx.stage !== 'closed') {
+    return 'Buyer';
+  }
+
+  const isListingSide = representing === 'seller' || representing === 'seller_and_buyer' || representing === 'landlord';
+  if (isListingSide && tx.stage !== 'closed' && tx.listing_date && tx.listing_date <= today && !tx.acceptance_date) {
+    return 'Active listing';
+  }
+
+  if (isListingSide && tx.stage !== 'closed' && tx.listing_date && tx.listing_date > today) {
+    return 'Pre-listing';
+  }
+
+  return 'Active';
 }
 
 /** All date fields that may appear on a transaction timeline */

@@ -154,6 +154,22 @@ export default function TransactionManager() {
     fetchActivities();
   }
 
+  async function createTask(body) {
+    const res = await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ ...body, transaction_id: Number(id) }),
+    });
+    const json = await res.json();
+    if (res.ok) {
+      setTasks((prev) => [...prev, json.task]);
+      fetchActivities();
+      return json.task;
+    }
+    return null;
+  }
+
   async function addComment(text) {
     await fetch(`/api/transactions/${id}/activity`, {
       method: 'POST',
@@ -247,6 +263,7 @@ export default function TransactionManager() {
         onSaveParties={saveParties}
         onTaskUpdate={updateTask}
         onTaskDelete={deleteTask}
+        onTaskCreate={createTask}
         onAddComment={addComment}
         onRefreshActivities={fetchActivities}
         onDeleteTransaction={deleteTransaction}

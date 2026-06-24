@@ -6,24 +6,23 @@ import Icon from '../components/shared/Icon';
 import DateText from '../components/shared/DateText';
 import { formatCurrency, parseTransactionAddress } from '../utils/format';
 import PriceInput from '../components/shared/PriceInput';
-import { validateTransactionFields } from '../constants/transactionForm';
+import { validateTransactionFields, transactionPortfolioType } from '../constants/transactionForm';
 
 const FILTERS = [
+  { key: 'active_transactions', label: 'Active Transactions' },
   { key: 'all', label: 'All Transactions' },
-  { key: 'active', label: 'Active Escrow' },
-  { key: 'pending', label: 'Pre-Listing' },
-  { key: 'escrow', label: 'Closing Soon' },
+  { key: 'current_listings', label: 'Current Listings' },
+  { key: 'all_listings', label: 'All Listings' },
+  { key: 'closing', label: 'Closing' },
+  { key: 'buyer', label: 'Buyer' },
+  { key: 'closed', label: 'Closed' },
 ];
 
-const STAGE_LABELS = {
-  active: 'Active Escrow',
-  pending: 'Pre-Listing',
-  closed: 'Closed',
-};
+const TABLE_HEADERS = ['Address', 'Type', 'Price', 'Creation Date', 'Agent', ''];
 
 export default function TransactionsList() {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('active_transactions');
   const [search, setSearch] = useState('');
   const [data, setData] = useState({ transactions: [], stats: {} });
   const [loading, setLoading] = useState(true);
@@ -110,8 +109,8 @@ export default function TransactionsList() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {[
             { label: 'Total Volume', value: formatCurrency(volume), sub: `${stats?.count || 0} properties` },
-            { label: 'Active Escrows', value: stats?.active_count || 0, sub: 'Properties' },
-            { label: 'Pending Closings', value: stats?.pending_count || 0, sub: 'In pipeline' },
+            { label: 'In contract', value: stats?.active_count || 0, sub: 'Properties' },
+            { label: 'Pre-listing', value: stats?.pending_count || 0, sub: 'In pipeline' },
             { label: 'Avg Deal Size', value: stats?.count ? formatCurrency(volume / stats.count) : '—', sub: 'Per transaction' },
           ].map((m) => (
             <div key={m.label} className="bg-white border border-outline-variant/20 p-6 shadow-executive">
@@ -141,7 +140,7 @@ export default function TransactionsList() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-container-low border-b border-outline-variant/30">
-                  {['Property', 'Lead Agent', 'Transaction Stage', 'Value', 'Est. Closing', ''].map((h) => (
+                  {TABLE_HEADERS.map((h) => (
                     <th key={h} className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest">{h}</th>
                   ))}
                 </tr>
@@ -178,16 +177,16 @@ export default function TransactionsList() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm">{tx.agent_name || '—'}</td>
                       <td className="px-6 py-4">
                         <span className="px-3 py-1 bg-secondary-container/30 text-secondary text-xs font-semibold rounded-full">
-                          {STAGE_LABELS[tx.stage] || tx.stage}
+                          {transactionPortfolioType(tx)}
                         </span>
                       </td>
                       <td className="px-6 py-4 font-semibold">{formatCurrency(tx.value)}</td>
                       <td className="px-6 py-4 text-sm whitespace-nowrap min-w-[9.5rem]">
-                        {tx.close_date ? <DateText value={tx.close_date} /> : tx.important_date ? <DateText value={tx.important_date} /> : '—'}
+                        {tx.created_at ? <DateText value={tx.created_at.slice(0, 10)} /> : '—'}
                       </td>
+                      <td className="px-6 py-4 text-sm">{tx.agent_name || '—'}</td>
                       <td className="px-6 py-4 text-right">
                         <ArrowRight size={18} className="text-on-surface-variant group-hover:text-primary inline" />
                       </td>

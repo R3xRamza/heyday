@@ -15,6 +15,8 @@ const FILTERS = [
   { key: 'today', label: 'Today' },
   { key: 'week', label: 'This Week' },
   { key: 'overdue', label: 'Overdue' },
+  { key: 'completed_today', label: 'Completed Today' },
+  { key: 'active', label: 'Active' },
 ];
 
 function sortMyTasks(tasks) {
@@ -42,11 +44,6 @@ function dueCellClass(task) {
   return 'text-on-surface-variant';
 }
 
-function isCompletedToday(task) {
-  const today = new Date().toISOString().slice(0, 10);
-  return task.status === 'complete' && task.completed_at?.slice(0, 10) === today;
-}
-
 function renderDueLabel(task) {
   if (task.status === 'complete') return 'Completed';
   if (!task.due_date) return '—';
@@ -68,7 +65,9 @@ export default function UserTaskDashboard() {
   const [showCreate, setShowCreate] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [viewMode, setViewMode] = useState('list');
-  const [summaryFilter, setSummaryFilter] = useState(null);
+
+  const includeCompleted = filter === 'completed_today'
+    || (filter === 'all' && showCompleted);
 
   const fetchMember = useCallback(async () => {
     const res = await fetch(`/api/team/${userId}`, { credentials: 'include' });
@@ -83,18 +82,18 @@ export default function UserTaskDashboard() {
     const params = new URLSearchParams({
       assigned_to: userId,
       filter,
-      include_completed: showCompleted ? 'true' : 'false',
+      include_completed: includeCompleted ? 'true' : 'false',
     });
     const res = await fetch(`/api/tasks?${params}`, { credentials: 'include' });
     if (res.ok) setData(await res.json());
     setLoading(false);
-  }, [userId, filter, showCompleted]);
+  }, [userId, filter, includeCompleted]);
 
   useEffect(() => {
     fetch('/api/team', { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setUsers(json.members || []));
-    fetch('/api/transactions?filter=escrow', { credentials: 'include' })
+    fetch('/api/transactions?filter=active_transactions', { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setTransactions((json.transactions || []).slice(0, 50)));
   }, []);
@@ -165,69 +164,30 @@ export default function UserTaskDashboard() {
   const displayedTasks = useMemo(() => {
     let list = data.tasks;
     if (!showUndated) list = list.filter((t) => t.due_date);
-    if (summaryFilter === 'completedToday') {
-      list = list.filter(isCompletedToday);
-    }
     return sortMyTasks(list);
-  }, [data.tasks, showUndated, summaryFilter]);
+  }, [data.tasks, showUndated]);
 
-  function applySummaryCard(key) {
-    if (key === 'overdue') {
-      setSummaryFilter('overdue');
-      setFilter('overdue');
-      setShowCompleted(false);
-      return;
-    }
-    if (key === 'completedToday') {
-      setSummaryFilter('completedToday');
-      setFilter('all');
-      setShowCompleted(true);
-      return;
-    }
-    if (key === 'active') {
-      setSummaryFilter('active');
-      setFilter('all');
-      setShowCompleted(false);
-    }
+  function selectFilter(key) {
+    setFilter(key);
+    if (key === 'completed_today') setShowCompleted(true);
+    else if (key === 'active' || key === 'overdue') setShowCompleted(false);
   }
-
-  const statCards = [
-    {
-      key: 'completedToday',
-      icon: 'task_alt',
-      label: 'Completed Today',
-      value: stats.completedToday ?? 0,
-      iconBg: 'bg-secondary/10 text-secondary',
-      hover: 'hover:border-secondary/30',
-      activeRing: 'ring-2 ring-secondary/40 border-secondary/30',
-    },
-    {
-      key: 'overdue',
-      icon: 'warning',
-      label: 'Overdue',
-      value: String(stats.overdueCount ?? stats.highPriority ?? 0).padStart(2, '0'),
-      iconBg: 'bg-error/5 text-error',
-      hover: 'hover:border-error/30',
-      valueClass: 'text-error',
-      activeRing: 'ring-2 ring-error/40 border-error/30',
-    },
-    {
-      key: 'active',
-      icon: 'list_alt',
-      label: 'Total Active',
-      value: stats.totalActive ?? 0,
-      iconBg: 'bg-primary/5 text-primary',
-      hover: 'hover:border-primary/30',
-      activeRing: 'ring-2 ring-primary/30 border-primary/30',
-    },
-  ];
 
   const filterLabel = (key, base) => {
     if (key === 'today' && stats.todayCount) return `${base} (${stats.todayCount})`;
     if (key === 'overdue' && stats.overdueCount) return `${base} (${stats.overdueCount})`;
     if (key === 'week' && stats.weekCount) return `${base} (${stats.weekCount})`;
+    if (key === 'completed_today' && stats.completedToday) return `${base} (${stats.completedToday})`;
+    if (key === 'active' && stats.totalActive) return `${base} (${stats.totalActive})`;
     return base;
   };
+
+  function filterPillClass(key) {
+    if (filter !== key) return 'text-on-surface-variant hover:bg-surface-container-high';
+    if (key === 'overdue') return 'bg-error/10 text-error';
+    if (key === 'completed_today') return 'bg-secondary/15 text-secondary';
+    return 'bg-primary text-white';
+  }
 
   const rowPad = compact ? 'py-2' : 'py-4';
 
@@ -245,51 +205,19 @@ export default function UserTaskDashboard() {
           profile={profile}
           showBorder={false}
         >
-          <div className="flex items-center gap-2 flex-wrap mb-6">
+          <div className="flex items-center gap-2 flex-wrap pb-4">
             {FILTERS.map((f) => (
               <button
                 key={f.key}
                 type="button"
-                onClick={() => {
-                  setFilter(f.key);
-                  setSummaryFilter(f.key === 'overdue' ? 'overdue' : null);
-                  if (f.key === 'overdue') setShowCompleted(false);
-                }}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide transition-colors ${
-                  filter === f.key
-                    ? f.key === 'overdue' ? 'bg-error/10 text-error' : 'bg-primary text-white'
-                    : 'text-on-surface-variant hover:bg-surface-container-high'
-                }`}
+                onClick={() => selectFilter(f.key)}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide transition-colors ${filterPillClass(f.key)}`}
               >
                 {filterLabel(f.key, f.label)}
               </button>
             ))}
           </div>
         </TaskHubPersonHeader>
-
-        <div className="px-10 pb-6 grid grid-cols-3 gap-6">
-          {statCards.map((card) => {
-            const active = summaryFilter === card.key;
-            return (
-              <button
-                key={card.key}
-                type="button"
-                onClick={() => applySummaryCard(card.key)}
-                className={`bg-surface-container-low border border-outline-variant/20 rounded-xl p-5 flex items-center gap-4 text-left transition-all ${card.hover} ${
-                  active ? card.activeRing : ''
-                }`}
-              >
-                <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${card.iconBg}`}>
-                  <Icon name={card.icon} className="!text-[28px]" />
-                </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-wider text-on-surface-variant/60 font-semibold">{card.label}</p>
-                  <p className={`text-2xl font-bold text-primary ${card.valueClass || ''}`}>{card.value}</p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden min-h-0">

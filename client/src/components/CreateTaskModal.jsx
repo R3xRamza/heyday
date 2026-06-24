@@ -1,31 +1,61 @@
 import { useState } from 'react';
+import TaskDeadlineFields, { getAnchorOptionsForTransaction } from './TaskDeadlineFields';
 
 export default function CreateTaskModal({
   users,
   transactions = [],
   defaultAssignedTo,
+  defaultTransactionId,
+  lockTransaction = false,
+  transaction = null,
   onClose,
   onSave,
 }) {
+  const showLinkedDeadline = Boolean(transaction || (lockTransaction && defaultTransactionId));
+  const [deadlineMode, setDeadlineMode] = useState('fixed');
+  const [timingValue, setTimingValue] = useState(0);
+  const [timingDirection, setTimingDirection] = useState('A');
+  const [timingAnchor, setTimingAnchor] = useState('');
   const [form, setForm] = useState({
     title: '',
     description: '',
     due_date: '',
     assigned_to: defaultAssignedTo ? String(defaultAssignedTo) : '',
-    transaction_id: '',
+    transaction_id: defaultTransactionId ? String(defaultTransactionId) : '',
   });
   const [saving, setSaving] = useState(false);
+
+  function handleDeadlineModeChange(mode) {
+    setDeadlineMode(mode);
+    if (mode === 'relative' && !timingAnchor && transaction) {
+      const options = getAnchorOptionsForTransaction(transaction);
+      if (options.length > 0) setTimingAnchor(options[0].anchor);
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
-    await onSave({
+    const payload = {
       title: form.title.trim(),
       description: form.description.trim() || null,
-      due_date: form.due_date || null,
       assigned_to: form.assigned_to ? Number(form.assigned_to) : null,
-      transaction_id: form.transaction_id ? Number(form.transaction_id) : null,
-    });
+      transaction_id: lockTransaction && defaultTransactionId
+        ? Number(defaultTransactionId)
+        : (form.transaction_id ? Number(form.transaction_id) : null),
+    };
+
+    if (showLinkedDeadline && deadlineMode === 'relative') {
+      payload.timing_value = timingValue;
+      payload.timing_direction = timingDirection;
+      payload.timing_anchor = timingAnchor || null;
+      payload.due_date = null;
+    } else {
+      payload.due_date = form.due_date || null;
+      payload.timing_anchor = null;
+    }
+
+    await onSave(payload);
     setSaving(false);
   }
 
@@ -54,15 +84,31 @@ export default function CreateTaskModal({
               className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm resize-none"
             />
           </div>
-          <div>
-            <label className="text-xs font-semibold text-on-surface-variant uppercase">Deadline</label>
-            <input
-              type="date"
-              value={form.due_date}
-              onChange={(e) => setForm({ ...form, due_date: e.target.value })}
-              className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
+          {showLinkedDeadline && transaction ? (
+            <TaskDeadlineFields
+              transaction={transaction}
+              deadlineMode={deadlineMode}
+              onDeadlineModeChange={handleDeadlineModeChange}
+              dueDate={form.due_date}
+              onDueDateChange={(value) => setForm({ ...form, due_date: value })}
+              timingValue={timingValue}
+              onTimingValueChange={setTimingValue}
+              timingDirection={timingDirection}
+              onTimingDirectionChange={setTimingDirection}
+              timingAnchor={timingAnchor}
+              onTimingAnchorChange={setTimingAnchor}
             />
-          </div>
+          ) : (
+            <div>
+              <label className="text-xs font-semibold text-on-surface-variant uppercase">Deadline</label>
+              <input
+                type="date"
+                value={form.due_date}
+                onChange={(e) => setForm({ ...form, due_date: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
+              />
+            </div>
+          )}
           <div>
             <label className="text-xs font-semibold text-on-surface-variant uppercase">Assigned to</label>
             <select
@@ -76,21 +122,23 @@ export default function CreateTaskModal({
               ))}
             </select>
           </div>
-          <div>
-            <label className="text-xs font-semibold text-on-surface-variant uppercase">Transaction (optional)</label>
-            <select
-              value={form.transaction_id}
-              onChange={(e) => setForm({ ...form, transaction_id: e.target.value })}
-              className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
-            >
-              <option value="">No transaction</option>
-              {transactions.map((tx) => (
-                <option key={tx.id} value={String(tx.id)}>
-                  {[tx.address, tx.city, tx.state, tx.zip].filter(Boolean).join(', ')}
-                </option>
-              ))}
-            </select>
-          </div>
+          {!lockTransaction && (
+            <div>
+              <label className="text-xs font-semibold text-on-surface-variant uppercase">Transaction (optional)</label>
+              <select
+                value={form.transaction_id}
+                onChange={(e) => setForm({ ...form, transaction_id: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
+              >
+                <option value="">No transaction</option>
+                {transactions.map((tx) => (
+                  <option key={tx.id} value={String(tx.id)}>
+                    {[tx.address, tx.city, tx.state, tx.zip].filter(Boolean).join(', ')}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
         <div className="px-6 py-4 border-t border-outline-variant/20 flex gap-3 justify-end">
           <button type="button" onClick={onClose} className="px-5 py-2 text-sm font-semibold text-on-surface-variant border rounded">
