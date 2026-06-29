@@ -15,6 +15,7 @@ import {
   isDualCounterpartyRepresenting,
 } from '../constants/transactionForm';
 import PriceInput from './shared/PriceInput';
+import AddressAutocomplete from './shared/AddressAutocomplete';
 import { buildFallbackParties } from '../data/transactionParties';
 
 const STEPS = [
@@ -282,11 +283,13 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="text-xs font-semibold text-on-surface-variant">{fieldLabel('address', 'Address')}</label>
-              <input
+              <AddressAutocomplete
                 required={isRequired('address')}
                 value={form.address || ''}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                onChange={(address) => setForm({ ...form, address })}
+                onAddressSelect={(fields) => setForm({ ...form, ...fields })}
                 className="w-full mt-1 px-3 py-2 border rounded text-sm"
+                placeholder="Start typing an address…"
               />
             </div>
             <div>
