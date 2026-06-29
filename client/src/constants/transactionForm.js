@@ -74,7 +74,7 @@ export function transactionPortfolioType(tx) {
 
   const today = portfolioTodayStr();
   if (tx.stage === 'active' && tx.close_date && tx.close_date >= today) {
-    return 'Closing';
+    return 'Pending';
   }
 
   const representing = normalizeRepresenting(tx.representing);

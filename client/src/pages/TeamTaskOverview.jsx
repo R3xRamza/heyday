@@ -83,14 +83,12 @@ export default function TeamTaskOverview() {
   return (
     <DashboardLayout title="Team Task Overview" className="p-8">
       <div className="max-w-[1440px] mx-auto">
-        <div className="mb-4 flex justify-between items-end flex-wrap gap-4">
+        <div className="mb-4 flex justify-between items-center flex-wrap gap-4">
           <div>
-            <h2 className="text-2xl font-semibold text-primary">Team Task Overview</h2>
-            <p className="text-sm text-on-surface-variant">Real-time operational sync for the Heyday executive team.</p>
             {user?.id && (
               <Link
                 to={`/tasks/${user.id}`}
-                className="text-sm text-secondary font-semibold hover:underline mt-1 inline-block"
+                className="text-sm text-secondary font-semibold hover:underline inline-block"
               >
                 My tasks →
               </Link>

@@ -13,8 +13,7 @@ const FILTERS = [
   { key: 'all', label: 'All Transactions' },
   { key: 'current_listings', label: 'Current Listings' },
   { key: 'all_listings', label: 'All Listings' },
-  { key: 'closing', label: 'Closing' },
-  { key: 'buyer', label: 'Buyer' },
+  { key: 'pending', label: 'Pending' },
   { key: 'closed', label: 'Closed' },
 ];
 
@@ -81,16 +80,9 @@ export default function TransactionsList() {
   const volume = stats?.volume || 0;
 
   return (
-    <DashboardLayout title="Transaction Portfolio" className="bg-surface">
-      <div className="max-w-[1440px] mx-auto px-8 py-10">
-        <header className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
-          <div>
-            <h1 className="text-3xl font-semibold text-primary tracking-tight">Transaction Portfolio</h1>
-            <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mt-1">
-              Enterprise Command Center
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
+    <DashboardLayout title="Transactions" className="bg-surface">
+      <div className="max-w-[1440px] mx-auto px-8 py-6">
+        <header className="flex justify-end mb-6 gap-4">
             <Link
               to="/checklists"
               className="flex items-center gap-2 px-6 py-3 bg-surface-container-highest border border-outline-variant/30 text-primary text-xs font-semibold uppercase tracking-wider hover:bg-surface-container-high"
@@ -103,15 +95,14 @@ export default function TransactionsList() {
             >
               <Plus size={18} /> New Transaction
             </button>
-          </div>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {[
+            { label: 'Listings', value: stats?.listings_count ?? 0, sub: 'On market' },
+            { label: 'Pre-Listings', value: stats?.pre_listings_count ?? 0, sub: 'Coming soon' },
+            { label: 'Pending', value: stats?.pending_count ?? 0, sub: 'Under contract' },
             { label: 'Total Volume', value: formatCurrency(volume), sub: `${stats?.count || 0} properties` },
-            { label: 'In contract', value: stats?.active_count || 0, sub: 'Properties' },
-            { label: 'Pre-listing', value: stats?.pending_count || 0, sub: 'In pipeline' },
-            { label: 'Avg Deal Size', value: stats?.count ? formatCurrency(volume / stats.count) : '—', sub: 'Per transaction' },
           ].map((m) => (
             <div key={m.label} className="bg-white border border-outline-variant/20 p-6 shadow-executive">
               <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">{m.label}</p>

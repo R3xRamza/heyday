@@ -22,15 +22,18 @@ import {
 const router = Router();
 
 const LISTING_REPRESENTING = "representing IN ('seller','seller_and_buyer','landlord','both','seller_and_client','leasing')";
-const BUYER_REPRESENTING = "representing IN ('buyer','tenant','renting')";
+
+const PORTFOLIO_SCOPE = "stage != 'closed'";
+const LISTINGS_COUNT = `${LISTING_REPRESENTING} AND stage != 'closed' AND listing_date IS NOT NULL AND listing_date <= date('now') AND acceptance_date IS NULL`;
+const PRE_LISTINGS_COUNT = `${LISTING_REPRESENTING} AND stage != 'closed' AND listing_date IS NOT NULL AND listing_date > date('now')`;
+const PENDING_COUNT = "stage = 'active' AND close_date IS NOT NULL AND close_date >= date('now')";
 
 const VIEW_MAP = {
   active_transactions: "stage IN ('active','pending')",
   all: '1=1',
-  current_listings: `${LISTING_REPRESENTING} AND stage != 'closed' AND listing_date IS NOT NULL AND listing_date <= date('now') AND acceptance_date IS NULL`,
+  current_listings: LISTINGS_COUNT,
   all_listings: LISTING_REPRESENTING,
-  closing: "stage = 'active' AND close_date IS NOT NULL AND close_date >= date('now')",
-  buyer: `${BUYER_REPRESENTING} AND stage != 'closed'`,
+  pending: PENDING_COUNT,
   closed: "stage = 'closed'",
 };
 
@@ -89,9 +92,10 @@ router.get('/', (req, res) => {
 
   const stats = db.prepare(`
     SELECT COUNT(*) as count, COALESCE(SUM(value), 0) as volume,
-      SUM(CASE WHEN stage = 'active' THEN 1 ELSE 0 END) as active_count,
-      SUM(CASE WHEN stage = 'pending' THEN 1 ELSE 0 END) as pending_count
-    FROM transactions WHERE ${where}
+      SUM(CASE WHEN ${LISTINGS_COUNT} THEN 1 ELSE 0 END) as listings_count,
+      SUM(CASE WHEN ${PRE_LISTINGS_COUNT} THEN 1 ELSE 0 END) as pre_listings_count,
+      SUM(CASE WHEN ${PENDING_COUNT} THEN 1 ELSE 0 END) as pending_count
+    FROM transactions WHERE ${PORTFOLIO_SCOPE}
   `).get();
 
   res.json({ transactions, stats });
