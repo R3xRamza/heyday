@@ -63,6 +63,21 @@ export function resolveAssigneeId(db, title, defaultRole) {
   return usersByRole[role] ?? null;
 }
 
+/** Push template default_role to all transaction tasks spawned from this template row. */
+export function syncLinkedTaskAssignees(db, templateTaskId, defaultRole, title) {
+  const assignedTo = resolveAssigneeId(db, title, defaultRole);
+  db.prepare('UPDATE tasks SET assigned_to = ? WHERE template_task_id = ?').run(assignedTo, templateTaskId);
+}
+
+export function syncAllTaskAssigneesFromTemplates(db) {
+  const rows = db.prepare('SELECT id, title, default_role FROM template_tasks').all();
+  db.transaction(() => {
+    for (const row of rows) {
+      syncLinkedTaskAssignees(db, row.id, row.default_role, row.title);
+    }
+  })();
+}
+
 export function reassignAllTasksByRole(db) {
   const usersByRole = getUsersByRole(db);
   if (Object.keys(usersByRole).length === 0) return;
