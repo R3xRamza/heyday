@@ -7,6 +7,7 @@ import DateText from '../components/shared/DateText';
 import { formatCurrency, parseTransactionAddress } from '../utils/format';
 import PriceInput from '../components/shared/PriceInput';
 import AddressAutocomplete from '../components/shared/AddressAutocomplete';
+import { blurActiveElement, CHROME_AUTOCOMPLETE, ChromeAddressDecoy } from '../components/shared/chromeFormGuards';
 import { validateTransactionFields, transactionPortfolioType } from '../constants/transactionForm';
 
 const FILTERS = [
@@ -68,6 +69,7 @@ export default function TransactionsList() {
     const json = await res.json();
     setCreating(false);
     if (res.ok) {
+      blurActiveElement();
       setShowCreate(false);
       setCreateError('');
       navigate(`/transactions/${json.transaction.id}`);
@@ -197,7 +199,7 @@ export default function TransactionsList() {
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div
-            className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4"
+            className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4 relative"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
                 e.preventDefault();
@@ -205,6 +207,7 @@ export default function TransactionsList() {
               }
             }}
           >
+            <ChromeAddressDecoy />
             <h2 className="text-lg font-bold text-primary">Step 1 — Create Transaction</h2>
             <p className="text-sm text-on-surface-variant">Enter the property address to begin. You&apos;ll add full details next.</p>
             {createError && (
@@ -227,19 +230,19 @@ export default function TransactionsList() {
               <div>
                 <label className="block text-xs font-semibold text-on-surface-variant mb-1">City *</label>
                 <input required value={form.city} onChange={(e) => { setCreateError(''); setForm({ ...form, city: e.target.value }); }}
-                  autoComplete="heyday-property-city" name="heyday-property-city"
+                  autoComplete={CHROME_AUTOCOMPLETE}
                   className="w-full px-3 py-2 border border-outline-variant/40 rounded text-sm" placeholder="Austin" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-on-surface-variant mb-1">State *</label>
                 <input required value={form.state} onChange={(e) => { setCreateError(''); setForm({ ...form, state: e.target.value }); }}
-                  autoComplete="heyday-property-state" name="heyday-property-state"
+                  autoComplete={CHROME_AUTOCOMPLETE}
                   className="w-full px-3 py-2 border border-outline-variant/40 rounded text-sm" placeholder="TX" maxLength={2} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-on-surface-variant mb-1">ZIP *</label>
                 <input required value={form.zip} onChange={(e) => { setCreateError(''); setForm({ ...form, zip: e.target.value }); }}
-                  autoComplete="heyday-property-zip" name="heyday-property-zip"
+                  autoComplete={CHROME_AUTOCOMPLETE}
                   className="w-full px-3 py-2 border border-outline-variant/40 rounded text-sm" placeholder="78746" />
               </div>
             </div>
@@ -256,7 +259,7 @@ export default function TransactionsList() {
               <div>
                 <label className="block text-xs font-semibold text-on-surface-variant mb-1">Client Name</label>
                 <input value={form.client_name} onChange={(e) => setForm({ ...form, client_name: e.target.value })}
-                  autoComplete="heyday-client-name" name="heyday-client-name"
+                  autoComplete={CHROME_AUTOCOMPLETE}
                   className="w-full px-3 py-2 border border-outline-variant/40 rounded text-sm" />
               </div>
             </div>
