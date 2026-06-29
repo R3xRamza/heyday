@@ -272,7 +272,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
       </div>
 
       {step === 'details' && (
-        <form onSubmit={saveDetails} className="bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4">
+        <form onSubmit={saveDetails} autoComplete="off" className="bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4">
           <h2 className="text-xl font-bold text-primary">Transaction Details</h2>
           <p className="text-sm text-on-surface-variant">Add property, client, and key dates for this transaction.</p>
           {validationError && (
@@ -298,6 +298,8 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                 required={isRequired('city')}
                 value={form.city || ''}
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
+                autoComplete="heyday-property-city"
+                name="heyday-property-city"
                 className="w-full mt-1 px-3 py-2 border rounded text-sm"
               />
             </div>
@@ -307,6 +309,8 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                 required={isRequired('state')}
                 value={form.state || ''}
                 onChange={(e) => setForm({ ...form, state: e.target.value })}
+                autoComplete="heyday-property-state"
+                name="heyday-property-state"
                 className="w-full mt-1 px-3 py-2 border rounded text-sm"
                 placeholder="TX"
                 maxLength={2}
@@ -318,6 +322,8 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                 required={isRequired('zip')}
                 value={form.zip || ''}
                 onChange={(e) => setForm({ ...form, zip: e.target.value })}
+                autoComplete="heyday-property-zip"
+                name="heyday-property-zip"
                 className="w-full mt-1 px-3 py-2 border rounded text-sm"
                 placeholder="78746"
               />
@@ -343,6 +349,8 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                       client_name: e.target.value,
                       owner_name: e.target.value,
                     })}
+                    autoComplete="heyday-party-name"
+                    name="heyday-seller-name"
                     className="w-full mt-1 px-3 py-2 border rounded text-sm"
                   />
                 </div>
@@ -352,6 +360,8 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                   <input
                     value={form.buyer_party_name ?? ''}
                     onChange={(e) => setForm({ ...form, buyer_party_name: e.target.value })}
+                    autoComplete="heyday-party-name"
+                    name="heyday-buyer-name"
                     className="w-full mt-1 px-3 py-2 border rounded text-sm"
                   />
                 </div>
@@ -365,6 +375,8 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                   <input
                     value={form.client_name || form.owner_name || ''}
                     onChange={(e) => setForm({ ...form, client_name: e.target.value, owner_name: e.target.value })}
+                    autoComplete="heyday-party-name"
+                    name="heyday-party-name"
                     className="w-full mt-1 px-3 py-2 border rounded text-sm"
                   />
                 </div>
