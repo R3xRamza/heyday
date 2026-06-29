@@ -1,7 +1,11 @@
 import { computeDueDate, resolveAnchorDate } from './timing.js';
 import { resolveAssigneeId, resolveTaskPriority, resolveTaskRole } from './taskAssignment.js';
 import { logActivity, actorLabel } from './activity.js';
-import { linkTemplateToTransaction } from './transactionChecklists.js';
+import {
+  getTransactionChecklists,
+  linkTemplateToTransaction,
+  unlinkTemplateFromTransaction,
+} from './transactionChecklists.js';
 
 /**
  * Apply one or more checklist templates to a transaction.
@@ -28,7 +32,7 @@ export function applyChecklistsToTransaction(db, transactionId, templateIds, use
 
   const created = [];
   const appliedNames = [];
-  const appliedChecklists = [];
+  const inSetup = transaction.workflow_status && transaction.workflow_status !== 'active';
 
   db.transaction(() => {
     ids.forEach((templateId, index) => {
@@ -38,12 +42,6 @@ export function applyChecklistsToTransaction(db, transactionId, templateIds, use
     for (const templateId of ids) {
       const template = db.prepare('SELECT name FROM checklist_templates WHERE id = ?').get(templateId);
       if (!template) continue;
-
-      appliedChecklists.push({
-        id: templateId,
-        name: template.name,
-        sort_order: ids.indexOf(templateId),
-      });
 
       const templateTasks = db.prepare(
         'SELECT * FROM template_tasks WHERE template_id = ? ORDER BY sort_order',
@@ -68,8 +66,13 @@ export function applyChecklistsToTransaction(db, transactionId, templateIds, use
     }
 
     const lastTemplateId = ids[ids.length - 1];
-    db.prepare('UPDATE transactions SET checklist_template_id = ?, workflow_status = ? WHERE id = ?')
-      .run(lastTemplateId, 'assign', transactionId);
+    if (inSetup) {
+      db.prepare('UPDATE transactions SET checklist_template_id = ?, workflow_status = ? WHERE id = ?')
+        .run(lastTemplateId, 'assign', transactionId);
+    } else if (!transaction.checklist_template_id) {
+      db.prepare('UPDATE transactions SET checklist_template_id = ? WHERE id = ?')
+        .run(lastTemplateId, transactionId);
+    }
   })();
 
   if (user && appliedNames.length > 0) {
@@ -83,8 +86,80 @@ export function applyChecklistsToTransaction(db, transactionId, templateIds, use
   }
 
   const enrichedTasks = created.map((t) => enrichTaskWithTemplate(db, t));
+  const checklists = getTransactionChecklists(db, transactionId);
 
-  return { tasks: enrichedTasks, applied: appliedNames, checklists: appliedChecklists };
+  return { tasks: enrichedTasks, applied: appliedNames, checklists };
+}
+
+/**
+ * Remove a checklist template from a transaction and delete its spawned tasks.
+ */
+export function removeChecklistFromTransaction(db, transactionId, templateId, user) {
+  const transaction = db.prepare('SELECT * FROM transactions WHERE id = ?').get(transactionId);
+  if (!transaction) return { error: 'not_found', status: 404 };
+
+  const templateIdNum = Number(templateId);
+  const linked = db.prepare(
+    'SELECT 1 FROM transaction_checklists WHERE transaction_id = ? AND template_id = ?',
+  ).get(transactionId, templateIdNum);
+  if (!linked) return { error: 'checklist_not_linked', status: 404 };
+
+  const template = db.prepare('SELECT name FROM checklist_templates WHERE id = ?').get(templateIdNum);
+  if (!template) return { error: 'template_not_found', status: 404 };
+
+  const taskStats = db.prepare(`
+    SELECT
+      COUNT(*) as total,
+      SUM(CASE WHEN status = 'complete' THEN 1 ELSE 0 END) as completed
+    FROM tasks t
+    INNER JOIN template_tasks tt ON tt.id = t.template_task_id
+    WHERE t.transaction_id = ? AND tt.template_id = ?
+  `).get(transactionId, templateIdNum);
+
+  const tasksRemoved = taskStats?.total ?? 0;
+
+  db.transaction(() => {
+    db.prepare(`
+      DELETE FROM tasks
+      WHERE transaction_id = ?
+        AND template_task_id IN (SELECT id FROM template_tasks WHERE template_id = ?)
+    `).run(transactionId, templateIdNum);
+
+    unlinkTemplateFromTransaction(db, transactionId, templateIdNum);
+
+    if (Number(transaction.checklist_template_id) === templateIdNum) {
+      const next = db.prepare(`
+        SELECT template_id FROM transaction_checklists
+        WHERE transaction_id = ?
+        ORDER BY sort_order ASC, template_id ASC
+        LIMIT 1
+      `).get(transactionId);
+      db.prepare('UPDATE transactions SET checklist_template_id = ? WHERE id = ?')
+        .run(next?.template_id ?? null, transactionId);
+    }
+  })();
+
+  if (user) {
+    const actor = actorLabel(user);
+    const total = taskStats?.total ?? 0;
+    const completed = taskStats?.completed ?? 0;
+    const detail = total > 0
+      ? `${total} task${total === 1 ? '' : 's'} removed (${completed} completed)`
+      : null;
+    logActivity({
+      transactionId: Number(transactionId),
+      userId: user.id,
+      eventType: 'checklist_removed',
+      summary: `${actor} removed checklist: ${template.name}`,
+      detail,
+    });
+  }
+
+  return {
+    removed: template.name,
+    tasksRemoved,
+    checklists: getTransactionChecklists(db, transactionId),
+  };
 }
 
 function enrichTaskWithTemplate(db, task) {

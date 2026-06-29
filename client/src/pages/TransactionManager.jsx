@@ -192,6 +192,32 @@ export default function TransactionManager() {
     return false;
   }
 
+  async function removeChecklist(templateId) {
+    const res = await fetch(`/api/transactions/${id}/checklists/${templateId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    if (!res.ok) return false;
+    await Promise.all([fetchTasks(), fetchChecklists(), fetchActivities()]);
+    return true;
+  }
+
+  async function applyChecklists(templateIds) {
+    const res = await fetch(`/api/transactions/${id}/apply-checklists`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ template_ids: templateIds }),
+    });
+    const json = await res.json();
+    if (!res.ok) return { ok: false, error: json.error || 'Could not apply checklist' };
+    await fetchTasks();
+    if (json.checklists) setChecklists(json.checklists);
+    else await fetchChecklists();
+    await fetchActivities();
+    return { ok: true, applied: json.applied || [] };
+  }
+
   if (loading) {
     return (
       <DashboardLayout title="Transaction" className="p-0">
@@ -267,6 +293,8 @@ export default function TransactionManager() {
         onAddComment={addComment}
         onRefreshActivities={fetchActivities}
         onDeleteTransaction={deleteTransaction}
+        onRemoveChecklist={removeChecklist}
+        onApplyChecklists={applyChecklists}
       />
     </DashboardLayout>
   );

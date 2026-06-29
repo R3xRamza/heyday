@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { Plus, X } from 'lucide-react';
 import Icon from './shared/Icon';
 import EditTaskModal from './EditTaskModal';
 import CreateTaskModal from './CreateTaskModal';
@@ -53,6 +54,7 @@ function activityLabel(type) {
     task_deleted: 'Task deleted',
     task_created: 'Task added',
     checklist_added: 'Checklist added',
+    checklist_removed: 'Checklist removed',
     comment: 'Comment',
   };
   return map[type] || type;
@@ -122,6 +124,8 @@ export default function TransactionWorkspace({
   onAddComment,
   onRefreshActivities,
   onDeleteTransaction,
+  onRemoveChecklist,
+  onApplyChecklists,
 }) {
   const [view, setView] = useState('details');
   const [activeChecklistId, setActiveChecklistId] = useState(null);
@@ -129,6 +133,11 @@ export default function TransactionWorkspace({
   const [selectedTask, setSelectedTask] = useState(null);
   const [editTask, setEditTask] = useState(null);
   const [showCreateTask, setShowCreateTask] = useState(false);
+  const [showAddChecklist, setShowAddChecklist] = useState(false);
+  const [checklistTemplates, setChecklistTemplates] = useState([]);
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState([]);
+  const [checklistActionLoading, setChecklistActionLoading] = useState(false);
+  const [checklistActionError, setChecklistActionError] = useState('');
   const [comment, setComment] = useState('');
   const [savingTx, setSavingTx] = useState(false);
   const [savedMsg, setSavedMsg] = useState('');
@@ -177,6 +186,67 @@ export default function TransactionWorkspace({
       setSelectedTask(checklistTasks[0] || null);
     }
   }, [checklistTasks, selectedTask, view]);
+
+  const loadChecklistTemplates = useCallback(async () => {
+    const res = await fetch('/api/checklists', { credentials: 'include' });
+    if (res.ok) {
+      const json = await res.json();
+      setChecklistTemplates(json.templates || []);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showAddChecklist) loadChecklistTemplates();
+  }, [showAddChecklist, loadChecklistTemplates]);
+
+  const appliedChecklistIds = new Set(sidebarChecklists.map((c) => Number(c.id)));
+  const availableTemplates = checklistTemplates.filter((t) => !appliedChecklistIds.has(Number(t.id)));
+
+  async function handleRemoveChecklist(cl) {
+    const total = cl.task_count ?? 0;
+    const msg = total > 0
+      ? `Remove "${cl.name}"? This deletes ${total} task${total === 1 ? '' : 's'} from this transaction (including any completed).`
+      : `Remove "${cl.name}" from this transaction?`;
+    if (!window.confirm(msg)) return;
+
+    setChecklistActionLoading(true);
+    setChecklistActionError('');
+    const ok = await onRemoveChecklist?.(cl.id);
+    setChecklistActionLoading(false);
+    if (!ok) {
+      setChecklistActionError('Could not remove checklist.');
+      return;
+    }
+    if (Number(activeChecklistId) === Number(cl.id)) {
+      setActiveChecklistId(null);
+      setSelectedTask(null);
+    }
+    onRefreshActivities?.();
+  }
+
+  function toggleAddTemplate(id) {
+    setSelectedTemplateIds((prev) =>
+      (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]),
+    );
+  }
+
+  async function handleApplyChecklists() {
+    if (selectedTemplateIds.length === 0) return;
+    setChecklistActionLoading(true);
+    setChecklistActionError('');
+    const result = await onApplyChecklists?.(selectedTemplateIds);
+    setChecklistActionLoading(false);
+    if (!result?.ok) {
+      setChecklistActionError(result?.error || 'Could not apply checklist.');
+      return;
+    }
+    setShowAddChecklist(false);
+    setSelectedTemplateIds([]);
+    if (result.applied?.length) {
+      setView('checklist');
+    }
+    onRefreshActivities?.();
+  }
 
   async function saveTransaction(updates) {
     setSavingTx(true);
@@ -300,25 +370,54 @@ export default function TransactionWorkspace({
         </div>
 
         <div className="p-3">
-          <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest px-2 mb-2">Checklists</p>
+          <div className="flex items-center justify-between px-2 mb-2">
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Checklists</p>
+            <button
+              type="button"
+              onClick={() => {
+                setChecklistActionError('');
+                setSelectedTemplateIds([]);
+                setShowAddChecklist(true);
+              }}
+              className="p-1 text-secondary hover:text-primary rounded"
+              title="Add checklist"
+              aria-label="Add checklist"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+          {checklistActionError && (
+            <p className="text-[10px] text-error px-2 mb-2" role="alert">{checklistActionError}</p>
+          )}
           {sidebarChecklists.length > 0 ? (
             <div className="space-y-1">
               {sidebarChecklists.map((cl) => (
-                <button
-                  key={cl.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveChecklistId(cl.id);
-                    setView('checklist');
-                  }}
-                  className={`w-full text-left px-2 py-2 text-sm rounded truncate ${
-                    view === 'checklist' && Number(activeChecklistId) === Number(cl.id)
-                      ? 'bg-primary-container text-white font-semibold'
-                      : 'text-primary hover:bg-surface-container-low'
-                  }`}
-                >
-                  {cl.name}
-                </button>
+                <div key={cl.id} className="flex items-center gap-0.5 group">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveChecklistId(cl.id);
+                      setView('checklist');
+                    }}
+                    className={`flex-1 min-w-0 text-left px-2 py-2 text-sm rounded truncate ${
+                      view === 'checklist' && Number(activeChecklistId) === Number(cl.id)
+                        ? 'bg-primary-container text-white font-semibold'
+                        : 'text-primary hover:bg-surface-container-low'
+                    }`}
+                  >
+                    {cl.name}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveChecklist(cl)}
+                    disabled={checklistActionLoading}
+                    className="shrink-0 p-1.5 rounded text-on-surface-variant hover:text-error hover:bg-error/10 opacity-60 group-hover:opacity-100"
+                    title={`Remove ${cl.name}`}
+                    aria-label={`Remove ${cl.name}`}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               ))}
             </div>
           ) : (
@@ -633,8 +732,9 @@ export default function TransactionWorkspace({
                       activities.map((a) => (
                         <div key={a.id} className="border-b border-outline-variant/10 pb-4 last:border-0">
                           <p className="text-sm">
-                            <span className="font-bold text-primary">{a.user_name || 'System'}</span>
-                            {' '}{activityLabel(a.event_type).toLowerCase()}
+                            <span className="font-semibold text-primary">
+                              {a.summary || `${a.user_name || 'System'} ${activityLabel(a.event_type).toLowerCase()}`}
+                            </span>
                           </p>
                           <DateText value={a.created_at?.slice(0, 10)} className="text-xs text-on-surface-variant mt-1 block" />
                           {a.detail && (
@@ -711,6 +811,71 @@ export default function TransactionWorkspace({
           onClose={() => setShowCreateTask(false)}
           onSave={handleCreateTask}
         />
+      )}
+
+      {showAddChecklist && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <h2 className="text-lg font-bold text-primary">Add checklist</h2>
+            <p className="text-sm text-on-surface-variant">
+              Select templates to apply. Tasks are created from the template with current assignees and due dates.
+            </p>
+            {checklistActionError && (
+              <p className="text-sm text-error bg-error/10 border border-error/20 rounded-lg px-3 py-2" role="alert">
+                {checklistActionError}
+              </p>
+            )}
+            <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar">
+              {availableTemplates.length === 0 ? (
+                <p className="text-sm text-on-surface-variant py-4 text-center">All templates are already applied.</p>
+              ) : (
+                availableTemplates.map((t) => {
+                  const checked = selectedTemplateIds.includes(t.id);
+                  return (
+                    <label
+                      key={t.id}
+                      className={`flex items-start gap-3 w-full p-3 rounded-lg border cursor-pointer transition-colors ${
+                        checked ? 'border-feather bg-feather/5' : 'border-outline-variant/20 hover:bg-surface-container-low'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleAddTemplate(t.id)}
+                        className="mt-1 rounded border-outline-variant text-secondary"
+                      />
+                      <div>
+                        <p className="font-semibold text-primary text-sm">{t.name}</p>
+                        <p className="text-xs text-on-surface-variant">{t.tasks?.length || 0} tasks</p>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddChecklist(false);
+                  setSelectedTemplateIds([]);
+                  setChecklistActionError('');
+                }}
+                className="px-4 py-2 text-sm text-on-surface-variant"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyChecklists}
+                disabled={checklistActionLoading || selectedTemplateIds.length === 0}
+                className="px-4 py-2 bg-lemon text-feather font-bold rounded text-sm disabled:opacity-50"
+              >
+                {checklistActionLoading ? 'Applying…' : 'Apply'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

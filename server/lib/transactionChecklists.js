@@ -21,6 +21,12 @@ export function linkTemplateToTransaction(db, transactionId, templateId, sortOrd
   `).run(transactionId, templateId, sortOrder);
 }
 
+export function unlinkTemplateFromTransaction(db, transactionId, templateId) {
+  db.prepare(
+    'DELETE FROM transaction_checklists WHERE transaction_id = ? AND template_id = ?',
+  ).run(transactionId, templateId);
+}
+
 export function getTransactionChecklists(db, transactionId) {
   return db.prepare(`
     SELECT tc.template_id AS id, ct.name, tc.sort_order,
