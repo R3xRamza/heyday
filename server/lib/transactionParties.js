@@ -2,9 +2,9 @@ import { normalizeRepresenting } from './transactionValidation.js';
 
 /** Team / vendor roles shown on every transaction */
 export const PARTY_ROLES = [
-  { key: 'listing_agent', label: 'listing agent', isTeam: true, email: 'meredith@heyday.com' },
-  { key: 'office_administrator', label: 'office administrator', isTeam: true, email: 'tessa@heyday.com' },
-  { key: 'transaction_coordinator', label: 'transaction coordinator', isTeam: true, email: 'adam@heyday.com' },
+  { key: 'listing_agent', label: 'listing agent', isTeam: true, email: 'meredith@theheydaygroup.com' },
+  { key: 'office_administrator', label: 'office administrator', isTeam: true, email: 'tessa@theheydaygroup.com' },
+  { key: 'transaction_coordinator', label: 'transaction coordinator', isTeam: true, email: 'adam@theheydaygroup.com' },
   { key: 'escrow_officer', label: 'escrow officer', isTeam: false },
 ];
 
@@ -33,10 +33,10 @@ export function isCounterpartyRole(role) {
 }
 
 export const TEAM_DISPLAY_NAMES = {
-  'meredith@heyday.com': 'Meredith Alderson',
-  'tessa@heyday.com': 'Tessa Osborn',
-  'adam@heyday.com': 'Adam Walding',
-  'margaret@heyday.com': 'Margaret Analyst',
+  'meredith@theheydaygroup.com': 'Meredith Alderson',
+  'tessa@theheydaygroup.com': 'Tessa Osborn',
+  'adam@theheydaygroup.com': 'Adam Walding',
+  'margaret@theheydaygroup.com': 'Margaret Analyst',
 };
 
 function externalNameFromTransaction(transaction) {
@@ -44,7 +44,7 @@ function externalNameFromTransaction(transaction) {
 }
 
 function buildTeamPartyRows(db) {
-  const team = db.prepare("SELECT id, email, name FROM users WHERE email != 'admin@heyday.com'").all();
+  const team = db.prepare("SELECT id, email, name FROM users WHERE email != 'admin@theheydaygroup.com'").all();
   const byEmail = Object.fromEntries(team.map((u) => [u.email, u]));
 
   return PARTY_ROLES.map((role, i) => {

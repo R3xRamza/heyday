@@ -53,7 +53,7 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-4 py-2.5 rounded-lg border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-feather/20 focus:border-feather"
-                placeholder="you@heyday.com"
+                placeholder="you@theheydaygroup.com"
               />
             </div>
 

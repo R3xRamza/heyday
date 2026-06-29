@@ -38,11 +38,11 @@ CLIENT_URL=http://localhost:5173
 
 ## Connecting mailboxes
 
-1. Log in as **admin** (`admin@heyday.com` / `admin123`) to connect all three mailboxes.
+1. Log in as **admin** (`admin@theheydaygroup.com` / `admin123`) to connect all three mailboxes.
 2. Open **CRM** → Gmail mailboxes section → **Connect Gmail** for each address.
 3. Sign in with the **matching** Google account (e.g. connect `meredith@theheydaygroup.com` while signed into that inbox).
 
-Agents with `*@heyday.com` logins can connect their mapped Workspace mailbox (see `HEYDAY_TO_GMAIL` in `server/lib/gmailPermissions.js`).
+Agents with `*@theheydaygroup.com` logins can connect their Workspace mailbox (Adam uses Margaret's inbox; see `HEYDAY_TO_GMAIL` in `server/lib/gmailPermissions.js`).
 
 ## Sync behavior
 

@@ -1,12 +1,9 @@
 import db from '../db.js';
 import { GMAIL_MAILBOXES } from './gmailConfig.js';
 
-/** Map HEYDAY login emails to Workspace Gmail mailboxes */
+/** Adam uses Margaret's Workspace inbox for Gmail sync */
 export const HEYDAY_TO_GMAIL = {
-  'meredith@heyday.com': 'meredith@theheydaygroup.com',
-  'tessa@heyday.com': 'tessa@theheydaygroup.com',
-  'margaret@heyday.com': 'margaret@theheydaygroup.com',
-  'adam@heyday.com': 'margaret@theheydaygroup.com',
+  'adam@theheydaygroup.com': 'margaret@theheydaygroup.com',
 };
 
 export function isAdmin(user) {

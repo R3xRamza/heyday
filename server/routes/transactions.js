@@ -199,7 +199,7 @@ router.post('/', (req, res) => {
 
   const name = (req.body.client_name || req.body.owner_name)?.trim() || null;
   const normalized = normalizeAddressFields(req.body);
-  const meredith = db.prepare("SELECT id FROM users WHERE email = 'meredith@heyday.com'").get();
+  const meredith = db.prepare("SELECT id FROM users WHERE email = 'meredith@theheydaygroup.com'").get();
   const defaultAgentId = meredith?.id ?? req.user.id;
   const result = db.prepare(`
     INSERT INTO transactions (address, city, state, zip, value, owner_name, client_name, agent_id, workflow_status, stage)

@@ -28,11 +28,11 @@ Real estate operations platform — Express/SQLite API + React/Vite SPA.
 
 | User | Email | Password | Role |
 |------|-------|----------|------|
-| Admin | `admin@heyday.com` | `admin123` | admin |
-| Tessa | `tessa@heyday.com` | `heyday123` | operations |
-| Adam | `adam@heyday.com` | `heyday123` | marketing |
-| Margaret | `margaret@heyday.com` | `heyday123` | analyst |
-| Meredith | `meredith@heyday.com` | `heyday123` | owner_lead |
+| Admin | `admin@theheydaygroup.com` | `admin123` | admin |
+| Tessa | `tessa@theheydaygroup.com` | `heyday123` | operations |
+| Adam | `adam@theheydaygroup.com` | `heyday123` | marketing |
+| Margaret | `margaret@theheydaygroup.com` | `heyday123` | analyst |
+| Meredith | `meredith@theheydaygroup.com` | `heyday123` | owner_lead |
 
 Change these before broader production use.
 
@@ -46,7 +46,7 @@ npm run dev
 
 - API: http://localhost:3001  
 - Client: http://localhost:5173  
-- Login: `admin@heyday.com` / `admin123`
+- Login: `admin@theheydaygroup.com` / `admin123`
 
 ### Scripts
 

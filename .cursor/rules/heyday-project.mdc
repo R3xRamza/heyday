@@ -25,7 +25,7 @@ alwaysApply: true
 ## DEV
 
 - `npm run dev` from heyday root
-- Default login seeded: `admin@heyday.com` / `admin123`
+- Default login seeded: `admin@theheydaygroup.com` / `admin123`
 - Scripts: `clear-transactions`, `import-crm`, `seed-sample-transactions`
 
 ## REPO LAYOUT

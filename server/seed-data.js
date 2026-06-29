@@ -14,10 +14,10 @@ export const SEED_TRANSACTIONS = [
 ];
 
 export const TEAM_MEMBERS = [
-  { name: 'Tessa', email: 'tessa@heyday.com', role: 'operations' },
-  { name: 'Adam', email: 'adam@heyday.com', role: 'marketing' },
-  { name: 'Margaret', email: 'margaret@heyday.com', role: 'analyst' },
-  { name: 'Meredith', email: 'meredith@heyday.com', role: 'owner_lead' },
+  { name: 'Tessa', email: 'tessa@theheydaygroup.com', role: 'operations' },
+  { name: 'Adam', email: 'adam@theheydaygroup.com', role: 'marketing' },
+  { name: 'Margaret', email: 'margaret@theheydaygroup.com', role: 'analyst' },
+  { name: 'Meredith', email: 'meredith@theheydaygroup.com', role: 'owner_lead' },
 ];
 
 export function syncChecklistTemplatesOnly(db) {

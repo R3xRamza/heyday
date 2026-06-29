@@ -72,7 +72,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
     if (step !== 'details' || users.length === 0) return;
     setForm((prev) => {
       if (prev.agent_id) return prev;
-      const meredith = users.find((u) => u.email === 'meredith@heyday.com');
+      const meredith = users.find((u) => u.email === 'meredith@theheydaygroup.com');
       const defaultId = meredith?.id ?? users[0]?.id;
       return defaultId ? { ...prev, agent_id: defaultId } : prev;
     });
