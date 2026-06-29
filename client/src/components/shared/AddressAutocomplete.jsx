@@ -165,8 +165,6 @@ export default function AddressAutocomplete({
     }
   };
 
-  const usePlainInput = lookupEnabled === false;
-
   return (
     <div ref={wrapperRef} className="relative">
       <input
@@ -180,7 +178,8 @@ export default function AddressAutocomplete({
         onKeyDown={handleKeyDown}
         className={className}
         placeholder={placeholder}
-        autoComplete={usePlainInput ? 'street-address' : 'off'}
+        autoComplete="heyday-property-address"
+        name="heyday-property-address"
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
