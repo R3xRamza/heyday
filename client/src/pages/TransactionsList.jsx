@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, ListChecks, Plus } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
@@ -19,7 +19,77 @@ const FILTERS = [
   { key: 'closed', label: 'Closed' },
 ];
 
-const TABLE_HEADERS = ['Address', 'Type', 'Price', 'Creation Date', 'Agent', ''];
+const DATE_COLUMN_BY_FILTER = {
+  active_transactions: { label: 'Creation Date', field: 'created_at' },
+  all: { label: 'Creation Date', field: 'created_at' },
+  current_listings: { label: 'Listing Date', field: 'listing_date' },
+  all_listings: { label: 'Listing Date', field: 'listing_date' },
+  pending: { label: 'Closing Date', field: 'close_date' },
+  closed: { label: 'Closing Date', field: 'close_date' },
+};
+
+const SORTABLE_COLUMNS = [
+  { key: 'address', label: 'Address' },
+  { key: 'type', label: 'Type' },
+  { key: 'value', label: 'Price' },
+  { key: 'date', label: null },
+  { key: 'agent', label: 'Agent' },
+];
+
+function transactionDateValue(tx, field) {
+  const raw = tx[field];
+  if (!raw) return '';
+  return String(raw).slice(0, 10);
+}
+
+function compareTransactions(a, b, sortKey, sortDir, dateField) {
+  let cmp = 0;
+  switch (sortKey) {
+    case 'address': {
+      const av = parseTransactionAddress({
+        address: a.address,
+        city: a.city,
+        state: a.state,
+        zip: a.zip,
+      }).street || a.address || '';
+      const bv = parseTransactionAddress({
+        address: b.address,
+        city: b.city,
+        state: b.state,
+        zip: b.zip,
+      }).street || b.address || '';
+      cmp = av.localeCompare(bv, undefined, { sensitivity: 'base' });
+      break;
+    }
+    case 'type':
+      cmp = transactionPortfolioType(a).localeCompare(transactionPortfolioType(b));
+      break;
+    case 'value': {
+      const av = a.value != null && a.value !== '' ? Number(a.value) : null;
+      const bv = b.value != null && b.value !== '' ? Number(b.value) : null;
+      if (av == null && bv == null) cmp = 0;
+      else if (av == null) cmp = 1;
+      else if (bv == null) cmp = -1;
+      else cmp = av - bv;
+      break;
+    }
+    case 'date': {
+      const av = transactionDateValue(a, dateField);
+      const bv = transactionDateValue(b, dateField);
+      if (!av && !bv) cmp = 0;
+      else if (!av) cmp = 1;
+      else if (!bv) cmp = -1;
+      else cmp = av.localeCompare(bv);
+      break;
+    }
+    case 'agent':
+      cmp = (a.agent_name || '').localeCompare(b.agent_name || '', undefined, { sensitivity: 'base' });
+      break;
+    default:
+      cmp = 0;
+  }
+  return sortDir === 'asc' ? cmp : -cmp;
+}
 
 export default function TransactionsList() {
   const navigate = useNavigate();
@@ -31,6 +101,30 @@ export default function TransactionsList() {
   const [form, setForm] = useState({ address: '', city: '', state: '', zip: '', value: '', client_name: '' });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [sortKey, setSortKey] = useState('date');
+  const [sortDir, setSortDir] = useState('desc');
+
+  const dateColumn = DATE_COLUMN_BY_FILTER[filter] || DATE_COLUMN_BY_FILTER.all;
+
+  useEffect(() => {
+    setSortKey('date');
+    setSortDir('desc');
+  }, [filter]);
+
+  function handleSort(key) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  }
+
+  const sortedTransactions = useMemo(() => {
+    const rows = data.transactions || [];
+    if (!sortKey) return rows;
+    return [...rows].sort((a, b) => compareTransactions(a, b, sortKey, sortDir, dateColumn.field));
+  }, [data.transactions, sortKey, sortDir, dateColumn.field]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -133,24 +227,36 @@ export default function TransactionsList() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-container-low border-b border-outline-variant/30">
-                  {TABLE_HEADERS.map((h) => (
-                    <th key={h} className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest">{h}</th>
-                  ))}
+                  {SORTABLE_COLUMNS.map((col) => {
+                    const label = col.key === 'date' ? dateColumn.label : col.label;
+                    return (
+                      <th
+                        key={col.key}
+                        className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest cursor-pointer select-none hover:text-primary"
+                        onClick={() => handleSort(col.key)}
+                      >
+                        {label}
+                        {sortKey === col.key && (sortDir === 'asc' ? ' ↑' : ' ↓')}
+                      </th>
+                    );
+                  })}
+                  <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest" aria-hidden />
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/10">
                 {loading ? (
                   <tr><td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">Loading…</td></tr>
-                ) : data.transactions.length === 0 ? (
+                ) : sortedTransactions.length === 0 ? (
                   <tr><td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">No transactions yet. Create one to get started.</td></tr>
                 ) : (
-                  data.transactions.map((tx) => {
+                  sortedTransactions.map((tx) => {
                     const { street, cityLine } = parseTransactionAddress({
                       address: tx.address,
                       city: tx.city,
                       state: tx.state,
                       zip: tx.zip,
                     });
+                    const dateValue = transactionDateValue(tx, dateColumn.field);
                     return (
                     <tr
                       key={tx.id}
@@ -177,7 +283,7 @@ export default function TransactionsList() {
                       </td>
                       <td className="px-6 py-4 font-semibold">{formatCurrency(tx.value)}</td>
                       <td className="px-6 py-4 text-sm whitespace-nowrap min-w-[9.5rem]">
-                        {tx.created_at ? <DateText value={tx.created_at.slice(0, 10)} /> : '—'}
+                        {dateValue ? <DateText value={dateValue} /> : '—'}
                       </td>
                       <td className="px-6 py-4 text-sm">{tx.agent_name || '—'}</td>
                       <td className="px-6 py-4 text-right">

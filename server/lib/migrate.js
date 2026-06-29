@@ -118,6 +118,14 @@ export function runMigrations(db) {
   migrateProjectsTables(db);
   migrateUserTodosTable(db);
   addColumnIfMissing(db, 'user_todos', 'due_date', 'DATE');
+  migratePendingStageFromCloseDate(db);
+}
+
+function migratePendingStageFromCloseDate(db) {
+  db.prepare(`
+    UPDATE transactions SET stage = 'pending'
+    WHERE stage = 'active' AND close_date IS NOT NULL AND TRIM(close_date) != ''
+  `).run();
 }
 
 function migrateProjectsTables(db) {

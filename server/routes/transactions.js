@@ -26,7 +26,7 @@ const LISTING_REPRESENTING = "representing IN ('seller','seller_and_buyer','land
 const PORTFOLIO_SCOPE = "stage != 'closed'";
 const LISTINGS_COUNT = `${LISTING_REPRESENTING} AND stage != 'closed' AND listing_date IS NOT NULL AND listing_date <= date('now') AND acceptance_date IS NULL`;
 const PRE_LISTINGS_COUNT = `${LISTING_REPRESENTING} AND stage != 'closed' AND listing_date IS NOT NULL AND listing_date > date('now')`;
-const PENDING_COUNT = "stage = 'active' AND close_date IS NOT NULL AND close_date >= date('now')";
+const PENDING_COUNT = "stage = 'pending' AND close_date IS NOT NULL";
 
 const VIEW_MAP = {
   active_transactions: "stage IN ('active','pending')",
@@ -44,6 +44,25 @@ const TX_FIELDS = [
   'sale_type', 'gross_commission', 'buyer_agreement_date', 'buyer_expiration_date',
   'client_name', 'owner_name', 'agent_id',
 ];
+
+/** Under contract: pending when close_date is set; closed is manual; else active. */
+function deriveStageFromCloseDate(record) {
+  if (record.stage === 'closed') return 'closed';
+  if (record.close_date) return 'pending';
+  return 'active';
+}
+
+function syncStageFromCloseDate(db, transactionId, beforeStage) {
+  const row = db.prepare('SELECT stage, close_date FROM transactions WHERE id = ?').get(transactionId);
+  const derived = deriveStageFromCloseDate(row);
+  if (derived === row.stage) return { changed: false, stage: row.stage };
+  db.prepare('UPDATE transactions SET stage = ? WHERE id = ?').run(derived, transactionId);
+  return {
+    changed: true,
+    stage: derived,
+    change: formatFieldChange('stage', beforeStage, derived),
+  };
+}
 
 function requireField(body, fields) {
   for (const f of fields) {
@@ -245,6 +264,12 @@ router.put('/:id', (req, res) => {
   db.prepare(`UPDATE transactions SET ${sets.join(', ')} WHERE id = ?`).run(...values);
 
   let after = db.prepare('SELECT * FROM transactions WHERE id = ?').get(req.params.id);
+
+  const stageSync = syncStageFromCloseDate(db, after.id, before.stage);
+  if (stageSync.changed) {
+    changes.push(stageSync.change);
+    after = db.prepare('SELECT * FROM transactions WHERE id = ?').get(req.params.id);
+  }
 
   if ('address' in req.body || 'city' in req.body || 'state' in req.body || 'zip' in req.body) {
     const normalized = normalizeAddressFields({
