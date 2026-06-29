@@ -12,6 +12,14 @@ const router = Router();
 const PLACES_AUTOCOMPLETE_URL = 'https://places.googleapis.com/v1/places:autocomplete';
 const PLACES_BASE_URL = 'https://places.googleapis.com/v1/places';
 
+/** Prefer greater Austin metro (bias, not hard restriction). */
+const AUSTIN_LOCATION_BIAS = {
+  circle: {
+    center: { latitude: 30.2672, longitude: -97.7431 },
+    radius: 50000,
+  },
+};
+
 const lookupLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
@@ -50,6 +58,7 @@ router.get('/autocomplete', async (req, res) => {
         input: q,
         includedRegionCodes: ['us'],
         includedPrimaryTypes: ['street_address', 'premise', 'subpremise'],
+        locationBias: AUSTIN_LOCATION_BIAS,
         sessionToken: session,
       }),
     });
