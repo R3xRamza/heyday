@@ -45,8 +45,7 @@ export default function TransactionsList() {
     return () => clearTimeout(t);
   }, [fetchData, search]);
 
-  async function handleCreate(e) {
-    e.preventDefault();
+  async function handleCreate() {
     const validation = validateTransactionFields({
       ...form,
       representing: 'seller_and_buyer',
@@ -197,7 +196,15 @@ export default function TransactionsList() {
 
       {showCreate && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <form onSubmit={handleCreate} autoComplete="off" className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                handleCreate();
+              }
+            }}
+          >
             <h2 className="text-lg font-bold text-primary">Step 1 — Create Transaction</h2>
             <p className="text-sm text-on-surface-variant">Enter the property address to begin. You&apos;ll add full details next.</p>
             {createError && (
@@ -255,11 +262,11 @@ export default function TransactionsList() {
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-on-surface-variant">Cancel</button>
-              <button type="submit" disabled={creating} className="px-4 py-2 bg-lemon text-feather font-bold rounded text-sm">
+              <button type="button" onClick={handleCreate} disabled={creating} className="px-4 py-2 bg-lemon text-feather font-bold rounded text-sm">
                 {creating ? 'Creating…' : 'Continue →'}
               </button>
             </div>
-          </form>
+          </div>
         </div>
       )}
     </DashboardLayout>
