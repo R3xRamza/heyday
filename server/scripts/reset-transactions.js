@@ -8,7 +8,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { runMigrations } from '../lib/migrate.js';
-import { syncChecklistTemplatesOnly } from '../seed-data.js';
+import { seedChecklistTemplatesIfEmpty } from '../seed-data.js';
 import { resetTransactions } from '../lib/transactionSeed.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -19,7 +19,7 @@ db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
 runMigrations(db);
-syncChecklistTemplatesOnly(db);
+seedChecklistTemplatesIfEmpty(db);
 
 const before = {
   transactions: db.prepare('SELECT COUNT(*) as c FROM transactions').get().c,
