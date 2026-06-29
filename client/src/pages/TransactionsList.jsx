@@ -6,6 +6,7 @@ import Icon from '../components/shared/Icon';
 import DateText from '../components/shared/DateText';
 import { formatCurrency, parseTransactionAddress } from '../utils/format';
 import PriceInput from '../components/shared/PriceInput';
+import AddressAutocomplete from '../components/shared/AddressAutocomplete';
 import { validateTransactionFields, transactionPortfolioType } from '../constants/transactionForm';
 
 const FILTERS = [
@@ -206,8 +207,14 @@ export default function TransactionsList() {
             )}
             <div>
               <label className="block text-xs font-semibold text-on-surface-variant mb-1">Address *</label>
-              <input required value={form.address} onChange={(e) => { setCreateError(''); setForm({ ...form, address: e.target.value }); }}
-                className="w-full px-3 py-2 border border-outline-variant/40 rounded text-sm" placeholder="1245 Skyline Ridge Dr" />
+              <AddressAutocomplete
+                required
+                value={form.address}
+                onChange={(address) => { setCreateError(''); setForm({ ...form, address }); }}
+                onAddressSelect={(fields) => { setCreateError(''); setForm({ ...form, ...fields }); }}
+                className="w-full px-3 py-2 border border-outline-variant/40 rounded text-sm"
+                placeholder="Start typing an address…"
+              />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
