@@ -16,6 +16,7 @@ import {
 } from '../constants/transactionForm';
 import PriceInput from './shared/PriceInput';
 import AddressAutocomplete from './shared/AddressAutocomplete';
+import { blurActiveElement, CHROME_AUTOCOMPLETE, ChromeAddressDecoy } from './shared/chromeFormGuards';
 import { buildFallbackParties } from '../data/transactionParties';
 
 const STEPS = [
@@ -180,6 +181,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
           parties: parties.map(({ role, name, user_id }) => ({ role, name, user_id })),
         }),
       });
+      blurActiveElement();
       setStep('template');
     } else {
       setValidationError(json.error || 'Could not save transaction details.');
@@ -272,7 +274,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
 
       {step === 'details' && (
         <div
-          className="bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4"
+          className="bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4 relative"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
               e.preventDefault();
@@ -280,6 +282,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
             }
           }}
         >
+          <ChromeAddressDecoy />
           <h2 className="text-xl font-bold text-primary">Transaction Details</h2>
           <p className="text-sm text-on-surface-variant">Add property, client, and key dates for this transaction.</p>
           {validationError && (
@@ -305,8 +308,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                 required={isRequired('city')}
                 value={form.city || ''}
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
-                autoComplete="heyday-property-city"
-                name="heyday-property-city"
+                autoComplete={CHROME_AUTOCOMPLETE}
                 className="w-full mt-1 px-3 py-2 border rounded text-sm"
               />
             </div>
@@ -316,8 +318,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                 required={isRequired('state')}
                 value={form.state || ''}
                 onChange={(e) => setForm({ ...form, state: e.target.value })}
-                autoComplete="heyday-property-state"
-                name="heyday-property-state"
+                autoComplete={CHROME_AUTOCOMPLETE}
                 className="w-full mt-1 px-3 py-2 border rounded text-sm"
                 placeholder="TX"
                 maxLength={2}
@@ -329,8 +330,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                 required={isRequired('zip')}
                 value={form.zip || ''}
                 onChange={(e) => setForm({ ...form, zip: e.target.value })}
-                autoComplete="heyday-property-zip"
-                name="heyday-property-zip"
+                autoComplete={CHROME_AUTOCOMPLETE}
                 className="w-full mt-1 px-3 py-2 border rounded text-sm"
                 placeholder="78746"
               />
@@ -356,8 +356,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                       client_name: e.target.value,
                       owner_name: e.target.value,
                     })}
-                    autoComplete="heyday-party-name"
-                    name="heyday-seller-name"
+                    autoComplete={CHROME_AUTOCOMPLETE}
                     className="w-full mt-1 px-3 py-2 border rounded text-sm"
                   />
                 </div>
@@ -367,8 +366,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                   <input
                     value={form.buyer_party_name ?? ''}
                     onChange={(e) => setForm({ ...form, buyer_party_name: e.target.value })}
-                    autoComplete="heyday-party-name"
-                    name="heyday-buyer-name"
+                    autoComplete={CHROME_AUTOCOMPLETE}
                     className="w-full mt-1 px-3 py-2 border rounded text-sm"
                   />
                 </div>
@@ -382,8 +380,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                   <input
                     value={form.client_name || form.owner_name || ''}
                     onChange={(e) => setForm({ ...form, client_name: e.target.value, owner_name: e.target.value })}
-                    autoComplete="heyday-party-name"
-                    name="heyday-party-name"
+                    autoComplete={CHROME_AUTOCOMPLETE}
                     className="w-full mt-1 px-3 py-2 border rounded text-sm"
                   />
                 </div>

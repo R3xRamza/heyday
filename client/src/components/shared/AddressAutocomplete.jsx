@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { CHROME_AUTOCOMPLETE } from './chromeFormGuards';
 
 function newSessionToken() {
   return crypto.randomUUID();
@@ -178,8 +179,7 @@ export default function AddressAutocomplete({
         onKeyDown={handleKeyDown}
         className={className}
         placeholder={placeholder}
-        autoComplete="heyday-property-address"
-        name="heyday-property-address"
+        autoComplete={CHROME_AUTOCOMPLETE}
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
