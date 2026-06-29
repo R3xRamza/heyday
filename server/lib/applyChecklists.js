@@ -5,6 +5,8 @@ import {
   getTransactionChecklists,
   linkTemplateToTransaction,
   unlinkTemplateFromTransaction,
+  syncTransactionChecklistLinks,
+  isChecklistAppliedToTransaction,
 } from './transactionChecklists.js';
 
 /**
@@ -34,12 +36,15 @@ export function applyChecklistsToTransaction(db, transactionId, templateIds, use
   const appliedNames = [];
   const inSetup = transaction.workflow_status && transaction.workflow_status !== 'active';
 
-  db.transaction(() => {
-    ids.forEach((templateId, index) => {
-      linkTemplateToTransaction(db, transactionId, templateId, index);
-    });
+  syncTransactionChecklistLinks(db, transactionId);
+  let nextSortOrder = db.prepare(
+    'SELECT COALESCE(MAX(sort_order), -1) as m FROM transaction_checklists WHERE transaction_id = ?',
+  ).get(transactionId).m + 1;
 
+  db.transaction(() => {
     for (const templateId of ids) {
+      linkTemplateToTransaction(db, transactionId, templateId, nextSortOrder++);
+
       const template = db.prepare('SELECT name FROM checklist_templates WHERE id = ?').get(templateId);
       if (!template) continue;
 
@@ -62,7 +67,9 @@ export function applyChecklistsToTransaction(db, transactionId, templateIds, use
         addedFromTemplate += 1;
       }
 
-      if (addedFromTemplate > 0) appliedNames.push(template.name);
+      if (addedFromTemplate > 0) {
+        appliedNames.push(template.name);
+      }
     }
 
     const lastTemplateId = ids[ids.length - 1];
@@ -83,6 +90,19 @@ export function applyChecklistsToTransaction(db, transactionId, templateIds, use
       eventType: 'checklist_added',
       summary: `${actor} added checklist(s): ${appliedNames.join(', ')}`,
     });
+  } else if (user && ids.length > 0) {
+    const linkedNames = ids
+      .map((templateId) => db.prepare('SELECT name FROM checklist_templates WHERE id = ?').get(templateId)?.name)
+      .filter(Boolean);
+    if (linkedNames.length > 0) {
+      const actor = actorLabel(user);
+      logActivity({
+        transactionId: Number(transactionId),
+        userId: user.id,
+        eventType: 'checklist_added',
+        summary: `${actor} linked checklist(s): ${linkedNames.join(', ')}`,
+      });
+    }
   }
 
   const enrichedTasks = created.map((t) => enrichTaskWithTemplate(db, t));
@@ -99,10 +119,10 @@ export function removeChecklistFromTransaction(db, transactionId, templateId, us
   if (!transaction) return { error: 'not_found', status: 404 };
 
   const templateIdNum = Number(templateId);
-  const linked = db.prepare(
-    'SELECT 1 FROM transaction_checklists WHERE transaction_id = ? AND template_id = ?',
-  ).get(transactionId, templateIdNum);
-  if (!linked) return { error: 'checklist_not_linked', status: 404 };
+
+  if (!isChecklistAppliedToTransaction(db, transactionId, templateIdNum)) {
+    return { error: 'checklist_not_linked', status: 404 };
+  }
 
   const template = db.prepare('SELECT name FROM checklist_templates WHERE id = ?').get(templateIdNum);
   if (!template) return { error: 'template_not_found', status: 404 };

@@ -1,6 +1,5 @@
 import bcrypt from 'bcrypt';
 import { CHECKLIST_TEMPLATES, CHECKLIST_TEMPLATE_SORT_ORDER, defaultRoleForChecklistTemplate } from './lib/checklist-templates.js';
-import { reassignAllTasksByRole } from './lib/taskAssignment.js';
 import { deriveNickname } from './lib/deriveNickname.js';
 
 export { CHECKLIST_TEMPLATES };
@@ -86,6 +85,4 @@ function seedTeamMembers(db) {
       insert.run(member.name, member.email, hash, member.role);
     }
   }
-
-  reassignAllTasksByRole(db);
 }

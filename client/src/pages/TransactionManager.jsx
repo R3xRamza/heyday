@@ -197,9 +197,16 @@ export default function TransactionManager() {
       method: 'DELETE',
       credentials: 'include',
     });
-    if (!res.ok) return false;
-    await Promise.all([fetchTasks(), fetchChecklists(), fetchActivities()]);
-    return true;
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      return { ok: false, error: json.error || 'Could not remove checklist' };
+    }
+    const json = await res.json();
+    if (json.checklists) setChecklists(json.checklists);
+    else await fetchChecklists();
+    await fetchTasks();
+    await fetchActivities();
+    return { ok: true };
   }
 
   async function applyChecklists(templateIds) {
@@ -215,7 +222,12 @@ export default function TransactionManager() {
     if (json.checklists) setChecklists(json.checklists);
     else await fetchChecklists();
     await fetchActivities();
-    return { ok: true, applied: json.applied || [] };
+    return {
+      ok: true,
+      applied: json.applied || [],
+      checklists: json.checklists || [],
+      templateIds,
+    };
   }
 
   if (loading) {

@@ -82,11 +82,15 @@ export function reassignAllTasksByRole(db) {
   const usersByRole = getUsersByRole(db);
   if (Object.keys(usersByRole).length === 0) return;
 
-  const tasks = db.prepare('SELECT id, title FROM tasks').all();
+  const tasks = db.prepare(`
+    SELECT t.id, t.title, tt.default_role
+    FROM tasks t
+    LEFT JOIN template_tasks tt ON tt.id = t.template_task_id
+  `).all();
   const update = db.prepare('UPDATE tasks SET assigned_to = ? WHERE id = ?');
   db.transaction(() => {
     for (const task of tasks) {
-      const role = resolveTaskRole(task.title);
+      const role = task.default_role || resolveTaskRole(task.title);
       const userId = usersByRole[role];
       if (userId) update.run(userId, task.id);
     }
