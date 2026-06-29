@@ -211,10 +211,10 @@ export default function TransactionWorkspace({
 
     setChecklistActionLoading(true);
     setChecklistActionError('');
-    const ok = await onRemoveChecklist?.(cl.id);
+    const result = await onRemoveChecklist?.(cl.id);
     setChecklistActionLoading(false);
-    if (!ok) {
-      setChecklistActionError('Could not remove checklist.');
+    if (!result?.ok) {
+      setChecklistActionError(result?.error || 'Could not remove checklist.');
       return;
     }
     if (Number(activeChecklistId) === Number(cl.id)) {
@@ -242,7 +242,9 @@ export default function TransactionWorkspace({
     }
     setShowAddChecklist(false);
     setSelectedTemplateIds([]);
-    if (result.applied?.length) {
+    const firstId = result.templateIds?.[0] ?? selectedTemplateIds[0];
+    if (firstId != null) {
+      setActiveChecklistId(firstId);
       setView('checklist');
     }
     onRefreshActivities?.();

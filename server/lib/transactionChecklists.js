@@ -27,7 +27,68 @@ export function unlinkTemplateFromTransaction(db, transactionId, templateId) {
   ).run(transactionId, templateId);
 }
 
+/** Ensure junction rows exist for tasks + legacy checklist_template_id on one transaction. */
+export function syncTransactionChecklistLinks(db, transactionId) {
+  ensureTransactionChecklistsTable(db);
+
+  const fromTasks = db.prepare(`
+    SELECT DISTINCT tt.template_id
+    FROM tasks t
+    INNER JOIN template_tasks tt ON tt.id = t.template_task_id
+    WHERE t.transaction_id = ?
+  `).all(transactionId);
+
+  let nextOrder = db.prepare(
+    'SELECT COALESCE(MAX(sort_order), -1) as m FROM transaction_checklists WHERE transaction_id = ?',
+  ).get(transactionId).m + 1;
+
+  for (const row of fromTasks) {
+    const exists = db.prepare(
+      'SELECT 1 FROM transaction_checklists WHERE transaction_id = ? AND template_id = ?',
+    ).get(transactionId, row.template_id);
+    if (!exists) {
+      linkTemplateToTransaction(db, transactionId, row.template_id, nextOrder++);
+    }
+  }
+
+  const legacy = db.prepare(
+    'SELECT checklist_template_id FROM transactions WHERE id = ?',
+  ).get(transactionId);
+  if (legacy?.checklist_template_id) {
+    const exists = db.prepare(
+      'SELECT 1 FROM transaction_checklists WHERE transaction_id = ? AND template_id = ?',
+    ).get(transactionId, legacy.checklist_template_id);
+    if (!exists) {
+      linkTemplateToTransaction(db, transactionId, legacy.checklist_template_id, nextOrder++);
+    }
+  }
+}
+
+export function isChecklistAppliedToTransaction(db, transactionId, templateId) {
+  syncTransactionChecklistLinks(db, transactionId);
+
+  const inJunction = db.prepare(
+    'SELECT 1 FROM transaction_checklists WHERE transaction_id = ? AND template_id = ?',
+  ).get(transactionId, templateId);
+  if (inJunction) return true;
+
+  const hasTasks = db.prepare(`
+    SELECT 1 FROM tasks t
+    INNER JOIN template_tasks tt ON tt.id = t.template_task_id
+    WHERE t.transaction_id = ? AND tt.template_id = ?
+    LIMIT 1
+  `).get(transactionId, templateId);
+  if (hasTasks) return true;
+
+  const legacy = db.prepare(
+    'SELECT checklist_template_id FROM transactions WHERE id = ?',
+  ).get(transactionId);
+  return Number(legacy?.checklist_template_id) === Number(templateId);
+}
+
 export function getTransactionChecklists(db, transactionId) {
+  syncTransactionChecklistLinks(db, transactionId);
+
   return db.prepare(`
     SELECT tc.template_id AS id, ct.name, tc.sort_order,
       (SELECT COUNT(*) FROM tasks tk
@@ -40,27 +101,19 @@ export function getTransactionChecklists(db, transactionId) {
   `).all(transactionId);
 }
 
-/** Backfill junction from tasks + legacy checklist_template_id. */
+/** Backfill junction from tasks + legacy checklist_template_id (all transactions). */
 export function backfillTransactionChecklists(db) {
   ensureTransactionChecklistsTable(db);
 
-  const fromTasks = db.prepare(`
-    SELECT DISTINCT t.transaction_id, tt.template_id
-    FROM tasks t
-    INNER JOIN template_tasks tt ON tt.id = t.template_task_id
-    WHERE t.transaction_id IS NOT NULL
+  const transactionIds = db.prepare(`
+    SELECT DISTINCT transaction_id FROM (
+      SELECT transaction_id FROM tasks WHERE transaction_id IS NOT NULL
+      UNION
+      SELECT id AS transaction_id FROM transactions WHERE checklist_template_id IS NOT NULL
+    )
   `).all();
 
-  for (const row of fromTasks) {
-    linkTemplateToTransaction(db, row.transaction_id, row.template_id, 0);
-  }
-
-  const legacy = db.prepare(`
-    SELECT id, checklist_template_id FROM transactions
-    WHERE checklist_template_id IS NOT NULL
-  `).all();
-
-  for (const tx of legacy) {
-    linkTemplateToTransaction(db, tx.id, tx.checklist_template_id, 0);
+  for (const { transaction_id } of transactionIds) {
+    syncTransactionChecklistLinks(db, transaction_id);
   }
 }
