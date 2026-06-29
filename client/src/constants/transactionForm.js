@@ -12,14 +12,23 @@ export function representingLabel(value) {
     || (value === 'both' || value === 'seller_and_client' ? 'Seller and Buyer' : value === 'leasing' ? 'Landlord' : value === 'renting' ? 'Tenant' : value);
 }
 
-const TRANSACTION_STAGE_LABELS = {
-  active: 'In contract',
-  pending: 'Pre-listing',
-  closed: 'Closed',
-};
+export const TRANSACTION_STAGE_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'closed', label: 'Closed' },
+];
+
+const TRANSACTION_STAGE_LABELS = Object.fromEntries(
+  TRANSACTION_STAGE_OPTIONS.map((o) => [o.value, o.label]),
+);
 
 export function transactionStageLabel(stage) {
-  return TRANSACTION_STAGE_LABELS[stage] || stage || 'In contract';
+  return TRANSACTION_STAGE_LABELS[stage] || stage || 'Active';
+}
+
+function isUnderContract(tx) {
+  if (!tx || tx.stage === 'closed') return false;
+  return tx.stage === 'pending' || Boolean(tx.close_date);
 }
 
 /** Label for counterparty name field(s) in setup / forms */
@@ -71,24 +80,18 @@ function portfolioTodayStr() {
 export function transactionPortfolioType(tx) {
   if (!tx) return 'Active';
   if (tx.stage === 'closed') return 'Closed';
+  if (isUnderContract(tx)) return 'Pending';
 
   const today = portfolioTodayStr();
-  if (tx.stage === 'active' && tx.close_date && tx.close_date >= today) {
-    return 'Pending';
-  }
-
   const representing = normalizeRepresenting(tx.representing);
-  if ((representing === 'buyer' || representing === 'tenant') && tx.stage !== 'closed') {
-    return 'Buyer';
-  }
-
   const isListingSide = representing === 'seller' || representing === 'seller_and_buyer' || representing === 'landlord';
-  if (isListingSide && tx.stage !== 'closed' && tx.listing_date && tx.listing_date <= today && !tx.acceptance_date) {
-    return 'Active listing';
+
+  if (isListingSide && tx.listing_date && tx.listing_date > today) {
+    return 'Pre-listing';
   }
 
-  if (isListingSide && tx.stage !== 'closed' && tx.listing_date && tx.listing_date > today) {
-    return 'Pre-listing';
+  if (isListingSide && tx.listing_date && tx.listing_date <= today && !tx.acceptance_date) {
+    return 'Active listing';
   }
 
   return 'Active';
