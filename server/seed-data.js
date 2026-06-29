@@ -20,31 +20,44 @@ export const TEAM_MEMBERS = [
   { name: 'Meredith', email: 'meredith@theheydaygroup.com', role: 'owner_lead' },
 ];
 
-export function syncChecklistTemplatesOnly(db) {
-  syncChecklistTemplates(db);
+/** Seed bundled templates only when the DB has none (first install). */
+export function seedChecklistTemplatesIfEmpty(db) {
+  const count = db.prepare('SELECT COUNT(*) as c FROM checklist_templates').get().c;
+  if (count > 0) return false;
+
+  insertChecklistTemplatesFromSeed(db);
+  console.log(`Seeded ${CHECKLIST_TEMPLATES.length} checklist templates (${CHECKLIST_TEMPLATES.reduce((n, t) => n + t.tasks.length, 0)} tasks)`);
+  return true;
 }
 
-export function seedBrokermintData(db) {
-  syncChecklistTemplates(db);
-  seedTeamMembers(db);
-}
-
-function needsTemplateResync(db) {
-  const expectedTotal = CHECKLIST_TEMPLATES.reduce((n, t) => n + t.tasks.length, 0);
-  const actualTotal = db.prepare('SELECT COUNT(*) as c FROM template_tasks').get().c;
-  if (actualTotal !== expectedTotal) return true;
-  return db.prepare('SELECT COUNT(*) as c FROM checklist_templates').get().c !== CHECKLIST_TEMPLATES.length;
-}
-
-function syncChecklistTemplates(db) {
-  if (!needsTemplateResync(db)) return;
-
+/**
+ * Wipe and re-import from checklist-templates.js.
+ * For admin scripts only — never call on routine server startup.
+ */
+export function forceResyncChecklistTemplates(db) {
   db.exec('PRAGMA foreign_keys = OFF');
   db.prepare('UPDATE transactions SET checklist_template_id = NULL').run();
   db.prepare('UPDATE tasks SET template_task_id = NULL').run();
   db.prepare('DELETE FROM template_tasks').run();
   db.prepare('DELETE FROM checklist_templates').run();
 
+  insertChecklistTemplatesFromSeed(db);
+
+  db.exec('PRAGMA foreign_keys = ON');
+  console.log(`Force-synced ${CHECKLIST_TEMPLATES.length} checklist templates (${CHECKLIST_TEMPLATES.reduce((n, t) => n + t.tasks.length, 0)} tasks)`);
+}
+
+/** @deprecated Use forceResyncChecklistTemplates — kept for explicit admin scripts */
+export function syncChecklistTemplatesOnly(db) {
+  forceResyncChecklistTemplates(db);
+}
+
+export function seedBrokermintData(db) {
+  seedChecklistTemplatesIfEmpty(db);
+  seedTeamMembers(db);
+}
+
+function insertChecklistTemplatesFromSeed(db) {
   CHECKLIST_TEMPLATES.forEach((template) => {
     const sortOrder = CHECKLIST_TEMPLATE_SORT_ORDER[template.name] ?? 99;
     const templateDefaultRole = defaultRoleForChecklistTemplate(template.name);
@@ -58,9 +71,6 @@ function syncChecklistTemplates(db) {
       `).run(r.lastInsertRowid, task.title, task.v, task.d, task.anchor, i, templateDefaultRole, calendarNickname);
     });
   });
-
-  db.exec('PRAGMA foreign_keys = ON');
-  console.log(`Synced ${CHECKLIST_TEMPLATES.length} checklist templates (${CHECKLIST_TEMPLATES.reduce((n, t) => n + t.tasks.length, 0)} tasks)`);
 }
 
 function seedTeamMembers(db) {
