@@ -131,8 +131,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
     }
   }
 
-  async function saveDetails(e) {
-    e.preventDefault();
+  async function saveDetails() {
     const validation = validateTransactionFields(form);
     if (!validation.ok) {
       setValidationError(validation.message);
@@ -272,7 +271,15 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
       </div>
 
       {step === 'details' && (
-        <form onSubmit={saveDetails} autoComplete="off" className="bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4">
+        <div
+          className="bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
+              e.preventDefault();
+              saveDetails();
+            }
+          }}
+        >
           <h2 className="text-xl font-bold text-primary">Transaction Details</h2>
           <p className="text-sm text-on-surface-variant">Add property, client, and key dates for this transaction.</p>
           {validationError && (
@@ -468,10 +475,10 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
               />
             </div>
           </div>
-          <button type="submit" disabled={saving} className="w-full py-3 bg-lemon text-feather font-bold rounded-lg">
+          <button type="button" onClick={saveDetails} disabled={saving} className="w-full py-3 bg-lemon text-feather font-bold rounded-lg">
             {saving ? 'Saving…' : 'Save & Continue →'}
           </button>
-        </form>
+        </div>
       )}
 
       {step === 'template' && (
