@@ -221,7 +221,7 @@ export default function TransactionManager() {
     return (
       <DashboardLayout title={street} subtitle={cityLine || undefined} className="bg-surface">
         <div className="px-8 pt-4">
-          <Link to="/transactions" className="text-sm text-secondary hover:underline">← Back to portfolio</Link>
+          <Link to="/transactions" className="text-sm text-secondary hover:underline">← Back to transactions</Link>
           <h1 className="text-2xl font-bold text-primary mt-2">{street}</h1>
           {cityLine && <p className="text-sm text-on-surface-variant mt-1">{cityLine}</p>}
         </div>

@@ -269,7 +269,6 @@ export default function TransactionWorkspace({
           <Icon name="chevron_right" className="!text-[14px]" />
           <span className="text-secondary font-bold">{street?.toUpperCase()}</span>
         </div>
-        <h2 className="text-3xl font-semibold text-primary tracking-tight">Transaction Dashboard</h2>
         {savedMsg && <p className="text-xs text-secondary mt-1 font-semibold">{savedMsg}</p>}
       </div>
       <div className="flex flex-wrap gap-2">

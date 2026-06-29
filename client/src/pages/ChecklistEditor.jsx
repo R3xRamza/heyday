@@ -249,8 +249,8 @@ export default function ChecklistEditor() {
   }
 
   return (
-    <DashboardLayout title="Checklist Templates" className="bg-surface">
-      <div className="max-w-[1440px] mx-auto px-8 py-10">
+    <DashboardLayout title="Edit Checklists" className="bg-surface">
+      <div className="max-w-[1440px] mx-auto px-8 py-6">
         <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
           <div>
             <Link
@@ -259,8 +259,7 @@ export default function ChecklistEditor() {
             >
               ← Back to Transactions
             </Link>
-            <h1 className="text-3xl font-semibold text-primary tracking-tight">Edit Checklists</h1>
-            <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mt-1">
+            <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
               Template tasks used when applying checklists to transactions
             </p>
           </div>

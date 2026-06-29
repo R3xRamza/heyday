@@ -35,7 +35,6 @@ export default function Login() {
           alt="HEYDAY"
           className="w-full max-w-[280px] h-auto object-contain"
         />
-        <p className="text-sky mt-6 text-center text-xl">Your real estate command center.</p>
       </div>
 
       <div className="flex-1 flex items-center justify-center p-8">
