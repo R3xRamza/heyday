@@ -1,6 +1,11 @@
 import { parseLegacyCityLine } from './address.js';
 import { backfillTransactionChecklists } from './transactionChecklists.js';
 import { deriveNickname } from './deriveNickname.js';
+import {
+  CHECKLIST_TEMPLATE_SORT_ORDER,
+  defaultRoleForChecklistTemplate,
+} from './checklist-templates.js';
+import { syncAllTaskAssigneesFromTemplates } from './taskAssignment.js';
 
 export function addColumnIfMissing(db, table, column, definition) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
@@ -119,6 +124,35 @@ export function runMigrations(db) {
   migrateUserTodosTable(db);
   addColumnIfMissing(db, 'user_todos', 'due_date', 'DATE');
   migratePendingStageFromCloseDate(db);
+  migrateChecklistTemplateSortOrder(db);
+  migrateChecklistTemplateAssigneesOnce(db);
+}
+
+function migrateChecklistTemplateSortOrder(db) {
+  for (const [name, sortOrder] of Object.entries(CHECKLIST_TEMPLATE_SORT_ORDER)) {
+    db.prepare('UPDATE checklist_templates SET sort_order = ? WHERE name = ?').run(sortOrder, name);
+  }
+}
+
+function migrateChecklistTemplateAssigneesOnce(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )
+  `);
+  const done = db.prepare("SELECT 1 FROM app_meta WHERE key = 'checklist_template_roles_v1'").get();
+  if (done) return;
+
+  const templates = db.prepare('SELECT id, name FROM checklist_templates').all();
+  const updateRole = db.prepare('UPDATE template_tasks SET default_role = ? WHERE template_id = ?');
+  db.transaction(() => {
+    for (const template of templates) {
+      updateRole.run(defaultRoleForChecklistTemplate(template.name), template.id);
+    }
+    syncAllTaskAssigneesFromTemplates(db);
+    db.prepare("INSERT INTO app_meta (key, value) VALUES ('checklist_template_roles_v1', '1')").run();
+  })();
 }
 
 function migratePendingStageFromCloseDate(db) {

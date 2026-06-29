@@ -1,3 +1,20 @@
+export const MARKETING_90_DAY_TEMPLATE_NAME = 'Listing: Marketing 90 Day Plan';
+
+/** Sidebar order: listings → buyer → leasing */
+export const CHECKLIST_TEMPLATE_SORT_ORDER = {
+  'Listing : CTC (if no TC)': 0,
+  'Listing : CTC (With TC)': 1,
+  'Listing: Marketing 90 Day Plan': 2,
+  'Buyer : CTC (if no TC)': 3,
+  'Buyer (With TC)': 4,
+  'Lease : Listing': 5,
+  'Lease : Tenant': 6,
+};
+
+export function defaultRoleForChecklistTemplate(templateName) {
+  return templateName === MARKETING_90_DAY_TEMPLATE_NAME ? 'marketing' : 'operations';
+}
+
 export const CHECKLIST_TEMPLATES = [
   {
     name: 'Buyer : CTC (if no TC)',

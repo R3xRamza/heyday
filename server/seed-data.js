@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
-import { CHECKLIST_TEMPLATES } from './lib/checklist-templates.js';
-import { resolveTaskRole, reassignAllTasksByRole } from './lib/taskAssignment.js';
+import { CHECKLIST_TEMPLATES, CHECKLIST_TEMPLATE_SORT_ORDER, defaultRoleForChecklistTemplate } from './lib/checklist-templates.js';
+import { reassignAllTasksByRole } from './lib/taskAssignment.js';
 import { deriveNickname } from './lib/deriveNickname.js';
 
 export { CHECKLIST_TEMPLATES };
@@ -45,16 +45,17 @@ function syncChecklistTemplates(db) {
   db.prepare('DELETE FROM template_tasks').run();
   db.prepare('DELETE FROM checklist_templates').run();
 
-  CHECKLIST_TEMPLATES.forEach((template, ti) => {
+  CHECKLIST_TEMPLATES.forEach((template) => {
+    const sortOrder = CHECKLIST_TEMPLATE_SORT_ORDER[template.name] ?? 99;
+    const templateDefaultRole = defaultRoleForChecklistTemplate(template.name);
     const r = db.prepare('INSERT INTO checklist_templates (name, category, sort_order) VALUES (?, ?, ?)')
-      .run(template.name, template.category, ti);
+      .run(template.name, template.category, sortOrder);
     template.tasks.forEach((task, i) => {
-      const defaultRole = resolveTaskRole(task.title);
       const calendarNickname = deriveNickname(task.title);
       db.prepare(`
         INSERT INTO template_tasks (template_id, title, timing_value, timing_direction, timing_anchor, sort_order, default_role, calendar_nickname)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(r.lastInsertRowid, task.title, task.v, task.d, task.anchor, i, defaultRole, calendarNickname);
+      `).run(r.lastInsertRowid, task.title, task.v, task.d, task.anchor, i, templateDefaultRole, calendarNickname);
     });
   });
 

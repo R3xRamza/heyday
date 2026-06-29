@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { resolveTaskRole } from '../lib/taskAssignment.js';
+import { syncLinkedTaskAssignees } from '../lib/taskAssignment.js';
 import { deriveNickname } from '../lib/deriveNickname.js';
 
 const router = Router();
@@ -47,7 +47,7 @@ function normalizeTaskBody(body, templateId, existingSortOrder) {
     timing_direction: body.timing_direction === 'B' ? 'B' : 'A',
     timing_anchor: anchor,
     sort_order,
-    default_role: body.default_role?.trim() || resolveTaskRole(title),
+    default_role: body.default_role?.trim() || 'operations',
     calendar_nickname,
   };
 }
@@ -170,7 +170,7 @@ router.put('/:id/tasks/:taskId', (req, res) => {
     : task.timing_anchor;
   const sort_order = req.body.sort_order != null ? Number(req.body.sort_order) : task.sort_order;
   const default_role = req.body.default_role != null
-    ? (req.body.default_role.trim() || resolveTaskRole(title))
+    ? (req.body.default_role.trim() || 'operations')
     : task.default_role;
   const calendar_nickname = req.body.calendar_nickname != null
     ? String(req.body.calendar_nickname).trim()
@@ -191,6 +191,8 @@ router.put('/:id/tasks/:taskId', (req, res) => {
     taskId,
     templateId,
   );
+
+  syncLinkedTaskAssignees(db, Number(taskId), default_role, title);
 
   res.json({ template: getTemplateWithTasks(templateId) });
 });
