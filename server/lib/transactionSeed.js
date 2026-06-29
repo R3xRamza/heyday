@@ -66,7 +66,7 @@ function applyChecklist(db, transactionId, templateName) {
 }
 
 export function seedTransactionsWithChecklists(db) {
-  const admin = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@heyday.com');
+  const admin = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@theheydaygroup.com');
   const agentId = admin?.id ?? 1;
 
   const insert = db.prepare(`

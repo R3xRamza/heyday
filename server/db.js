@@ -63,12 +63,14 @@ if (splitCount > 0) {
   console.log(`Split combined address/city on ${splitCount} transaction(s)`);
 }
 
-const adminExists = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@heyday.com');
+const ADMIN_EMAIL = 'admin@theheydaygroup.com';
+
+const adminExists = db.prepare('SELECT id FROM users WHERE email = ?').get(ADMIN_EMAIL);
 if (!adminExists) {
   const passwordHash = bcrypt.hashSync('admin123', 12);
   db.prepare('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)')
-    .run('Admin User', 'admin@heyday.com', passwordHash, 'admin');
-  console.log('Seeded admin user: admin@heyday.com / admin123');
+    .run('Admin User', ADMIN_EMAIL, passwordHash, 'admin');
+  console.log(`Seeded admin user: ${ADMIN_EMAIL} / admin123`);
 }
 
 seedBrokermintData(db);

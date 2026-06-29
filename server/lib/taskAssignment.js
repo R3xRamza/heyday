@@ -51,7 +51,7 @@ export function resolveTaskPriority(title, role) {
 
 export function getUsersByRole(db) {
   const map = {};
-  db.prepare("SELECT id, role FROM users WHERE email != 'admin@heyday.com'").all().forEach((u) => {
+  db.prepare("SELECT id, role FROM users WHERE email != 'admin@theheydaygroup.com'").all().forEach((u) => {
     map[u.role] = u.id;
   });
   return map;

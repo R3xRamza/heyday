@@ -41,12 +41,12 @@ function memberStats(userId) {
 router.get('/', (_req, res) => {
   const members = db.prepare(`
     SELECT id, name, email, role FROM users
-    WHERE email != 'admin@heyday.com'
+    WHERE email != 'admin@theheydaygroup.com'
     ORDER BY CASE email
-      WHEN 'tessa@heyday.com' THEN 0
-      WHEN 'adam@heyday.com' THEN 1
-      WHEN 'margaret@heyday.com' THEN 2
-      WHEN 'meredith@heyday.com' THEN 3
+      WHEN 'tessa@theheydaygroup.com' THEN 0
+      WHEN 'adam@theheydaygroup.com' THEN 1
+      WHEN 'margaret@theheydaygroup.com' THEN 2
+      WHEN 'meredith@theheydaygroup.com' THEN 3
       ELSE 99
     END, name
   `).all();

@@ -1,11 +1,11 @@
 /** Map Follow Up Boss CSV row → contacts table row */
 
 const TEAM_NAME_MAP = {
-  'meredith alderson': 'meredith@heyday.com',
-  'tessa osborn': 'tessa@heyday.com',
-  'adam walding': 'adam@heyday.com',
-  'margaret analyst': 'margaret@heyday.com',
-  'margaret manifold': 'margaret@heyday.com',
+  'meredith alderson': 'meredith@theheydaygroup.com',
+  'tessa osborn': 'tessa@theheydaygroup.com',
+  'adam walding': 'adam@theheydaygroup.com',
+  'margaret analyst': 'margaret@theheydaygroup.com',
+  'margaret manifold': 'margaret@theheydaygroup.com',
   'lisa harrell': null,
 };
 

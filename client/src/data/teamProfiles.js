@@ -4,19 +4,19 @@ import margaretPhoto from '../assets/team/margaret.jpg';
 import meredithPhoto from '../assets/team/meredith.jpg';
 
 export const TEAM_PROFILES = {
-  'tessa@heyday.com': {
+  'tessa@theheydaygroup.com': {
     role: 'Operations',
     img: tessaPhoto,
   },
-  'adam@heyday.com': {
+  'adam@theheydaygroup.com': {
     role: 'Marketing',
     img: adamPhoto,
   },
-  'margaret@heyday.com': {
+  'margaret@theheydaygroup.com': {
     role: 'Analyst',
     img: margaretPhoto,
   },
-  'meredith@heyday.com': {
+  'meredith@theheydaygroup.com': {
     role: 'Owner/Lead',
     img: meredithPhoto,
   },

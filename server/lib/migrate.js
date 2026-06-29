@@ -126,6 +126,25 @@ export function runMigrations(db) {
   migratePendingStageFromCloseDate(db);
   migrateChecklistTemplateSortOrder(db);
   migrateChecklistTemplateAssigneesOnce(db);
+  migrateUserEmailsToHeydayGroup(db);
+}
+
+function migrateUserEmailsToHeydayGroup(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )
+  `);
+  const done = db.prepare("SELECT 1 FROM app_meta WHERE key = 'user_emails_theheydaygroup_v1'").get();
+  if (done) return;
+
+  db.prepare(`
+    UPDATE users SET email = REPLACE(email, '@heyday.com', '@theheydaygroup.com')
+    WHERE email LIKE '%@heyday.com'
+  `).run();
+
+  db.prepare("INSERT INTO app_meta (key, value) VALUES ('user_emails_theheydaygroup_v1', '1')").run();
 }
 
 function migrateChecklistTemplateSortOrder(db) {

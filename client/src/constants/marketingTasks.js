@@ -1,4 +1,4 @@
-export const ADAM_EMAIL = 'adam@heyday.com';
+export const ADAM_EMAIL = 'adam@theheydaygroup.com';
 
 export function findAdamMember(members) {
   return (members || []).find(
