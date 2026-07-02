@@ -4,7 +4,6 @@ import DashboardLayout from '../components/DashboardLayout';
 import Icon from '../components/shared/Icon';
 import TeamAvatar from '../components/TeamAvatar';
 import { getTeamProfile } from '../data/teamProfiles';
-import { useAuth } from '../context/AuthContext';
 import DateText from '../components/shared/DateText';
 import { formatTaskDue, shortAddress } from '../utils/format';
 
@@ -27,12 +26,10 @@ const TASK_PANEL_HEIGHT = 'h-[28rem]';
 
 export default function TeamTaskOverview() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [loadingTeam, setLoadingTeam] = useState(true);
   const [teamMembers, setTeamMembers] = useState([]);
   const [priorityTasks, setPriorityTasks] = useState([]);
   const [closings, setClosings] = useState([]);
-  const [weekFilter, setWeekFilter] = useState(false);
   const [loadingPriority, setLoadingPriority] = useState(true);
   const [loadingClosings, setLoadingClosings] = useState(true);
 
@@ -46,12 +43,11 @@ export default function TeamTaskOverview() {
 
   const fetchPriority = useCallback(() => {
     setLoadingPriority(true);
-    const params = new URLSearchParams({ filter: weekFilter ? 'week' : 'all' });
-    fetch(`/api/tasks/team-priority?${params}`, { credentials: 'include' })
+    fetch('/api/tasks/team-priority?filter=all', { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setPriorityTasks(json.tasks || []))
       .finally(() => setLoadingPriority(false));
-  }, [weekFilter]);
+  }, []);
 
   const fetchClosings = useCallback(() => {
     setLoadingClosings(true);
@@ -81,43 +77,10 @@ export default function TeamTaskOverview() {
   const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
-    <DashboardLayout title="Team Task Overview" className="p-8">
+    <DashboardLayout title="Team Task Hub" className="p-8">
       <div className="max-w-[1440px] mx-auto">
-        <div className="mb-4 flex justify-between items-center flex-wrap gap-4">
-          <div>
-            {user?.id && (
-              <Link
-                to={`/tasks/${user.id}`}
-                className="text-sm text-secondary font-semibold hover:underline inline-block"
-              >
-                My tasks →
-              </Link>
-            )}
-          </div>
-          <div className="flex gap-3 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setWeekFilter((w) => !w)}
-              className={`px-4 py-2 border rounded-lg text-sm font-bold flex items-center gap-2 transition-colors ${
-                weekFilter
-                  ? 'bg-primary text-white border-primary'
-                  : 'border-outline-variant bg-white hover:bg-surface-container'
-              }`}
-            >
-              <Icon name="calendar_today" className="text-sm" /> This Week
-            </button>
-          </div>
-        </div>
-
         <div className="grid grid-cols-12 gap-gutter items-start">
           <section className="col-span-12 mb-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-primary">Team Workload Summary</h3>
-              <div className="h-px flex-1 mx-6 bg-primary/10" />
-              <div className="text-on-surface-variant text-xs font-semibold uppercase">
-                {teamMembers.length} Active Agents
-              </div>
-            </div>
             {loadingTeam ? (
               <p className="text-on-surface-variant">Loading team…</p>
             ) : (
@@ -187,14 +150,14 @@ export default function TeamTaskOverview() {
                 <Icon name="warning" className="text-lemon" /> Urgent Task Queue
               </h3>
               <span className="text-[10px] text-white/70 font-bold uppercase tracking-widest">
-                {weekFilter ? 'Overdue & due this week' : 'Overdue tasks'}
+                Overdue tasks
               </span>
             </div>
             {loadingPriority ? (
               <p className="flex-1 min-h-0 px-6 py-10 text-on-surface-variant">Loading urgent tasks…</p>
             ) : priorityTasks.length === 0 ? (
               <p className="flex-1 min-h-0 px-6 py-10 text-on-surface-variant">
-                {weekFilter ? 'No overdue or due-this-week tasks.' : 'No overdue tasks right now.'}
+                No overdue tasks right now.
               </p>
             ) : (
               <div className="flex flex-col flex-1 min-h-0">

@@ -127,6 +127,36 @@ export function runMigrations(db) {
   migrateChecklistTemplateSortOrder(db);
   migrateChecklistTemplateAssigneesOnce(db);
   migrateUserEmailsToHeydayGroup(db);
+  migrateTaskCategory(db);
+  migrateTeamHubTables(db);
+}
+
+function migrateTeamHubTables(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS team_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(id),
+      body TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS team_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      label TEXT NOT NULL,
+      url TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_team_messages_created ON team_messages(created_at);
+  `);
+}
+
+function migrateTaskCategory(db) {
+  addColumnIfMissing(db, 'tasks', 'category', 'TEXT');
+  db.prepare(`
+    UPDATE tasks SET category = CASE WHEN transaction_id IS NOT NULL THEN 'transaction' ELSE 'admin' END
+    WHERE category IS NULL
+  `).run();
 }
 
 function migrateUserEmailsToHeydayGroup(db) {

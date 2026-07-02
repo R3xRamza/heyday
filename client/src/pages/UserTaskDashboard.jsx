@@ -15,8 +15,6 @@ const FILTERS = [
   { key: 'today', label: 'Today' },
   { key: 'week', label: 'This Week' },
   { key: 'overdue', label: 'Overdue' },
-  { key: 'completed_today', label: 'Completed Today' },
-  { key: 'active', label: 'Active' },
 ];
 
 function sortMyTasks(tasks) {
@@ -50,14 +48,15 @@ function renderDueLabel(task) {
   return <DateText value={task.due_date} />;
 }
 
-export default function UserTaskDashboard() {
+export default function UserTaskDashboard({ category = 'transaction' }) {
   const { userId } = useParams();
   const [member, setMember] = useState(null);
   const [users, setUsers] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [filter, setFilter] = useState('all');
   const [showCompleted, setShowCompleted] = useState(false);
-  const [showUndated, setShowUndated] = useState(false);
+  const [transactionShowUndated, setTransactionShowUndated] = useState(false);
+  const showUndated = category === 'admin' || transactionShowUndated;
   const [compact, setCompact] = useState(false);
   const [data, setData] = useState({ tasks: [], stats: {} });
   const [loading, setLoading] = useState(true);
@@ -66,8 +65,7 @@ export default function UserTaskDashboard() {
   const [expandedId, setExpandedId] = useState(null);
   const [viewMode, setViewMode] = useState('list');
 
-  const includeCompleted = filter === 'completed_today'
-    || (filter === 'all' && showCompleted);
+  const includeCompleted = filter === 'all' && showCompleted;
 
   const fetchMember = useCallback(async () => {
     const res = await fetch(`/api/team/${userId}`, { credentials: 'include' });
@@ -82,12 +80,13 @@ export default function UserTaskDashboard() {
     const params = new URLSearchParams({
       assigned_to: userId,
       filter,
+      category,
       include_completed: includeCompleted ? 'true' : 'false',
     });
     const res = await fetch(`/api/tasks?${params}`, { credentials: 'include' });
     if (res.ok) setData(await res.json());
     setLoading(false);
-  }, [userId, filter, includeCompleted]);
+  }, [userId, filter, category, includeCompleted]);
 
   useEffect(() => {
     fetch('/api/team', { credentials: 'include' })
@@ -169,23 +168,19 @@ export default function UserTaskDashboard() {
 
   function selectFilter(key) {
     setFilter(key);
-    if (key === 'completed_today') setShowCompleted(true);
-    else if (key === 'active' || key === 'overdue') setShowCompleted(false);
+    if (key === 'overdue') setShowCompleted(false);
   }
 
   const filterLabel = (key, base) => {
     if (key === 'today' && stats.todayCount) return `${base} (${stats.todayCount})`;
     if (key === 'overdue' && stats.overdueCount) return `${base} (${stats.overdueCount})`;
     if (key === 'week' && stats.weekCount) return `${base} (${stats.weekCount})`;
-    if (key === 'completed_today' && stats.completedToday) return `${base} (${stats.completedToday})`;
-    if (key === 'active' && stats.totalActive) return `${base} (${stats.totalActive})`;
     return base;
   };
 
   function filterPillClass(key) {
     if (filter !== key) return 'text-on-surface-variant hover:bg-surface-container-high';
     if (key === 'overdue') return 'bg-error/10 text-error';
-    if (key === 'completed_today') return 'bg-secondary/15 text-secondary';
     return 'bg-primary text-white';
   }
 
@@ -200,7 +195,7 @@ export default function UserTaskDashboard() {
       <div className="bg-surface border-b border-outline-variant/20 shrink-0">
         <TaskHubPersonHeader
           userId={userId}
-          title="Daily Task Dashboard"
+          title={category === 'admin' ? 'Administrative Task Dashboard' : 'Daily Task Dashboard'}
           member={member}
           profile={profile}
           showBorder={false}
@@ -304,7 +299,7 @@ export default function UserTaskDashboard() {
                           )}
                         </td>
                         <td className={`px-4 ${rowPad} text-sm text-on-surface-variant/80`}>
-                          {shortAddress(task.transaction_address)}
+                          {category === 'admin' ? '—' : shortAddress(task.transaction_address)}
                         </td>
                         <td className={`px-4 ${rowPad} whitespace-nowrap min-w-[9.5rem]`}>
                           <span className={`inline-flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap ${dueCellClass(task)}`}>
@@ -410,12 +405,13 @@ export default function UserTaskDashboard() {
                   <div className={`absolute top-[2px] h-4 w-4 rounded-full bg-white transition-all ${compact ? 'left-[18px]' : 'left-[2px]'}`} />
                 </div>
               </label>
-              <label className="flex items-center justify-between cursor-pointer">
+              <label className={`flex items-center justify-between ${category === 'admin' ? 'cursor-default' : 'cursor-pointer'}`}>
                 <span className="text-sm text-on-surface-variant font-medium">Show tasks without due date</span>
                 <input
                   type="checkbox"
                   checked={showUndated}
-                  onChange={(e) => setShowUndated(e.target.checked)}
+                  disabled={category === 'admin'}
+                  onChange={(e) => setTransactionShowUndated(e.target.checked)}
                   className="sr-only peer"
                 />
                 <div className={`w-9 h-5 rounded-full relative transition-colors ${showUndated ? 'bg-secondary' : 'bg-outline-variant/30'}`}>
@@ -452,6 +448,7 @@ export default function UserTaskDashboard() {
           users={users}
           transactions={transactions}
           defaultAssignedTo={Number(userId)}
+          adminOnly={category === 'admin'}
           onClose={() => setShowCreate(false)}
           onSave={createTask}
         />

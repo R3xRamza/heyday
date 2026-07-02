@@ -28,8 +28,8 @@ export function applyChecklistsToTransaction(db, transactionId, templateIds, use
   );
 
   const insert = db.prepare(`
-    INSERT INTO tasks (title, due_date, status, transaction_id, template_task_id, priority, assigned_to)
-    VALUES (?, ?, 'pending', ?, ?, ?, ?)
+    INSERT INTO tasks (title, due_date, status, transaction_id, template_task_id, priority, assigned_to, category)
+    VALUES (?, ?, 'pending', ?, ?, ?, ?, 'transaction')
   `);
 
   const created = [];

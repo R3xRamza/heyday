@@ -19,7 +19,7 @@ import { FullScreenSkeleton } from './components/shared/Skeleton';
 function RootRedirect() {
   const { user, loading } = useAuth();
   if (loading) return <FullScreenSkeleton />;
-  return <Navigate to={user ? '/tasks' : '/login'} replace />;
+  return <Navigate to={user ? '/team-ops' : '/login'} replace />;
 }
 
 export default function App() {
@@ -37,7 +37,8 @@ export default function App() {
           <Route path="/tasks">
             <Route index element={<ProtectedRoute><TeamTaskOverview /></ProtectedRoute>} />
             <Route path=":userId/projects" element={<ProtectedRoute><UserProjectDashboard /></ProtectedRoute>} />
-            <Route path=":userId" element={<ProtectedRoute><UserTaskDashboard /></ProtectedRoute>} />
+            <Route path=":userId/admin" element={<ProtectedRoute><UserTaskDashboard category="admin" /></ProtectedRoute>} />
+            <Route path=":userId" element={<ProtectedRoute><UserTaskDashboard category="transaction" /></ProtectedRoute>} />
           </Route>
           <Route path="/marketing" element={<ProtectedRoute><MarketingCalendar /></ProtectedRoute>} />
           <Route path="/revenue" element={<ProtectedRoute><RevenueAnalytics /></ProtectedRoute>} />

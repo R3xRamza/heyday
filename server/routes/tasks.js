@@ -162,6 +162,10 @@ router.get('/', (req, res) => {
   if (req.query.transaction_only === 'true') {
     baseSql += ' AND t.transaction_id IS NOT NULL';
   }
+  if (req.query.category === 'transaction' || req.query.category === 'admin') {
+    baseSql += " AND COALESCE(t.category, CASE WHEN t.transaction_id IS NOT NULL THEN 'transaction' ELSE 'admin' END) = ?";
+    baseParams.push(req.query.category);
+  }
   if (req.query.due_after) {
     baseSql += ' AND t.due_date >= ?';
     baseParams.push(req.query.due_after);
@@ -219,6 +223,7 @@ router.post('/', (req, res) => {
     due_date,
     assigned_to,
     transaction_id,
+    category,
     timing_value,
     timing_direction,
     timing_anchor,
@@ -246,19 +251,24 @@ router.post('/', (req, res) => {
     ...timing,
   });
 
+  const resolvedCategory = txId
+    ? 'transaction'
+    : (category === 'transaction' ? 'transaction' : 'admin');
+
   const r = db.prepare(`
     INSERT INTO tasks (
-      title, description, due_date, assigned_to, transaction_id,
+      title, description, due_date, assigned_to, transaction_id, category,
       timing_value, timing_direction, timing_anchor,
       priority, status
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
   `).run(
     String(title).trim(),
     description?.trim() || null,
     resolvedDueDate,
     assignee,
     txId,
+    resolvedCategory,
     timing.timing_value,
     timing.timing_direction,
     timing.timing_anchor,

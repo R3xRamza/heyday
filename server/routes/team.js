@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { isOverdue } from '../lib/timing.js';
+import { isOverdue, isDueThisWeek } from '../lib/timing.js';
 
 const router = Router();
 
@@ -11,7 +11,6 @@ function memberStats(userId) {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().slice(0, 10);
 
   let complete = 0;
   let overdue = 0;
@@ -25,7 +24,7 @@ function memberStats(userId) {
     }
     if (isOverdue(t.due_date, t.status)) {
       overdue += 1;
-    } else if (t.due_date === todayStr) {
+    } else if (isDueThisWeek(t.due_date, t.status, today)) {
       active += 1;
     } else {
       pending += 1;
