@@ -3,6 +3,7 @@ import db from '../db.js';
 import { isOverdue, isDueThisWeek } from '../lib/timing.js';
 import { celebrationsInRange, toDateStr } from '../lib/marketingCalendar.js';
 import { ACTIVE_LISTINGS_SCOPE, closedYtdStats, hubTransactionRows } from '../lib/transactionScopes.js';
+import { closePastDueTransactions } from '../lib/transactionAutoClose.js';
 
 const router = Router();
 
@@ -30,6 +31,7 @@ function isAdmin(user) {
 }
 
 router.get('/stats', (_req, res) => {
+  closePastDueTransactions(db);
   const closedYtd = closedYtdStats(db);
 
   const pending = db.prepare(`
