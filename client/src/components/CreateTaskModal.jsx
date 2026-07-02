@@ -8,6 +8,7 @@ export default function CreateTaskModal({
   defaultTransactionId,
   lockTransaction = false,
   transaction = null,
+  adminOnly = false,
   onClose,
   onSave,
 }) {
@@ -40,9 +41,12 @@ export default function CreateTaskModal({
       title: form.title.trim(),
       description: form.description.trim() || null,
       assigned_to: form.assigned_to ? Number(form.assigned_to) : null,
-      transaction_id: lockTransaction && defaultTransactionId
-        ? Number(defaultTransactionId)
-        : (form.transaction_id ? Number(form.transaction_id) : null),
+      transaction_id: adminOnly
+        ? null
+        : lockTransaction && defaultTransactionId
+          ? Number(defaultTransactionId)
+          : (form.transaction_id ? Number(form.transaction_id) : null),
+      category: adminOnly ? 'admin' : (form.transaction_id ? 'transaction' : 'admin'),
     };
 
     if (showLinkedDeadline && deadlineMode === 'relative') {
@@ -122,7 +126,7 @@ export default function CreateTaskModal({
               ))}
             </select>
           </div>
-          {!lockTransaction && (
+          {!lockTransaction && !adminOnly && (
             <div>
               <label className="text-xs font-semibold text-on-surface-variant uppercase">Transaction (optional)</label>
               <select

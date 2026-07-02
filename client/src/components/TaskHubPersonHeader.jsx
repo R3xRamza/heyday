@@ -13,7 +13,7 @@ export default function TaskHubPersonHeader({ userId, title, member, profile, ch
         <TaskHubTabs userId={userId} />
       </div>
 
-      <div className="pr-36 min-h-[6.5rem]">
+      <div className="pr-72 min-h-[6.5rem]">
         <Link to="/tasks" className="text-sm text-secondary hover:underline mb-1 inline-block">
           ← Back to Team Overview
         </Link>

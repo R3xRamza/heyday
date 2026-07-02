@@ -32,3 +32,23 @@ export function isOverdue(dueDate, status) {
   today.setHours(0, 0, 0, 0);
   return new Date(`${dueDate}T12:00:00`) < today;
 }
+
+/** Sun–Sat week containing refDate (default today). */
+export function weekRangeSunday(refDate = new Date()) {
+  const start = new Date(refDate);
+  start.setHours(12, 0, 0, 0);
+  start.setDate(start.getDate() - start.getDay());
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  return {
+    start: start.toISOString().slice(0, 10),
+    end: end.toISOString().slice(0, 10),
+  };
+}
+
+/** Open task due within the current Sun–Sat week (excludes overdue). */
+export function isDueThisWeek(dueDate, status, refDate = new Date()) {
+  if (!dueDate || status === 'complete' || isOverdue(dueDate, status)) return false;
+  const { start, end } = weekRangeSunday(refDate);
+  return dueDate >= start && dueDate <= end;
+}
