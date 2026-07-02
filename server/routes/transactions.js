@@ -18,6 +18,7 @@ import {
   shouldValidateSetupCompletion,
   mergeTransactionForValidation,
 } from '../lib/transactionValidation.js';
+import { closePastDueTransactions, deriveStageFromCloseDate } from '../lib/transactionAutoClose.js';
 
 const router = Router();
 
@@ -44,13 +45,6 @@ const TX_FIELDS = [
   'sale_type', 'gross_commission', 'buyer_agreement_date', 'buyer_expiration_date',
   'client_name', 'owner_name', 'agent_id',
 ];
-
-/** Under contract: pending when close_date is set; closed is manual; else active. */
-function deriveStageFromCloseDate(record) {
-  if (record.stage === 'closed') return 'closed';
-  if (record.close_date) return 'pending';
-  return 'active';
-}
 
 function syncStageFromCloseDate(db, transactionId, beforeStage) {
   const row = db.prepare('SELECT stage, close_date FROM transactions WHERE id = ?').get(transactionId);
@@ -89,6 +83,7 @@ function pickTransaction(id) {
 }
 
 router.get('/', (req, res) => {
+  closePastDueTransactions(db);
   const filter = req.query.filter || 'all';
   const search = (req.query.search || '').trim().toLowerCase();
   const where = VIEW_MAP[filter] || VIEW_MAP.all;
@@ -177,6 +172,7 @@ router.delete('/:id/checklists/:templateId', (req, res) => {
 });
 
 router.get('/:id', (req, res) => {
+  closePastDueTransactions(db);
   const transaction = pickTransaction(req.params.id);
   if (!transaction) return res.status(404).json({ error: 'Not found' });
   const parties = getPartiesForTransaction(db, transaction.id);
