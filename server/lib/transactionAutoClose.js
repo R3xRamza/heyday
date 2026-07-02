@@ -1,5 +1,3 @@
-import { logActivity } from './activity.js';
-
 /** True when close_date is strictly before today (local calendar date). */
 export function isCloseDatePast(closeDate) {
   if (!closeDate || !String(closeDate).trim()) return false;
@@ -32,17 +30,22 @@ export function closePastDueTransactions(db) {
   if (rows.length === 0) return { closed: 0 };
 
   const update = db.prepare("UPDATE transactions SET stage = 'closed' WHERE id = ?");
+  const insertActivity = db.prepare(`
+    INSERT INTO transaction_activity (transaction_id, user_id, event_type, summary, detail, task_id)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
 
   db.transaction(() => {
     for (const row of rows) {
       update.run(row.id);
-      logActivity({
-        transactionId: row.id,
-        userId: null,
-        eventType: 'stage_change',
-        summary: 'Auto-closed — closing date passed',
-        detail: row.close_date,
-      });
+      insertActivity.run(
+        row.id,
+        null,
+        'stage_change',
+        'Auto-closed — closing date passed',
+        row.close_date,
+        null,
+      );
     }
   })();
 

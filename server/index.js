@@ -7,6 +7,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import './db.js';
+import db from './db.js';
+import { closePastDueTransactions } from './lib/transactionAutoClose.js';
 import { authMiddleware } from './middleware/auth.js';
 import authRoutes from './routes/auth.js';
 import crmRoutes from './routes/crm.js';
@@ -23,6 +25,10 @@ import userTodosRoutes from './routes/user-todos.js';
 import addressRoutes from './routes/address.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const autoClosed = closePastDueTransactions(db);
+if (autoClosed.closed > 0) {
+  console.log(`Auto-closed ${autoClosed.closed} transaction(s) past close date`);
+}
 const app = express();
 const PORT = process.env.PORT || 3001;
 
