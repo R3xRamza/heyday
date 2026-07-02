@@ -139,6 +139,16 @@ export function removeChecklistFromTransaction(db, transactionId, templateId, us
   const tasksRemoved = taskStats?.total ?? 0;
 
   db.transaction(() => {
+    // Detach activity references first (FK: transaction_activity.task_id → tasks.id).
+    db.prepare(`
+      UPDATE transaction_activity SET task_id = NULL
+      WHERE task_id IN (
+        SELECT id FROM tasks
+        WHERE transaction_id = ?
+          AND template_task_id IN (SELECT id FROM template_tasks WHERE template_id = ?)
+      )
+    `).run(transactionId, templateIdNum);
+
     db.prepare(`
       DELETE FROM tasks
       WHERE transaction_id = ?

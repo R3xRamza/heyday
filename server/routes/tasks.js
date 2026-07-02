@@ -423,15 +423,19 @@ router.delete('/:id', (req, res) => {
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!task) return res.status(404).json({ error: 'Not found' });
 
+  // Detach activity references before deleting (FK: transaction_activity.task_id → tasks.id).
+  db.transaction(() => {
+    db.prepare('UPDATE transaction_activity SET task_id = NULL WHERE task_id = ?').run(task.id);
+    db.prepare('DELETE FROM tasks WHERE id = ?').run(task.id);
+  })();
+
   logActivity({
     transactionId: task.transaction_id,
     userId: req.user.id,
     eventType: 'task_deleted',
     summary: `${actorLabel(req.user)} deleted "${task.title}"`,
-    taskId: task.id,
   });
 
-  db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
 
