@@ -6,7 +6,6 @@ import {
   defaultRoleForChecklistTemplate,
 } from './checklist-templates.js';
 import { syncAllTaskAssigneesFromTemplates } from './taskAssignment.js';
-import { closePastDueTransactions } from './transactionAutoClose.js';
 
 export function addColumnIfMissing(db, table, column, definition) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
@@ -130,7 +129,6 @@ export function runMigrations(db) {
   migrateUserEmailsToHeydayGroup(db);
   migrateTaskCategory(db);
   migrateTeamHubTables(db);
-  closePastDueTransactions(db);
 }
 
 function migrateTeamHubTables(db) {
