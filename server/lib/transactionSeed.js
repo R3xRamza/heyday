@@ -11,6 +11,7 @@ import { linkTemplateToTransaction } from './transactionChecklists.js';
 
 const CHECKLIST_BY_REPRESENTING = {
   seller: 'Listing : CTC (if no TC)',
+  private_listing: 'Listing : CTC (if no TC)',
   buyer: 'Buyer : CTC (if no TC)',
   seller_and_buyer: 'Listing : CTC (if no TC)',
   seller_and_client: 'Listing : CTC (if no TC)',

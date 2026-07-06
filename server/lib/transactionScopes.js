@@ -1,10 +1,10 @@
 /** Shared SQL scopes for transaction portfolio segments. */
-export const LISTING_REPRESENTING = "representing IN ('seller','seller_and_buyer','landlord','both','seller_and_client','leasing')";
+export const LISTING_REPRESENTING = "representing IN ('seller','private_listing','seller_and_buyer','landlord','both','seller_and_client','leasing')";
 
 /** On-market listings: listing-side, live listing date, no accepted offer, not closed. */
 export const ACTIVE_LISTINGS_SCOPE = `${LISTING_REPRESENTING} AND stage != 'closed' AND listing_date IS NOT NULL AND listing_date <= date('now') AND acceptance_date IS NULL`;
 
-/** Pre-listings: listing date in the future. */
+/** Coming soon: listing date in the future. */
 export const PRE_LISTINGS_SCOPE = `${LISTING_REPRESENTING} AND stage != 'closed' AND listing_date IS NOT NULL AND listing_date > date('now')`;
 
 /** Under contract with a close date set. */

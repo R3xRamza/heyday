@@ -196,7 +196,7 @@ export default function TransactionsList() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {[
             { label: 'Listings', value: stats?.listings_count ?? 0, sub: 'On market' },
-            { label: 'Pre-Listings', value: stats?.pre_listings_count ?? 0, sub: 'Coming soon' },
+            { label: 'Coming Soon', value: stats?.pre_listings_count ?? 0, sub: 'Future listings' },
             { label: 'Pending', value: stats?.pending_count ?? 0, sub: 'Under contract' },
             { label: 'Total Volume', value: formatCurrency(volume), sub: `${stats?.count || 0} properties` },
           ].map((m) => (

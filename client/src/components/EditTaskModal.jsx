@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import TaskDeadlineFields from './TaskDeadlineFields';
 
-export default function EditTaskModal({ task, users, transaction = null, onClose, onSave }) {
+const PRIORITY_OPTIONS = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'high', label: 'High' },
+];
+
+export default function EditTaskModal({ task, users, transaction = null, adminOnly = false, onClose, onSave }) {
   const isTemplateTask = Boolean(task.template_task_id);
   const showLinkedDeadline = Boolean(transaction);
   const initialMode = (task.task_timing_anchor || (isTemplateTask && task.timing_anchor))
@@ -17,6 +22,7 @@ export default function EditTaskModal({ task, users, transaction = null, onClose
     description: task.description || '',
     due_date: task.due_date || '',
     assigned_to: task.assigned_to || '',
+    priority: task.priority || 'normal',
   });
   const [saving, setSaving] = useState(false);
 
@@ -33,6 +39,7 @@ export default function EditTaskModal({ task, users, transaction = null, onClose
       description: task.description || '',
       due_date: task.due_date || '',
       assigned_to: task.assigned_to || '',
+      priority: task.priority || 'normal',
     });
   }, [task]);
 
@@ -59,6 +66,10 @@ export default function EditTaskModal({ task, users, transaction = null, onClose
       }
     } else {
       payload.due_date = form.due_date || null;
+    }
+
+    if (adminOnly) {
+      payload.priority = form.priority;
     }
 
     await onSave(payload);
@@ -137,6 +148,20 @@ export default function EditTaskModal({ task, users, transaction = null, onClose
               ))}
             </select>
           </div>
+          {adminOnly && (
+            <div>
+              <label className="text-xs font-semibold text-on-surface-variant uppercase">Priority</label>
+              <select
+                value={form.priority}
+                onChange={(e) => setForm({ ...form, priority: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
+              >
+                {PRIORITY_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
         <div className="px-6 py-4 border-t border-outline-variant/20 flex gap-3 justify-end">
           <button type="button" onClick={onClose} className="px-5 py-2 text-sm font-semibold text-on-surface-variant border rounded">

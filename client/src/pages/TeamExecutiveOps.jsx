@@ -7,7 +7,7 @@ import DateText from '../components/shared/DateText';
 import { getTeamProfile } from '../data/teamProfiles';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency, shortAddress } from '../utils/format';
-import { displayTaskTitle } from '../utils/taskDisplay';
+import ClosingSoonPanel from '../components/tasks/ClosingSoonPanel';
 
 const STAT_CARDS = [
   {
@@ -34,14 +34,17 @@ const STAT_CARDS = [
     sub: (s) => `${s?.pending?.count ?? 0} under contract`,
   },
   {
-    key: 'leads',
-    label: 'Active Leads',
-    icon: 'groups',
+    key: 'comingSoon',
+    label: 'Coming Soon',
+    icon: 'schedule',
     accent: 'from-lemon/40 to-lemon/10',
     iconBg: 'bg-lemon text-feather',
-    path: '/crm',
-    volume: (s) => String(s?.activeLeads?.count ?? 0),
-    sub: () => 'CRM contacts',
+    path: '/transactions?filter=active_transactions',
+    volume: (s) => formatCurrency(s?.comingSoonStats?.volume ?? 0),
+    sub: (s) => {
+      const n = s?.comingSoonStats?.count ?? 0;
+      return `${n} future listing${n === 1 ? '' : 's'}`;
+    },
   },
   {
     key: 'listings',
@@ -137,6 +140,38 @@ function celebrationWindowLabel() {
   return day === 5 ? 'Today & this weekend' : 'Today';
 }
 
+function CelebrationChip({ event }) {
+  return (
+    <Link
+      to={`/crm/${event.contact_id}`}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${celebrationChipClass(event)} hover:brightness-95 transition-all`}
+    >
+      <span className="truncate max-w-[8rem]">{event.name}</span>
+      <span className="opacity-70">·</span>
+      <span className="shrink-0">{celebrationShort(event)}</span>
+      {event.subtype === 'child' && <span className="text-[9px] font-black uppercase opacity-80">kid</span>}
+    </Link>
+  );
+}
+
+function CelebrationSection({ icon, title, events, emptyLabel }) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap rounded-xl bg-gradient-to-r from-lemon/30 via-secondary/10 to-sky/20 border border-secondary/15 px-3 py-2 min-h-[2.5rem]">
+      <Icon name={icon} className="text-tertiary !text-[18px] shrink-0" />
+      <span className="text-[10px] font-black uppercase tracking-widest text-tertiary shrink-0">
+        {title}
+      </span>
+      {events.length === 0 ? (
+        <span className="text-xs text-on-surface-variant">{emptyLabel}</span>
+      ) : (
+        events.map((e, i) => (
+          <CelebrationChip key={`${e.type}-${e.subtype}-${e.contact_id}-${e.date}-${i}`} event={e} />
+        ))
+      )}
+    </div>
+  );
+}
+
 function StatCard({ card, stats, onClick }) {
   return (
     <button
@@ -230,6 +265,8 @@ export default function TeamExecutiveOps() {
   const [teamTasks, setTeamTasks] = useState([]);
   const [messages, setMessages] = useState([]);
   const [links, setLinks] = useState([]);
+  const [closings, setClosings] = useState([]);
+  const [loadingClosings, setLoadingClosings] = useState(true);
   const [loadingStats, setLoadingStats] = useState(true);
 
   const [composer, setComposer] = useState('');
@@ -238,6 +275,16 @@ export default function TeamExecutiveOps() {
   const [linkForm, setLinkForm] = useState({ label: '', url: '' });
 
   const celebrationLabel = useMemo(() => celebrationWindowLabel(), []);
+
+  const birthdayEvents = useMemo(
+    () => celebrations.filter((e) => e.type === 'birthday' || (e.type === 'anniversary' && e.subtype === 'contact')),
+    [celebrations],
+  );
+
+  const homeAnniversaryEvents = useMemo(
+    () => celebrations.filter((e) => e.type === 'anniversary' && e.subtype === 'home'),
+    [celebrations],
+  );
 
   useEffect(() => {
     fetch('/api/team-hub/stats', { credentials: 'include' })
@@ -253,6 +300,10 @@ export default function TeamExecutiveOps() {
     fetch('/api/team-hub/links', { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setLinks(json.links || []));
+    fetch('/api/tasks/milestones', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((json) => setClosings(json.milestones || []))
+      .finally(() => setLoadingClosings(false));
   }, []);
 
   const fetchMessages = useCallback(() => {
@@ -324,7 +375,7 @@ export default function TeamExecutiveOps() {
             ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
           {TX_PANELS.map((panel) => (
             <TxPanel
               key={panel.key}
@@ -334,6 +385,7 @@ export default function TeamExecutiveOps() {
               onViewAll={() => navigate(panel.link)}
             />
           ))}
+          <ClosingSoonPanel milestones={closings} loading={loadingClosings} compact />
         </div>
 
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 items-start">
@@ -353,7 +405,7 @@ export default function TeamExecutiveOps() {
                     <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant truncate">{profile.role}</p>
                   </div>
                 </div>
-                <div className="flex gap-1.5 mb-2">
+                <div className="flex gap-1.5">
                   <div className="flex-1 rounded-md bg-secondary/10 px-2 py-1 text-center">
                     <div className="text-lg font-black text-secondary leading-none">{m.activeCount}</div>
                     <div className="text-[8px] uppercase font-bold text-on-surface-variant">Active</div>
@@ -365,46 +417,27 @@ export default function TeamExecutiveOps() {
                     <div className={`text-[8px] uppercase font-bold ${m.overdueCount > 0 ? 'text-error' : 'text-on-surface-variant'}`}>Overdue</div>
                   </div>
                 </div>
-                {m.nextTasks.length === 0 ? (
-                  <p className="text-[11px] text-secondary font-semibold">All caught up</p>
-                ) : (
-                  <ul className="space-y-1">
-                    {m.nextTasks.map((t) => (
-                      <li key={t.id} className="flex gap-1.5 text-[10px] leading-snug">
-                        <span className="text-on-surface line-clamp-1 flex-1">{displayTaskTitle(t)}</span>
-                        <span className={`shrink-0 ${t.is_overdue ? 'text-error font-semibold' : 'text-on-surface-variant'}`}>
-                          {t.due_date ? <DateText value={t.due_date} /> : '—'}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </button>
             );
           })}
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap rounded-xl bg-gradient-to-r from-lemon/30 via-secondary/10 to-sky/20 border border-secondary/15 px-3 py-2 min-h-[2.5rem]">
-          <Icon name="cake" className="text-tertiary !text-[18px] shrink-0" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-tertiary shrink-0">
+        <div className="space-y-2">
+          <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant px-1">
             {celebrationLabel}
-          </span>
-          {celebrations.length === 0 ? (
-            <span className="text-xs text-on-surface-variant">No celebrations</span>
-          ) : (
-            celebrations.map((e, i) => (
-              <Link
-                key={`${e.type}-${e.subtype}-${e.contact_id}-${e.date}-${i}`}
-                to={`/crm/${e.contact_id}`}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${celebrationChipClass(e)} hover:brightness-95 transition-all`}
-              >
-                <span className="truncate max-w-[8rem]">{e.name}</span>
-                <span className="opacity-70">·</span>
-                <span className="shrink-0">{celebrationShort(e)}</span>
-                {e.subtype === 'child' && <span className="text-[9px] font-black uppercase opacity-80">kid</span>}
-              </Link>
-            ))
-          )}
+          </p>
+          <CelebrationSection
+            icon="cake"
+            title="Birthdays"
+            events={birthdayEvents}
+            emptyLabel="No birthdays"
+          />
+          <CelebrationSection
+            icon="home"
+            title="Home Anniversaries"
+            events={homeAnniversaryEvents}
+            emptyLabel="No home anniversaries"
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-4">

@@ -4,6 +4,7 @@ import {
   Users,
   CheckSquare,
   ListTodo,
+  ClipboardList,
   FolderKanban,
   BookUser,
   BarChart2,
@@ -133,14 +134,24 @@ export default function Sidebar() {
                 <NavLink
                   to={`/tasks/${user.id}`}
                   end
-                  title={collapsed ? 'My tasks' : undefined}
+                  title={collapsed ? 'My Transaction Tasks' : undefined}
                   className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
                 >
                   <ListTodo size={collapsed ? 20 : 18} className="shrink-0" />
-                  {!collapsed && <span>My tasks</span>}
+                  {!collapsed && <span>My Transaction Tasks</span>}
+                </NavLink>
+                <NavLink
+                  to={`/tasks/${user.id}/admin`}
+                  end
+                  title={collapsed ? 'My Admin Tasks' : undefined}
+                  className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
+                >
+                  <ClipboardList size={collapsed ? 20 : 18} className="shrink-0" />
+                  {!collapsed && <span>My Admin Tasks</span>}
                 </NavLink>
                 <NavLink
                   to={`/tasks/${user.id}/projects`}
+                  end
                   title={collapsed ? 'My projects' : undefined}
                   className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
                 >

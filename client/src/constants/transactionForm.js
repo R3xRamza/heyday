@@ -1,6 +1,7 @@
 /** Representing / transaction type — stored value + UI label */
 export const REPRESENTING_OPTIONS = [
   { value: 'seller', label: 'Seller' },
+  { value: 'private_listing', label: 'Private listing' },
   { value: 'buyer', label: 'Buyer' },
   { value: 'seller_and_buyer', label: 'Seller and Buyer' },
   { value: 'landlord', label: 'Landlord' },
@@ -72,6 +73,11 @@ export function normalizeRepresenting(value) {
   return value || 'seller';
 }
 
+export function isListingSideRepresenting(representing) {
+  const r = normalizeRepresenting(representing);
+  return r === 'seller' || r === 'private_listing' || r === 'seller_and_buyer' || r === 'landlord';
+}
+
 function portfolioTodayStr() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -84,10 +90,10 @@ export function transactionPortfolioType(tx) {
 
   const today = portfolioTodayStr();
   const representing = normalizeRepresenting(tx.representing);
-  const isListingSide = representing === 'seller' || representing === 'seller_and_buyer' || representing === 'landlord';
+  const isListingSide = isListingSideRepresenting(representing);
 
   if (isListingSide && tx.listing_date && tx.listing_date > today) {
-    return 'Pre-listing';
+    return 'Coming Soon';
   }
 
   if (isListingSide && tx.listing_date && tx.listing_date <= today && !tx.acceptance_date) {
@@ -108,6 +114,13 @@ export const TIMELINE_DATE_KEYS = [
 
 export const TIMELINE_BY_REPRESENTING = {
   seller: [
+    { key: 'listing_date', label: 'Listing date', icon: 'event_available' },
+    { key: 'acceptance_date', label: 'Acceptance date', icon: 'verified' },
+    { key: 'option_end_date', label: 'Option period end date', icon: 'pending_actions' },
+    { key: 'close_date', label: 'Closing date', icon: 'key' },
+    { key: 'important_date', label: 'Expiration date', icon: 'event_busy' },
+  ],
+  private_listing: [
     { key: 'listing_date', label: 'Listing date', icon: 'event_available' },
     { key: 'acceptance_date', label: 'Acceptance date', icon: 'verified' },
     { key: 'option_end_date', label: 'Option period end date', icon: 'pending_actions' },
@@ -164,6 +177,7 @@ const BASE_REQUIRED = ['address', 'city', 'state', 'zip'];
 
 const REQUIRED_BY_REPRESENTING = {
   seller: ['listing_date', 'important_date'],
+  private_listing: ['listing_date', 'important_date'],
   buyer: ['close_date', 'acceptance_date', 'option_end_date'],
   seller_and_buyer: [],
   landlord: ['listing_date'],

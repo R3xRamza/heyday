@@ -13,7 +13,7 @@ export const TEAM_PROFILES = {
     img: adamPhoto,
   },
   'margaret@theheydaygroup.com': {
-    role: 'Analyst',
+    role: 'Operations',
     img: margaretPhoto,
   },
   'meredith@theheydaygroup.com': {

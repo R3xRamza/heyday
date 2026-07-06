@@ -22,7 +22,7 @@ import { closePastDueTransactions, deriveStageFromCloseDate } from '../lib/trans
 
 const router = Router();
 
-const LISTING_REPRESENTING = "representing IN ('seller','seller_and_buyer','landlord','both','seller_and_client','leasing')";
+const LISTING_REPRESENTING = "representing IN ('seller','private_listing','seller_and_buyer','landlord','both','seller_and_client','leasing')";
 
 const PORTFOLIO_SCOPE = "stage != 'closed'";
 const LISTINGS_COUNT = `${LISTING_REPRESENTING} AND stage != 'closed' AND listing_date IS NOT NULL AND listing_date <= date('now') AND acceptance_date IS NULL`;
