@@ -1,4 +1,5 @@
 import { normalizeAddressFields } from './address.js';
+import { clearTransactionData } from './transactionSeed.js';
 
 const SALE_TYPE_TRADITIONAL = 'Traditional sale';
 const SALE_TYPE_RENT_LEASE = 'Rent/lease';
@@ -116,3 +117,62 @@ export const BROKERMINT_INSERT_COLUMNS = [
   'transaction_name', 'sale_type', 'gross_commission', 'buyer_agreement_date',
   'buyer_expiration_date', 'agent_id', 'created_at',
 ];
+
+/**
+ * Clear existing transactions and import Brokermint rows.
+ * Closed deals get no checklists (historical import).
+ */
+export function runBrokermintImport(db, rawRows, { clearFirst = true } = {}) {
+  const users = db.prepare('SELECT id, email, name FROM users').all();
+  const usersByEmail = Object.fromEntries(users.map((u) => [u.email, u.id]));
+  const meredith = usersByEmail['meredith@theheydaygroup.com'];
+  const defaultAgentId = meredith ?? users[0]?.id ?? 1;
+
+  const before = clearFirst
+    ? {
+      transactions: db.prepare('SELECT COUNT(*) as c FROM transactions').get().c,
+      tasks: db.prepare('SELECT COUNT(*) as c FROM tasks').get().c,
+    }
+    : null;
+
+  if (clearFirst) clearTransactionData(db);
+
+  const placeholders = BROKERMINT_INSERT_COLUMNS.map(() => '?').join(', ');
+  const insert = db.prepare(`
+    INSERT INTO transactions (${BROKERMINT_INSERT_COLUMNS.join(', ')})
+    VALUES (${placeholders})
+  `);
+
+  let inserted = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  db.transaction(() => {
+    for (const row of rawRows) {
+      try {
+        const mapped = mapBrokermintRow(row, { usersByEmail, defaultAgentId });
+        if (!mapped) {
+          skipped++;
+          continue;
+        }
+        insert.run(...BROKERMINT_INSERT_COLUMNS.map((col) => mapped[col]));
+        inserted++;
+      } catch (e) {
+        errors++;
+        if (errors <= 5) console.error('Brokermint row error:', e.message);
+      }
+    }
+  })();
+
+  const byStage = db.prepare('SELECT stage, COUNT(*) as c FROM transactions GROUP BY stage ORDER BY stage').all();
+  const total = db.prepare('SELECT COUNT(*) as c FROM transactions').get().c;
+
+  return {
+    before,
+    inserted,
+    skipped,
+    errors,
+    total,
+    byStage: Object.fromEntries(byStage.map((r) => [r.stage, r.c])),
+  };
+}
