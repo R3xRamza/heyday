@@ -10,7 +10,6 @@ export const PARTY_ROLES = [
 
 const COUNTERPARTY_LABELS = {
   seller: 'seller',
-  private_listing: 'seller',
   buyer: 'buyer',
   landlord: 'landlord',
   tenant: 'tenant',

@@ -1,12 +1,31 @@
 /** Representing / transaction type — stored value + UI label */
 export const REPRESENTING_OPTIONS = [
   { value: 'seller', label: 'Seller' },
-  { value: 'private_listing', label: 'Private listing' },
   { value: 'buyer', label: 'Buyer' },
   { value: 'seller_and_buyer', label: 'Seller and Buyer' },
   { value: 'landlord', label: 'Landlord' },
   { value: 'tenant', label: 'Tenant' },
 ];
+
+export const LISTING_VISIBILITY_OPTIONS = [
+  { value: 'public', label: 'Public' },
+  { value: 'private', label: 'Private' },
+  { value: 'coming_soon', label: 'Coming Soon' },
+];
+
+export function normalizeListingVisibility(value) {
+  if (value === 'private') return 'private';
+  if (value === 'coming_soon') return 'coming_soon';
+  return 'public';
+}
+
+export function isPrivateListing(tx) {
+  return normalizeListingVisibility(tx?.listing_visibility) === 'private';
+}
+
+export function isComingSoonListing(tx) {
+  return normalizeListingVisibility(tx?.listing_visibility) === 'coming_soon';
+}
 
 export function representingLabel(value) {
   return REPRESENTING_OPTIONS.find((o) => o.value === value)?.label
@@ -67,6 +86,7 @@ export function normalizeSaleType(value, representing) {
 
 /** Map legacy DB values to current selects */
 export function normalizeRepresenting(value) {
+  if (value === 'private_listing') return 'seller';
   if (value === 'both' || value === 'seller_and_client') return 'seller_and_buyer';
   if (value === 'leasing') return 'landlord';
   if (value === 'renting') return 'tenant';
@@ -75,7 +95,7 @@ export function normalizeRepresenting(value) {
 
 export function isListingSideRepresenting(representing) {
   const r = normalizeRepresenting(representing);
-  return r === 'seller' || r === 'private_listing' || r === 'seller_and_buyer' || r === 'landlord';
+  return r === 'seller' || r === 'seller_and_buyer' || r === 'landlord';
 }
 
 function portfolioTodayStr() {
@@ -91,6 +111,10 @@ export function transactionPortfolioType(tx) {
   const today = portfolioTodayStr();
   const representing = normalizeRepresenting(tx.representing);
   const isListingSide = isListingSideRepresenting(representing);
+
+  if (isListingSide && isComingSoonListing(tx)) {
+    return 'Coming Soon';
+  }
 
   if (isListingSide && tx.listing_date && tx.listing_date > today) {
     return 'Coming Soon';
@@ -114,13 +138,6 @@ export const TIMELINE_DATE_KEYS = [
 
 export const TIMELINE_BY_REPRESENTING = {
   seller: [
-    { key: 'listing_date', label: 'Listing date', icon: 'event_available' },
-    { key: 'acceptance_date', label: 'Acceptance date', icon: 'verified' },
-    { key: 'option_end_date', label: 'Option period end date', icon: 'pending_actions' },
-    { key: 'close_date', label: 'Closing date', icon: 'key' },
-    { key: 'important_date', label: 'Expiration date', icon: 'event_busy' },
-  ],
-  private_listing: [
     { key: 'listing_date', label: 'Listing date', icon: 'event_available' },
     { key: 'acceptance_date', label: 'Acceptance date', icon: 'verified' },
     { key: 'option_end_date', label: 'Option period end date', icon: 'pending_actions' },
@@ -177,7 +194,6 @@ const BASE_REQUIRED = ['address', 'city', 'state', 'zip'];
 
 const REQUIRED_BY_REPRESENTING = {
   seller: ['listing_date', 'important_date'],
-  private_listing: ['listing_date', 'important_date'],
   buyer: ['close_date', 'acceptance_date', 'option_end_date'],
   seller_and_buyer: [],
   landlord: ['listing_date'],
@@ -195,9 +211,13 @@ export const FIELD_LABELS = {
   acceptance_date: 'Acceptance date',
   option_end_date: 'Option end date',
   representing: 'Representing',
+  listing_visibility: 'Listing visibility',
 };
 
-export function getRequiredTransactionFields(representing) {
+export function getRequiredTransactionFields(representing, listingVisibility) {
+  if (normalizeListingVisibility(listingVisibility) === 'coming_soon') {
+    return [...BASE_REQUIRED];
+  }
   const r = normalizeRepresenting(representing);
   return [...BASE_REQUIRED, ...(REQUIRED_BY_REPRESENTING[r] || [])];
 }
@@ -207,7 +227,7 @@ function isEmpty(value) {
 }
 
 export function validateTransactionFields(form) {
-  const required = getRequiredTransactionFields(form.representing);
+  const required = getRequiredTransactionFields(form.representing, form.listing_visibility);
   const missing = required.filter((key) => isEmpty(form[key]));
   if (missing.length === 0) {
     return { ok: true, missing: [] };

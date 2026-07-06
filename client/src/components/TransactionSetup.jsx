@@ -3,7 +3,10 @@ import DateText from './shared/DateText';
 import { buildAssignments } from '../utils/taskAssignment';
 import {
   REPRESENTING_OPTIONS,
+  LISTING_VISIBILITY_OPTIONS,
   normalizeRepresenting,
+  normalizeListingVisibility,
+  isListingSideRepresenting,
   showsOptionEndDate,
   getRequiredTransactionFields,
   validateTransactionFields,
@@ -31,6 +34,7 @@ function hydrateForm(transaction) {
     ...transaction,
     representing,
     sale_type: normalizeSaleType(transaction.sale_type, representing),
+    listing_visibility: normalizeListingVisibility(transaction.listing_visibility),
     state: transaction.state || '',
     zip: transaction.zip || '',
     agent_id: transaction.agent_id ?? '',
@@ -50,7 +54,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState('');
 
-  const requiredFields = getRequiredTransactionFields(form.representing);
+  const requiredFields = getRequiredTransactionFields(form.representing, form.listing_visibility);
   const isRequired = (key) => requiredFields.includes(key);
 
   function fieldLabel(key, fallback) {
@@ -394,10 +398,14 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                 onChange={(e) => {
                   setValidationError('');
                   const representing = e.target.value;
+                  const listing_visibility = isListingSideRepresenting(representing)
+                    ? normalizeListingVisibility(form.listing_visibility)
+                    : 'public';
                   setForm({
                     ...form,
                     representing,
                     sale_type: saleTypeForRepresenting(representing),
+                    listing_visibility,
                   });
                 }}
                 className="w-full mt-1 px-3 py-2 border rounded text-sm"
@@ -407,6 +415,20 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                 ))}
               </select>
             </div>
+            {isListingSideRepresenting(form.representing) && (
+              <div className="col-span-2">
+                <label className="text-xs font-semibold text-on-surface-variant">Listing visibility</label>
+                <select
+                  value={form.listing_visibility || 'public'}
+                  onChange={(e) => setForm({ ...form, listing_visibility: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 border rounded text-sm"
+                >
+                  {LISTING_VISIBILITY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="text-xs font-semibold text-on-surface-variant">Type of sale</label>
               <select

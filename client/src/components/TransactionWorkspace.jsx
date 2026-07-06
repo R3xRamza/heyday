@@ -5,16 +5,22 @@ import Icon from './shared/Icon';
 import EditTaskModal from './EditTaskModal';
 import CreateTaskModal from './CreateTaskModal';
 import PartiesToTransaction from './PartiesToTransaction';
+import PrivateListingFlag from './transactions/PrivateListingFlag';
 import DateText from './shared/DateText';
 import { formatCurrency, parseTransactionAddress } from '../utils/format';
 import {
   REPRESENTING_OPTIONS,
+  LISTING_VISIBILITY_OPTIONS,
   normalizeRepresenting,
+  normalizeListingVisibility,
+  isListingSideRepresenting,
+  isPrivateListing,
   representingLabel,
   getTimelineSteps,
   getTimelineDateKeys,
   datesToClearOnRepresentingChange,
   transactionStageLabel,
+  transactionPortfolioType,
   TRANSACTION_STAGE_OPTIONS,
   SALE_TYPE_OPTIONS,
   saleTypeForRepresenting,
@@ -30,6 +36,13 @@ const ASSET_VIEWS = [
 const EXTRA_FIELDS = [
   { key: 'created_at', label: 'Created', type: 'readonly-date' },
   { key: 'representing', label: 'Representing', type: 'select', options: REPRESENTING_OPTIONS },
+  {
+    key: 'listing_visibility',
+    label: 'Listing visibility',
+    type: 'select',
+    options: LISTING_VISIBILITY_OPTIONS,
+    listingSideOnly: true,
+  },
   { key: 'sale_type', label: 'Type of sale', type: 'select', options: SALE_TYPE_OPTIONS },
   { key: 'stage', label: 'Status', type: 'select', options: TRANSACTION_STAGE_OPTIONS },
   { key: 'address', label: 'Address', type: 'text' },
@@ -148,6 +161,7 @@ export default function TransactionWorkspace({
       ...transaction,
       representing,
       sale_type: normalizeSaleType(transaction.sale_type, representing),
+      listing_visibility: normalizeListingVisibility(transaction.listing_visibility),
     });
   }, [transaction]);
 
@@ -278,8 +292,11 @@ export default function TransactionWorkspace({
       const normalized = normalizeRepresenting(value);
       const { updates, patch } = datesToClearOnRepresentingChange(form, normalized);
       const sale_type = saleTypeForRepresenting(normalized);
-      const payload = { [key]: value, sale_type, ...updates };
-      setForm((prev) => ({ ...prev, [key]: value, sale_type, ...patch }));
+      const listing_visibility = isListingSideRepresenting(normalized)
+        ? normalizeListingVisibility(form.listing_visibility)
+        : 'public';
+      const payload = { [key]: value, sale_type, listing_visibility, ...updates };
+      setForm((prev) => ({ ...prev, [key]: value, sale_type, listing_visibility, ...patch }));
       saveTransaction(payload);
       return;
     }
@@ -331,8 +348,14 @@ export default function TransactionWorkspace({
   const openTasks = tasks.filter((t) => t.status !== 'complete').length;
   const timelineDates = getTimelineSteps(form.representing);
   const timelineKeySet = new Set(getTimelineDateKeys(form.representing));
-  const visibleExtraFields = EXTRA_FIELDS.filter((f) => !timelineKeySet.has(f.key));
+  const visibleExtraFields = EXTRA_FIELDS.filter((f) => {
+    if (timelineKeySet.has(f.key)) return false;
+    if (f.listingSideOnly && !isListingSideRepresenting(form.representing)) return false;
+    return true;
+  });
   const representingDisplay = representingLabel(form.representing);
+  const showPrivateFlag = isPrivateListing(form);
+  const portfolioType = transactionPortfolioType(form);
 
   const dashboardHeader = (
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-2">
@@ -348,6 +371,7 @@ export default function TransactionWorkspace({
         <span className="px-3 py-1 bg-secondary-container/30 text-secondary border border-secondary/20 rounded-full text-xs font-semibold uppercase tracking-wide">
           {stageBadge(transaction.stage)}
         </span>
+        {showPrivateFlag && <PrivateListingFlag />}
         {openTasks > 0 && (
           <span className="px-3 py-1 bg-primary-container text-white rounded-full text-xs font-semibold uppercase tracking-wide">
             {openTasks} OPEN TASKS
@@ -366,9 +390,12 @@ export default function TransactionWorkspace({
           </Link>
           <p className="text-sm font-semibold text-primary leading-snug">{street}</p>
           {cityLine && <p className="text-xs text-on-surface-variant mt-0.5">{cityLine}</p>}
-          <span className="inline-block mt-2 px-2 py-0.5 text-[10px] font-bold uppercase bg-secondary-container/40 text-secondary rounded-full">
-            {transaction.stage || 'active'}
-          </span>
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase bg-secondary-container/40 text-secondary rounded-full">
+              {transaction.stage || 'active'}
+            </span>
+            {showPrivateFlag && <PrivateListingFlag />}
+          </div>
         </div>
 
         <div className="p-3">
@@ -463,9 +490,13 @@ export default function TransactionWorkspace({
                     <p className="text-xl font-semibold leading-snug">{street || '—'}</p>
                     {cityLine && <p className="text-white/75 text-sm mt-1">{cityLine}</p>}
                     <div className="mt-4 flex flex-wrap gap-2">
+                      <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase bg-white/20 rounded-full">
+                        {portfolioType}
+                      </span>
                       <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase bg-white/15 rounded-full">
                         {stageBadge(transaction.stage)}
                       </span>
+                      {showPrivateFlag && <PrivateListingFlag />}
                     </div>
                   </div>
                 </div>

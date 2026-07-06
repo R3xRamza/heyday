@@ -104,6 +104,7 @@ export function runMigrations(db) {
   addColumnIfMissing(db, 'transactions', 'state', 'TEXT');
   addColumnIfMissing(db, 'transactions', 'zip', 'TEXT');
   migrateTransactionAddressAndRepresenting(db);
+  migratePrivateListingVisibility(db);
   migrateSellerAndBuyerRepresenting(db);
   migrateCounterpartyParties(db);
   backfillTransactionChecklists(db);
@@ -485,6 +486,19 @@ function migrateCounterpartyParties(db) {
       db.prepare("DELETE FROM transaction_parties WHERE transaction_id = ? AND role IN ('buyer', 'seller')").run(tx.id);
     }
   }
+}
+
+function migratePrivateListingVisibility(db) {
+  addColumnIfMissing(db, 'transactions', 'listing_visibility', "TEXT DEFAULT 'public'");
+  db.prepare(`
+    UPDATE transactions
+    SET listing_visibility = 'private', representing = 'seller'
+    WHERE representing = 'private_listing'
+  `).run();
+  db.prepare(`
+    UPDATE transactions SET listing_visibility = 'public'
+    WHERE listing_visibility IS NULL OR TRIM(listing_visibility) = ''
+  `).run();
 }
 
 function migrateTransactionAddressAndRepresenting(db) {

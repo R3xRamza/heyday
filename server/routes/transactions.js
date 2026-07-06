@@ -19,27 +19,25 @@ import {
   mergeTransactionForValidation,
 } from '../lib/transactionValidation.js';
 import { closePastDueTransactions, deriveStageFromCloseDate } from '../lib/transactionAutoClose.js';
+import { closedYtdStats, ACTIVE_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE } from '../lib/transactionScopes.js';
 
 const router = Router();
 
-const LISTING_REPRESENTING = "representing IN ('seller','private_listing','seller_and_buyer','landlord','both','seller_and_client','leasing')";
-
 const PORTFOLIO_SCOPE = "stage != 'closed'";
-const LISTINGS_COUNT = `${LISTING_REPRESENTING} AND stage != 'closed' AND listing_date IS NOT NULL AND listing_date <= date('now') AND acceptance_date IS NULL`;
-const PRE_LISTINGS_COUNT = `${LISTING_REPRESENTING} AND stage != 'closed' AND listing_date IS NOT NULL AND listing_date > date('now')`;
 const PENDING_COUNT = "stage = 'pending' AND close_date IS NOT NULL";
 
 const VIEW_MAP = {
   active_transactions: "stage IN ('active','pending')",
   all: '1=1',
-  current_listings: LISTINGS_COUNT,
-  all_listings: LISTING_REPRESENTING,
+  current_listings: ACTIVE_LISTINGS_SCOPE,
+  coming_soon: PRE_LISTINGS_SCOPE,
+  all_listings: PRE_LISTINGS_SCOPE,
   pending: PENDING_COUNT,
   closed: "stage = 'closed'",
 };
 
 const TX_FIELDS = [
-  'address', 'city', 'state', 'zip', 'value', 'owner_name', 'representing', 'stage',
+  'address', 'city', 'state', 'zip', 'value', 'owner_name', 'representing', 'listing_visibility', 'stage',
   'important_date', 'important_date_label', 'close_date', 'listing_date',
   'acceptance_date', 'option_end_date', 'workflow_status', 'transaction_name',
   'sale_type', 'gross_commission', 'buyer_agreement_date', 'buyer_expiration_date',
@@ -104,15 +102,28 @@ router.get('/', (req, res) => {
   sql += ' ORDER BY t.created_at DESC';
   const transactions = db.prepare(sql).all(...params);
 
-  const stats = db.prepare(`
+  const portfolioStats = db.prepare(`
     SELECT COUNT(*) as count, COALESCE(SUM(value), 0) as volume,
-      SUM(CASE WHEN ${LISTINGS_COUNT} THEN 1 ELSE 0 END) as listings_count,
-      SUM(CASE WHEN ${PRE_LISTINGS_COUNT} THEN 1 ELSE 0 END) as pre_listings_count,
+      SUM(CASE WHEN ${ACTIVE_LISTINGS_SCOPE} THEN 1 ELSE 0 END) as listings_count,
+      SUM(CASE WHEN ${PRE_LISTINGS_SCOPE} THEN 1 ELSE 0 END) as pre_listings_count,
       SUM(CASE WHEN ${PENDING_COUNT} THEN 1 ELSE 0 END) as pending_count
     FROM transactions WHERE ${PORTFOLIO_SCOPE}
   `).get();
 
-  res.json({ transactions, stats });
+  let filteredSql = `SELECT COUNT(*) as count, COALESCE(SUM(t.value), 0) as volume FROM transactions t WHERE ${where}`;
+  if (search) {
+    filteredSql += ` AND (LOWER(t.address) LIKE ? OR LOWER(t.city) LIKE ? OR LOWER(COALESCE(t.state, '')) LIKE ? OR LOWER(COALESCE(t.zip, '')) LIKE ? OR LOWER(COALESCE(t.client_name, t.owner_name)) LIKE ?)`;
+  }
+  const filtered = db.prepare(filteredSql).get(...(search ? params : []));
+
+  res.json({
+    transactions,
+    stats: {
+      ...portfolioStats,
+      filtered,
+      closedYtd: closedYtdStats(db),
+    },
+  });
 });
 
 router.get('/:id/activity', (req, res) => {
@@ -252,6 +263,8 @@ router.put('/:id', (req, res) => {
     } else if (field === 'client_name' && val != null && val !== '') {
       val = val.trim();
       if (!('owner_name' in req.body)) req.body.owner_name = val;
+    } else if (field === 'listing_visibility') {
+      val = val === 'private' ? 'private' : val === 'coming_soon' ? 'coming_soon' : 'public';
     } else if (typeof val === 'string') {
       val = emptyToNull(val.trim?.() ?? val);
     }

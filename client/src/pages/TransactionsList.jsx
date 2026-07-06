@@ -1,29 +1,68 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ListChecks, Plus } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
-import Icon from '../components/shared/Icon';
 import DateText from '../components/shared/DateText';
 import { formatCurrency, parseTransactionAddress } from '../utils/format';
 import PriceInput from '../components/shared/PriceInput';
 import AddressAutocomplete from '../components/shared/AddressAutocomplete';
 import { blurActiveElement, CHROME_AUTOCOMPLETE, ChromeAddressDecoy } from '../components/shared/chromeFormGuards';
-import { validateTransactionFields, transactionPortfolioType } from '../constants/transactionForm';
+import { validateTransactionFields, transactionPortfolioType, isPrivateListing } from '../constants/transactionForm';
+import PrivateListingFlag from '../components/transactions/PrivateListingFlag';
 
 const FILTERS = [
   { key: 'active_transactions', label: 'Active Transactions' },
-  { key: 'all', label: 'All Transactions' },
+  { key: 'coming_soon', label: 'Coming Soon' },
   { key: 'current_listings', label: 'Current Listings' },
-  { key: 'all_listings', label: 'All Listings' },
   { key: 'pending', label: 'Pending' },
   { key: 'closed', label: 'Closed' },
+  { key: 'all', label: 'All Transactions' },
 ];
+
+const VALID_FILTER_KEYS = new Set(FILTERS.map((f) => f.key));
+
+const KPI_CARDS = [
+  { key: 'listings', label: 'Listings', value: (s) => s?.listings_count ?? 0, sub: 'On market' },
+  { key: 'comingSoon', label: 'Coming Soon', value: (s) => s?.pre_listings_count ?? 0, sub: 'Future listings' },
+  { key: 'pending', label: 'Pending', value: (s) => s?.pending_count ?? 0, sub: 'Under contract' },
+];
+
+const VOLUME_BOX_BY_FILTER = {
+  active_transactions: { label: 'Active Volume', sub: (n) => `${n} active` },
+  all: { label: 'Total Volume', sub: (n) => `${n} propert${n === 1 ? 'y' : 'ies'}` },
+  current_listings: { label: 'Listing Volume', sub: (n) => `${n} on market` },
+  coming_soon: { label: 'Coming Soon Volume', sub: (n) => `${n} future listing${n === 1 ? '' : 's'}` },
+  pending: { label: 'Total Pending Volume', sub: (n) => `${n} under contract` },
+  closed: { label: 'Closed YTD', sub: (n) => `${n} closing${n === 1 ? '' : 's'}` },
+};
+
+const FOOTER_VOLUME_LABEL = {
+  active_transactions: 'active volume',
+  all: 'total volume',
+  current_listings: 'listing volume',
+  coming_soon: 'coming soon volume',
+  pending: 'total pending volume',
+  closed: 'closed YTD',
+};
+
+function filterVolume(stats, filter) {
+  if (filter === 'closed') {
+    return {
+      volume: stats?.closedYtd?.volume ?? 0,
+      count: stats?.closedYtd?.count ?? 0,
+    };
+  }
+  return {
+    volume: stats?.filtered?.volume ?? 0,
+    count: stats?.filtered?.count ?? 0,
+  };
+}
 
 const DATE_COLUMN_BY_FILTER = {
   active_transactions: { label: 'Creation Date', field: 'created_at' },
   all: { label: 'Creation Date', field: 'created_at' },
   current_listings: { label: 'Listing Date', field: 'listing_date' },
-  all_listings: { label: 'Listing Date', field: 'listing_date' },
+  coming_soon: { label: 'Listing Date', field: 'listing_date' },
   pending: { label: 'Closing Date', field: 'close_date' },
   closed: { label: 'Closing Date', field: 'close_date' },
 };
@@ -80,7 +119,7 @@ function compareTransactions(a, b, sortKey, sortDir, dateField) {
       else if (!av) cmp = 1;
       else if (!bv) cmp = -1;
       else cmp = av.localeCompare(bv);
-      break;
+      return sortDir === 'asc' ? cmp : -cmp;
     }
     case 'agent':
       cmp = (a.agent_name || '').localeCompare(b.agent_name || '', undefined, { sensitivity: 'base' });
@@ -91,20 +130,65 @@ function compareTransactions(a, b, sortKey, sortDir, dateField) {
   return sortDir === 'asc' ? cmp : -cmp;
 }
 
+function sortTransactions(rows, sortKey, sortDir, dateField) {
+  return [...rows].sort((a, b) => {
+    const ad = transactionDateValue(a, dateField);
+    const bd = transactionDateValue(b, dateField);
+    if (!ad && bd) return 1;
+    if (ad && !bd) return -1;
+    return compareTransactions(a, b, sortKey, sortDir, dateField);
+  });
+}
+
+function portfolioTypeBadgeClass(tx) {
+  const type = transactionPortfolioType(tx);
+  if (type === 'Coming Soon') return 'bg-lemon/35 text-feather border border-lemon/50';
+  if (type === 'Closed') return 'bg-secondary/15 text-secondary border border-secondary/25';
+  if (type === 'Pending') return 'bg-feather/10 text-feather border border-feather/20';
+  if (type === 'Active listing') return 'bg-sky/25 text-feather border border-sky/35';
+  return 'bg-secondary-container/30 text-secondary border border-secondary/20';
+}
+
+function StatCard({ label, value, sub }) {
+  return (
+    <div className="bg-white border border-outline-variant/20 p-4 shadow-executive rounded-lg">
+      <p className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">{label}</p>
+      <h2 className="text-xl font-bold text-primary leading-tight">{value}</h2>
+      <p className="text-xs text-on-surface-variant mt-1">{sub}</p>
+    </div>
+  );
+}
+
 export default function TransactionsList() {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState('active_transactions');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterParam = searchParams.get('filter');
+  const resolvedFilter = filterParam === 'all_listings' ? 'coming_soon' : filterParam;
+  const filter = VALID_FILTER_KEYS.has(resolvedFilter) ? resolvedFilter : 'active_transactions';
+
   const [search, setSearch] = useState('');
   const [data, setData] = useState({ transactions: [], stats: {} });
+  const [loadedFilter, setLoadedFilter] = useState(filter);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ address: '', city: '', state: '', zip: '', value: '', client_name: '' });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
   const [sortKey, setSortKey] = useState('date');
   const [sortDir, setSortDir] = useState('desc');
+  const fetchIdRef = useRef(0);
 
   const dateColumn = DATE_COLUMN_BY_FILTER[filter] || DATE_COLUMN_BY_FILTER.all;
+  const statsFilter = refreshing ? loadedFilter : filter;
+
+  function handleFilterChange(key) {
+    if (key === 'active_transactions') {
+      setSearchParams({}, { replace: true });
+    } else {
+      setSearchParams({ filter: key }, { replace: true });
+    }
+  }
 
   useEffect(() => {
     setSortKey('date');
@@ -123,16 +207,27 @@ export default function TransactionsList() {
   const sortedTransactions = useMemo(() => {
     const rows = data.transactions || [];
     if (!sortKey) return rows;
-    return [...rows].sort((a, b) => compareTransactions(a, b, sortKey, sortDir, dateColumn.field));
+    return sortTransactions(rows, sortKey, sortDir, dateColumn.field);
   }, [data.transactions, sortKey, sortDir, dateColumn.field]);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams({ filter });
+    const requestedFilter = filter;
+    const fetchId = ++fetchIdRef.current;
+    setRefreshing(true);
+    const params = new URLSearchParams({ filter: requestedFilter });
     if (search) params.set('search', search);
-    const res = await fetch(`/api/transactions?${params}`, { credentials: 'include' });
-    setData(await res.json());
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/transactions?${params}`, { credentials: 'include' });
+      const json = await res.json();
+      if (fetchId !== fetchIdRef.current) return;
+      setData(json);
+      setLoadedFilter(requestedFilter);
+    } finally {
+      if (fetchId === fetchIdRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
   }, [filter, search]);
 
   useEffect(() => {
@@ -173,7 +268,10 @@ export default function TransactionsList() {
   }
 
   const { stats } = data;
-  const volume = stats?.volume || 0;
+  const { volume, count: filterCount } = filterVolume(stats, statsFilter);
+  const volumeBox = VOLUME_BOX_BY_FILTER[statsFilter] || VOLUME_BOX_BY_FILTER.all;
+  const footerVolumeLabel = FOOTER_VOLUME_LABEL[statsFilter] || FOOTER_VOLUME_LABEL.all;
+  const showInitialLoading = loading && data.transactions.length === 0;
 
   return (
     <DashboardLayout title="Transactions" className="bg-surface">
@@ -193,26 +291,28 @@ export default function TransactionsList() {
             </button>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {[
-            { label: 'Listings', value: stats?.listings_count ?? 0, sub: 'On market' },
-            { label: 'Coming Soon', value: stats?.pre_listings_count ?? 0, sub: 'Future listings' },
-            { label: 'Pending', value: stats?.pending_count ?? 0, sub: 'Under contract' },
-            { label: 'Total Volume', value: formatCurrency(volume), sub: `${stats?.count || 0} properties` },
-          ].map((m) => (
-            <div key={m.label} className="bg-white border border-outline-variant/20 p-6 shadow-executive">
-              <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2">{m.label}</p>
-              <h2 className="text-3xl font-bold text-primary">{m.value}</h2>
-              <p className="text-xs text-on-surface-variant mt-1">{m.sub}</p>
-            </div>
+        <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-10 transition-opacity ${refreshing ? 'opacity-70' : ''}`}>
+          {KPI_CARDS.map((card) => (
+            <StatCard
+              key={card.key}
+              label={card.label}
+              value={card.value(stats)}
+              sub={card.sub}
+            />
           ))}
+          <StatCard
+            label={volumeBox.label}
+            value={formatCurrency(volume)}
+            sub={volumeBox.sub(filterCount)}
+          />
         </div>
 
         <nav className="flex items-center gap-2 mb-6 overflow-x-auto pb-2">
           {FILTERS.map((f) => (
             <button
               key={f.key}
-              onClick={() => setFilter(f.key)}
+              type="button"
+              onClick={() => handleFilterChange(f.key)}
               className={`px-6 py-2 text-xs font-semibold uppercase tracking-wider whitespace-nowrap transition-colors ${
                 filter === f.key ? 'bg-primary text-white' : 'text-on-surface-variant hover:bg-surface-container-low'
               }`}
@@ -222,8 +322,8 @@ export default function TransactionsList() {
           ))}
         </nav>
 
-        <div className="bg-white border border-outline-variant/20 shadow-executive overflow-hidden">
-          <div className="overflow-x-auto">
+        <div className="bg-white border border-outline-variant/20 shadow-executive overflow-hidden min-h-[16rem]">
+          <div className="overflow-x-auto relative">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-container-low border-b border-outline-variant/30">
@@ -243,8 +343,8 @@ export default function TransactionsList() {
                   <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest" aria-hidden />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-outline-variant/10">
-                {loading ? (
+              <tbody className={`divide-y divide-outline-variant/10 transition-opacity ${refreshing ? 'opacity-50' : ''}`}>
+                {showInitialLoading ? (
                   <tr><td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">Loading…</td></tr>
                 ) : sortedTransactions.length === 0 ? (
                   <tr><td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">No transactions yet. Create one to get started.</td></tr>
@@ -265,7 +365,10 @@ export default function TransactionsList() {
                     >
                       <td className="px-6 py-4">
                         <div>
-                          <p className="font-semibold text-primary">{street}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-primary">{street}</p>
+                            {isPrivateListing(tx) && <PrivateListingFlag />}
+                          </div>
                           <p className="text-xs text-on-surface-variant">
                             {cityLine || tx.client_name || tx.owner_name}
                           </p>
@@ -277,7 +380,7 @@ export default function TransactionsList() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="px-3 py-1 bg-secondary-container/30 text-secondary text-xs font-semibold rounded-full">
+                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${portfolioTypeBadgeClass(tx)}`}>
                           {transactionPortfolioType(tx)}
                         </span>
                       </td>
@@ -296,8 +399,13 @@ export default function TransactionsList() {
               </tbody>
             </table>
           </div>
-          <div className="px-6 py-4 bg-surface-container-low border-t border-outline-variant/30 text-xs text-on-surface-variant">
-            Showing {data.transactions.length} properties · {formatCurrency(volume)} total volume
+          <div className={`px-6 py-4 bg-surface-container-low border-t border-outline-variant/30 text-xs text-on-surface-variant transition-opacity ${refreshing ? 'opacity-70' : ''}`}>
+            Showing {data.transactions.length}{' '}
+            {statsFilter === 'closed'
+              ? `closed transaction${data.transactions.length === 1 ? '' : 's'}`
+              : `propert${data.transactions.length === 1 ? 'y' : 'ies'}`}
+            {' · '}
+            {formatCurrency(volume)} {footerVolumeLabel}
           </div>
         </div>
       </div>
