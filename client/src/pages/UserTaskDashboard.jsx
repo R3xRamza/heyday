@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import Icon from '../components/shared/Icon';
+import ListPagination from '../components/shared/ListPagination';
 import EditTaskModal from '../components/EditTaskModal';
 import CreateTaskModal from '../components/CreateTaskModal';
 import { getTeamProfile } from '../data/teamProfiles';
@@ -16,6 +17,8 @@ const FILTERS = [
   { key: 'week', label: 'This Week' },
   { key: 'overdue', label: 'Overdue' },
 ];
+
+const PAGE_SIZE = 50;
 
 function sortMyTasks(tasks, { admin = false } = {}) {
   const today = new Date().toISOString().slice(0, 10);
@@ -69,6 +72,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
   const [showCreate, setShowCreate] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [viewMode, setViewMode] = useState('list');
+  const [page, setPage] = useState(1);
 
   const includeCompleted = showCompleted;
 
@@ -88,18 +92,23 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
       category,
       include_completed: includeCompleted ? 'true' : 'false',
     });
+    if (!showUndated) params.set('require_due_date', 'true');
+    if (viewMode === 'list') {
+      params.set('page', String(page));
+      params.set('limit', String(PAGE_SIZE));
+    }
     const res = await fetch(`/api/tasks?${params}`, { credentials: 'include' });
     if (res.ok) setData(await res.json());
     setLoading(false);
-  }, [userId, filter, category, includeCompleted]);
+  }, [userId, filter, category, includeCompleted, showUndated, viewMode, page]);
 
   useEffect(() => {
     fetch('/api/team', { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setUsers(json.members || []));
-    fetch('/api/transactions?filter=active_transactions', { credentials: 'include' })
+    fetch('/api/transactions?filter=active_transactions&limit=50', { credentials: 'include' })
       .then((r) => r.json())
-      .then((json) => setTransactions((json.transactions || []).slice(0, 50)));
+      .then((json) => setTransactions(json.transactions || []));
   }, []);
 
   useEffect(() => {
@@ -109,6 +118,10 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [userId, filter, showUndated, includeCompleted, viewMode]);
 
   async function patchTask(taskId, body) {
     const res = await fetch(`/api/tasks/${taskId}`, {
@@ -167,11 +180,13 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
 
   const displayedTasks = useMemo(() => {
     let list = data.tasks;
+    if (viewMode === 'list') return list;
     if (!showUndated) list = list.filter((t) => t.due_date);
     return sortMyTasks(list, { admin: category === 'admin' });
-  }, [data.tasks, showUndated, category]);
+  }, [data.tasks, showUndated, category, viewMode]);
 
   function selectFilter(key) {
+    setPage(1);
     setFilter(key);
   }
 
@@ -251,6 +266,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
             </div>
           ) : (
             <div className="m-6 bg-white border border-outline-variant/20 rounded-xl shadow-executive overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full text-left border-separate border-spacing-0">
               <thead className="sticky top-0 bg-surface-container-low z-10">
                 <tr>
@@ -309,8 +325,22 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
                             </button>
                           )}
                         </td>
-                        <td className={`px-4 ${rowPad} text-sm text-on-surface-variant/80`}>
-                          {category === 'admin' ? '—' : shortAddress(task.transaction_address)}
+                        <td className={`px-4 ${rowPad} text-sm align-top`}>
+                          {category === 'admin' ? (
+                            '—'
+                          ) : task.transaction_id ? (
+                            <Link
+                              to={`/transactions/${task.transaction_id}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-on-surface-variant/80 hover:text-secondary hover:underline line-clamp-2 leading-snug block max-w-[10.5rem]"
+                            >
+                              {shortAddress(task.transaction_address)}
+                            </Link>
+                          ) : (
+                            <span className="text-on-surface-variant/80 line-clamp-2 leading-snug block max-w-[10.5rem]">
+                              {shortAddress(task.transaction_address) || '—'}
+                            </span>
+                          )}
                         </td>
                         <td className={`px-4 ${rowPad} whitespace-nowrap min-w-[9.5rem]`}>
                           <span className={`inline-flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap ${dueCellClass(task)}`}>
@@ -362,6 +392,12 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
                 })}
               </tbody>
             </table>
+            </div>
+            <ListPagination
+              page={page}
+              total={data.total ?? displayedTasks.length}
+              onPageChange={setPage}
+            />
             </div>
           )}
         </section>

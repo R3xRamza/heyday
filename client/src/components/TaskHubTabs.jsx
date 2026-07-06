@@ -15,11 +15,11 @@ export default function TaskHubTabs({ userId }) {
       <Link to={`/tasks/${userId}`} className={tabClass(!isProjects && !isAdmin, true)}>
         Transaction Tasks
       </Link>
-      <Link to={`/tasks/${userId}/projects`} className={tabClass(isProjects)}>
-        Projects
-      </Link>
       <Link to={`/tasks/${userId}/admin`} className={tabClass(isAdmin)}>
         Admin Tasks
+      </Link>
+      <Link to={`/tasks/${userId}/projects`} className={tabClass(isProjects)}>
+        Projects
       </Link>
     </div>
   );

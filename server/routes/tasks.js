@@ -3,6 +3,7 @@ import db from '../db.js';
 import { isOverdue, computeDueDate, resolveAnchorDate } from '../lib/timing.js';
 import { resolveAssigneeId, resolveTaskRole } from '../lib/taskAssignment.js';
 import { logActivity, formatFieldChange, actorLabel } from '../lib/activity.js';
+import { parsePagination, wantsPagination, buildCountSql } from '../lib/pagination.js';
 
 const router = Router();
 
@@ -199,6 +200,33 @@ router.get('/milestones', (_req, res) => {
   res.json({ milestones });
 });
 
+router.get('/expirations', (_req, res) => {
+  const today = todayStr();
+  const end = new Date();
+  end.setDate(end.getDate() + 30);
+  const endStr = end.toISOString().slice(0, 10);
+
+  const rows = db.prepare(`
+    SELECT id, address, city, stage, important_date
+    FROM transactions
+    WHERE important_date IS NOT NULL
+      AND important_date >= ?
+      AND important_date <= ?
+      AND stage != 'closed'
+    ORDER BY important_date ASC
+  `).all(today, endStr);
+
+  const milestones = rows.map((tx) => ({
+    transaction_id: tx.id,
+    date: tx.important_date,
+    title: tx.address?.trim() || '—',
+    sub: tx.stage ? `${tx.stage} · ${tx.city || '—'}` : (tx.city || '—'),
+    type: 'expiration',
+  }));
+
+  res.json({ milestones });
+});
+
 router.get('/', (req, res) => {
   const transactionId = req.query.transaction_id;
   const assignedTo = resolveAssignedTo(req);
@@ -230,6 +258,9 @@ router.get('/', (req, res) => {
   if (req.query.due_before) {
     baseSql += ' AND t.due_date <= ?';
     baseParams.push(req.query.due_before);
+  }
+  if (req.query.require_due_date === 'true') {
+    baseSql += ' AND t.due_date IS NOT NULL';
   }
 
   const allForStats = db.prepare(baseSql).all(...baseParams).map(enrich);
@@ -269,10 +300,29 @@ router.get('/', (req, res) => {
     }
   }
 
+  const countSql = buildCountSql(sql);
+  let total = null;
+  let page = null;
+  let limit = null;
+  let offset = 0;
+
+  if (wantsPagination(req.query)) {
+    ({ page, limit, offset } = parsePagination(req.query));
+    total = db.prepare(countSql).get(...params).c;
+  }
+
   sql += ` ORDER BY CASE WHEN t.status = 'complete' THEN 1 ELSE 0 END, t.due_date ASC, t.id ASC`;
+  if (wantsPagination(req.query)) {
+    sql += ' LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+  }
   const tasks = db.prepare(sql).all(...params).map(enrich);
 
-  res.json({ tasks, stats });
+  res.json({
+    tasks,
+    stats,
+    ...(total != null ? { total, page, limit } : {}),
+  });
 });
 
 router.post('/', (req, res) => {

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import Icon from '../components/shared/Icon';
+import ListPagination from '../components/shared/ListPagination';
 import DateText from '../components/shared/DateText';
 
 const ACTIVITY_TABS = [
@@ -122,7 +123,6 @@ export default function ContactDetail() {
   const [lastCommunication, setLastCommunication] = useState(null);
   const [activityTab, setActivityTab] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [posting, setPosting] = useState(false);
 
@@ -135,22 +135,18 @@ export default function ContactDetail() {
     setLoading(false);
   }, [id]);
 
-  const fetchActivities = useCallback(async (page = 1, append = false) => {
-    if (page === 1) setLoadingMore(false);
-    else setLoadingMore(true);
-
-    const params = new URLSearchParams({ page: String(page), limit: '30' });
+  const fetchActivities = useCallback(async (page = 1) => {
+    const params = new URLSearchParams({ page: String(page), limit: '50' });
     if (activityTab !== 'all') params.set('type', activityTab);
 
     const res = await fetch(`/api/crm/${id}/activity?${params}`, { credentials: 'include' });
     if (res.ok) {
       const json = await res.json();
-      setActivities((prev) => (append ? [...prev, ...json.activities] : json.activities));
+      setActivities(json.activities);
       setActivityTotal(json.total);
       setActivityPage(json.page);
       setLastCommunication(json.lastCommunication);
     }
-    setLoadingMore(false);
   }, [id, activityTab]);
 
   useEffect(() => {
@@ -158,7 +154,8 @@ export default function ContactDetail() {
   }, [fetchContact]);
 
   useEffect(() => {
-    fetchActivities(1, false);
+    setActivityPage(1);
+    fetchActivities(1);
   }, [fetchActivities]);
 
   async function submitNote(e) {
@@ -173,7 +170,7 @@ export default function ContactDetail() {
     });
     if (res.ok) {
       setNoteText('');
-      fetchActivities(1, false);
+      fetchActivities(1);
     }
     setPosting(false);
   }
@@ -322,19 +319,15 @@ export default function ContactDetail() {
             ) : (
               activities.map((a) => <ActivityCard key={a.id} activity={a} />)
             )}
-            {activities.length < activityTotal && (
-              <div className="p-4 text-center">
-                <button
-                  type="button"
-                  disabled={loadingMore}
-                  onClick={() => fetchActivities(activityPage + 1, true)}
-                  className="text-sm font-semibold text-secondary hover:underline disabled:opacity-50"
-                >
-                  {loadingMore ? 'Loading…' : 'Load more'}
-                </button>
-              </div>
-            )}
           </div>
+          <ListPagination
+            page={activityPage}
+            total={activityTotal}
+            onPageChange={(p) => {
+              setActivityPage(p);
+              fetchActivities(p);
+            }}
+          />
         </div>
 
         {/* Right — sidebar */}

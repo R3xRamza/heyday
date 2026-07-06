@@ -102,6 +102,7 @@ router.get('/team-tasks', (_req, res) => {
 
   const openTasksStmt = db.prepare(`
     SELECT t.id, t.title, t.due_date, t.status, t.transaction_id,
+      COALESCE(t.category, CASE WHEN t.transaction_id IS NOT NULL THEN 'transaction' ELSE 'admin' END) AS category,
       tt.calendar_nickname
     FROM tasks t
     LEFT JOIN template_tasks tt ON tt.id = t.template_task_id
@@ -109,18 +110,28 @@ router.get('/team-tasks', (_req, res) => {
     ORDER BY (t.due_date IS NULL), t.due_date ASC, t.id ASC
   `);
 
+  function countsForCategory(open, category, today) {
+    const tasks = open.filter((t) => t.category === category);
+    return {
+      activeCount: tasks.filter((t) => isDueThisWeek(t.due_date, t.status, today)).length,
+      overdueCount: tasks.filter((t) => isOverdue(t.due_date, t.status)).length,
+    };
+  }
+
   const summary = members.map((m) => {
     const open = openTasksStmt.all(m.id);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const overdueTasks = open.filter((t) => isOverdue(t.due_date, t.status));
-    const activeTasks = open.filter((t) => isDueThisWeek(t.due_date, t.status, today));
+    const transaction = countsForCategory(open, 'transaction', today);
+    const admin = countsForCategory(open, 'admin', today);
 
     return {
       ...m,
-      activeCount: activeTasks.length,
-      overdueCount: overdueTasks.length,
+      activeCount: transaction.activeCount + admin.activeCount,
+      overdueCount: transaction.overdueCount + admin.overdueCount,
+      transaction,
+      admin,
     };
   });
 

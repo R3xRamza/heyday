@@ -255,6 +255,28 @@ function TxPanel({ panel, rows, onRowClick, onViewAll }) {
   );
 }
 
+function TaskStatRow({ label, activeCount, overdueCount }) {
+  return (
+    <div>
+      <p className="text-[8px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">{label}</p>
+      <div className="flex gap-1.5">
+        <div className="flex-1 rounded-md bg-secondary/10 px-2 py-1 text-center">
+          <div className="text-lg font-black text-secondary leading-none tabular-nums">{activeCount}</div>
+          <div className="text-[8px] uppercase font-bold text-on-surface-variant">Active</div>
+        </div>
+        <div className={`flex-1 rounded-md px-2 py-1 text-center ${overdueCount > 0 ? 'bg-error/10' : 'bg-surface-container-low'}`}>
+          <div className={`text-lg font-black leading-none tabular-nums ${overdueCount > 0 ? 'text-error' : 'text-primary'}`}>
+            {overdueCount}
+          </div>
+          <div className={`text-[8px] uppercase font-bold ${overdueCount > 0 ? 'text-error' : 'text-on-surface-variant'}`}>
+            Overdue
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TeamExecutiveOps() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -267,6 +289,8 @@ export default function TeamExecutiveOps() {
   const [links, setLinks] = useState([]);
   const [closings, setClosings] = useState([]);
   const [loadingClosings, setLoadingClosings] = useState(true);
+  const [expirations, setExpirations] = useState([]);
+  const [loadingExpirations, setLoadingExpirations] = useState(true);
   const [loadingStats, setLoadingStats] = useState(true);
 
   const [composer, setComposer] = useState('');
@@ -304,6 +328,10 @@ export default function TeamExecutiveOps() {
       .then((r) => r.json())
       .then((json) => setClosings(json.milestones || []))
       .finally(() => setLoadingClosings(false));
+    fetch('/api/tasks/expirations', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((json) => setExpirations(json.milestones || []))
+      .finally(() => setLoadingExpirations(false));
   }, []);
 
   const fetchMessages = useCallback(() => {
@@ -387,11 +415,27 @@ export default function TeamExecutiveOps() {
           ))}
         </div>
 
-        <ClosingSoonPanel
-          milestones={closings}
-          loading={loadingClosings}
-          layout="horizontal"
-        />
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
+          <ClosingSoonPanel
+            milestones={closings}
+            loading={loadingClosings}
+            layout="horizontal"
+            className="col-span-2 xl:col-span-3 min-w-0"
+          />
+
+          <ClosingSoonPanel
+            title="Expiring in Next 30 Days"
+            icon="event_busy"
+            milestones={expirations}
+            loading={loadingExpirations}
+            layout="horizontal"
+            size="compact"
+            className="col-span-2 xl:col-span-1 min-w-0"
+            emptyMessage="None in 30 days."
+            loadingMessage="Loading…"
+            viewAllTo="/transactions?filter=current_listings"
+          />
+        </div>
 
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 items-start">
           {teamTasks.map((m) => {
@@ -410,17 +454,17 @@ export default function TeamExecutiveOps() {
                     <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant truncate">{profile.role}</p>
                   </div>
                 </div>
-                <div className="flex gap-1.5">
-                  <div className="flex-1 rounded-md bg-secondary/10 px-2 py-1 text-center">
-                    <div className="text-lg font-black text-secondary leading-none">{m.activeCount}</div>
-                    <div className="text-[8px] uppercase font-bold text-on-surface-variant">Active</div>
-                  </div>
-                  <div className={`flex-1 rounded-md px-2 py-1 text-center ${m.overdueCount > 0 ? 'bg-error/10' : 'bg-surface-container-low'}`}>
-                    <div className={`text-lg font-black leading-none ${m.overdueCount > 0 ? 'text-error' : 'text-primary'}`}>
-                      {m.overdueCount}
-                    </div>
-                    <div className={`text-[8px] uppercase font-bold ${m.overdueCount > 0 ? 'text-error' : 'text-on-surface-variant'}`}>Overdue</div>
-                  </div>
+                <div className="space-y-2">
+                  <TaskStatRow
+                    label="Transaction tasks"
+                    activeCount={m.transaction?.activeCount ?? 0}
+                    overdueCount={m.transaction?.overdueCount ?? 0}
+                  />
+                  <TaskStatRow
+                    label="Admin tasks"
+                    activeCount={m.admin?.activeCount ?? 0}
+                    overdueCount={m.admin?.overdueCount ?? 0}
+                  />
                 </div>
               </button>
             );

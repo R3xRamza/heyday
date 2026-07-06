@@ -37,11 +37,11 @@ export default function TeamAdminTasksPanel({
     <section
       className={`bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden flex flex-col h-[28rem] ${className}`}
     >
-      <div className="bg-primary-container px-4 py-3 flex items-center gap-2 shrink-0">
-        <Icon name="assignment" className="text-white !text-[18px]" />
-        <h3 className="text-sm font-bold text-white">Admin Tasks</h3>
+      <div className="bg-primary-container px-6 h-14 flex items-center gap-2 shrink-0">
+        <Icon name="assignment" className="text-white !text-[20px]" />
+        <h3 className="text-white text-lg font-semibold">Admin Tasks</h3>
         {!loading && (
-          <span className="ml-auto text-[9px] font-bold uppercase tracking-widest text-white/80">
+          <span className="ml-auto text-[10px] font-bold uppercase tracking-widest text-white/80 shrink-0">
             {tasks.length} open
           </span>
         )}

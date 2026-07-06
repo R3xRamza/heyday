@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ListChecks, Plus } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
@@ -9,6 +9,9 @@ import AddressAutocomplete from '../components/shared/AddressAutocomplete';
 import { blurActiveElement, CHROME_AUTOCOMPLETE, ChromeAddressDecoy } from '../components/shared/chromeFormGuards';
 import { validateTransactionFields, transactionPortfolioType, isPrivateListing } from '../constants/transactionForm';
 import PrivateListingFlag from '../components/transactions/PrivateListingFlag';
+import ListPagination from '../components/shared/ListPagination';
+
+const PAGE_SIZE = 50;
 
 const FILTERS = [
   { key: 'active_transactions', label: 'Active Transactions' },
@@ -81,65 +84,6 @@ function transactionDateValue(tx, field) {
   return String(raw).slice(0, 10);
 }
 
-function compareTransactions(a, b, sortKey, sortDir, dateField) {
-  let cmp = 0;
-  switch (sortKey) {
-    case 'address': {
-      const av = parseTransactionAddress({
-        address: a.address,
-        city: a.city,
-        state: a.state,
-        zip: a.zip,
-      }).street || a.address || '';
-      const bv = parseTransactionAddress({
-        address: b.address,
-        city: b.city,
-        state: b.state,
-        zip: b.zip,
-      }).street || b.address || '';
-      cmp = av.localeCompare(bv, undefined, { sensitivity: 'base' });
-      break;
-    }
-    case 'type':
-      cmp = transactionPortfolioType(a).localeCompare(transactionPortfolioType(b));
-      break;
-    case 'value': {
-      const av = a.value != null && a.value !== '' ? Number(a.value) : null;
-      const bv = b.value != null && b.value !== '' ? Number(b.value) : null;
-      if (av == null && bv == null) cmp = 0;
-      else if (av == null) cmp = 1;
-      else if (bv == null) cmp = -1;
-      else cmp = av - bv;
-      break;
-    }
-    case 'date': {
-      const av = transactionDateValue(a, dateField);
-      const bv = transactionDateValue(b, dateField);
-      if (!av && !bv) cmp = 0;
-      else if (!av) cmp = 1;
-      else if (!bv) cmp = -1;
-      else cmp = av.localeCompare(bv);
-      return sortDir === 'asc' ? cmp : -cmp;
-    }
-    case 'agent':
-      cmp = (a.agent_name || '').localeCompare(b.agent_name || '', undefined, { sensitivity: 'base' });
-      break;
-    default:
-      cmp = 0;
-  }
-  return sortDir === 'asc' ? cmp : -cmp;
-}
-
-function sortTransactions(rows, sortKey, sortDir, dateField) {
-  return [...rows].sort((a, b) => {
-    const ad = transactionDateValue(a, dateField);
-    const bd = transactionDateValue(b, dateField);
-    if (!ad && bd) return 1;
-    if (ad && !bd) return -1;
-    return compareTransactions(a, b, sortKey, sortDir, dateField);
-  });
-}
-
 function portfolioTypeBadgeClass(tx) {
   const type = transactionPortfolioType(tx);
   if (type === 'Coming Soon') return 'bg-lemon text-feather';
@@ -178,10 +122,11 @@ export default function TransactionsList() {
   const filter = VALID_FILTER_KEYS.has(resolvedFilter) ? resolvedFilter : 'active_transactions';
 
   const [search, setSearch] = useState('');
-  const [data, setData] = useState({ transactions: [], stats: {} });
+  const [data, setData] = useState({ transactions: [], stats: {}, total: 0 });
   const [loadedFilter, setLoadedFilter] = useState(filter);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ address: '', city: '', state: '', zip: '', value: '', client_name: '' });
   const [creating, setCreating] = useState(false);
@@ -194,6 +139,7 @@ export default function TransactionsList() {
   const statsFilter = refreshing ? loadedFilter : filter;
 
   function handleFilterChange(key) {
+    setPage(1);
     if (key === 'active_transactions') {
       setSearchParams({}, { replace: true });
     } else {
@@ -202,11 +148,17 @@ export default function TransactionsList() {
   }
 
   useEffect(() => {
+    setPage(1);
     setSortKey('date');
     setSortDir('desc');
   }, [filter]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
   function handleSort(key) {
+    setPage(1);
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -215,17 +167,19 @@ export default function TransactionsList() {
     }
   }
 
-  const sortedTransactions = useMemo(() => {
-    const rows = data.transactions || [];
-    if (!sortKey) return rows;
-    return sortTransactions(rows, sortKey, sortDir, dateColumn.field);
-  }, [data.transactions, sortKey, sortDir, dateColumn.field]);
+  const transactions = data.transactions || [];
 
   const fetchData = useCallback(async () => {
     const requestedFilter = filter;
     const fetchId = ++fetchIdRef.current;
     setRefreshing(true);
-    const params = new URLSearchParams({ filter: requestedFilter });
+    const params = new URLSearchParams({
+      filter: requestedFilter,
+      page: String(page),
+      limit: String(PAGE_SIZE),
+      sort: sortKey,
+      order: sortDir,
+    });
     if (search) params.set('search', search);
     try {
       const res = await fetch(`/api/transactions?${params}`, { credentials: 'include' });
@@ -239,7 +193,7 @@ export default function TransactionsList() {
         setRefreshing(false);
       }
     }
-  }, [filter, search]);
+  }, [filter, search, page, sortKey, sortDir]);
 
   useEffect(() => {
     const t = setTimeout(fetchData, search ? 300 : 0);
@@ -247,10 +201,7 @@ export default function TransactionsList() {
   }, [fetchData, search]);
 
   async function handleCreate() {
-    const validation = validateTransactionFields({
-      ...form,
-      representing: 'seller_and_buyer',
-    });
+    const validation = validateTransactionFields(form);
     if (!validation.ok) {
       setCreateError(validation.message);
       return;
@@ -359,10 +310,10 @@ export default function TransactionsList() {
               <tbody className={`divide-y divide-outline-variant/10 transition-opacity ${refreshing ? 'opacity-50' : ''}`}>
                 {showInitialLoading ? (
                   <tr><td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">Loading…</td></tr>
-                ) : sortedTransactions.length === 0 ? (
+                ) : transactions.length === 0 ? (
                   <tr><td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant">{emptyFilterMessage(filter)}</td></tr>
                 ) : (
-                  sortedTransactions.map((tx) => {
+                  transactions.map((tx) => {
                     const { street, cityLine } = parseTransactionAddress({
                       address: tx.address,
                       city: tx.city,
@@ -413,13 +364,19 @@ export default function TransactionsList() {
             </table>
           </div>
           <div className={`px-6 py-4 bg-surface-container-low border-t border-outline-variant/30 text-xs text-on-surface-variant transition-opacity ${refreshing ? 'opacity-70' : ''}`}>
-            Showing {data.transactions.length}{' '}
+            Showing {transactions.length} of {(data.total ?? 0).toLocaleString()}
+            {' '}
             {statsFilter === 'closed'
-              ? `closed transaction${data.transactions.length === 1 ? '' : 's'}`
-              : `propert${data.transactions.length === 1 ? 'y' : 'ies'}`}
+              ? `closed transaction${data.total === 1 ? '' : 's'}`
+              : `propert${data.total === 1 ? 'y' : 'ies'}`}
             {' · '}
             {formatCurrency(volume)} {footerVolumeLabel}
           </div>
+          <ListPagination
+            page={page}
+            total={data.total ?? 0}
+            onPageChange={setPage}
+          />
         </div>
       </div>
 

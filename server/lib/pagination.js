@@ -10,3 +10,10 @@ export function parsePagination(query, defaultLimit = DEFAULT_PAGE_SIZE) {
 export function wantsPagination(query) {
   return query.page != null || query.limit != null;
 }
+
+/** COUNT(*) query preserving FROM/WHERE of a SELECT (do not replace full multi-line SELECT). */
+export function buildCountSql(selectSql) {
+  const fromIdx = selectSql.search(/\bFROM\b/i);
+  if (fromIdx === -1) throw new Error('Invalid select SQL for count');
+  return `SELECT COUNT(*) as c ${selectSql.slice(fromIdx)}`;
+}

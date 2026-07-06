@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import Icon from '../components/shared/Icon';
+import ListPagination from '../components/shared/ListPagination';
 import DateText from '../components/shared/DateText';
 import { useGmailSync } from '../context/GmailSyncContext';
 
@@ -86,7 +87,6 @@ export default function CRMHub() {
     fetchContacts();
   }, [fetchContacts]);
 
-  const totalPages = Math.max(1, Math.ceil((data.total || 0) / 50));
   const highlights = data.stats?.stageHighlights || {};
 
   return (
@@ -244,29 +244,7 @@ export default function CRMHub() {
             </table>
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-outline-variant/10 bg-surface-container-low">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-                className="px-4 py-2 text-sm font-semibold text-primary disabled:opacity-40 hover:bg-white rounded-lg"
-              >
-                Previous
-              </button>
-              <span className="text-sm text-on-surface-variant">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-                className="px-4 py-2 text-sm font-semibold text-primary disabled:opacity-40 hover:bg-white rounded-lg"
-              >
-                Next
-              </button>
-            </div>
-          )}
+          <ListPagination page={page} total={data.total ?? 0} onPageChange={setPage} />
         </div>
       </div>
     </DashboardLayout>

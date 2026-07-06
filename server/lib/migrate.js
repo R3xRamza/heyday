@@ -107,6 +107,7 @@ export function runMigrations(db) {
   migratePrivateListingVisibility(db);
   migrateSellerAndBuyerRepresenting(db);
   migrateCounterpartyParties(db);
+  migrateDeprecateSellerAndBuyer(db);
   backfillTransactionChecklists(db);
 
   migrateContactsTable(db);
@@ -436,6 +437,10 @@ function migrateMarketingTables(db) {
 
 function migrateSellerAndBuyerRepresenting(db) {
   db.prepare("UPDATE transactions SET representing = 'seller_and_buyer' WHERE representing IN ('both', 'seller_and_client')").run();
+}
+
+function migrateDeprecateSellerAndBuyer(db) {
+  db.prepare("UPDATE transactions SET representing = 'seller' WHERE representing = 'seller_and_buyer'").run();
 }
 
 function migrateCounterpartyParties(db) {

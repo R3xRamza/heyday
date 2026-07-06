@@ -230,7 +230,7 @@ export default function MarketingCalendar() {
     const adamUserId = await fetchAdamUserId();
 
     const taskUrl = adamUserId
-      ? `/api/tasks?include_completed=false&transaction_only=true&assigned_to=${adamUserId}&due_after=${start}&due_before=${end}`
+      ? `/api/tasks?include_completed=true&transaction_only=true&assigned_to=${adamUserId}&due_after=${start}&due_before=${end}`
       : null;
 
     const [calRes, weekRes, lastWeekRes, bdayRes, monthBdayRes, todayBdayRes, taskRes] = await Promise.all([
