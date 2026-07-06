@@ -3,7 +3,6 @@ const BASE_REQUIRED = ['address', 'city', 'state', 'zip'];
 const REQUIRED_BY_REPRESENTING = {
   seller: ['listing_date', 'important_date'],
   buyer: ['close_date', 'acceptance_date', 'option_end_date'],
-  seller_and_buyer: [],
   landlord: ['listing_date'],
   tenant: ['acceptance_date', 'close_date'],
 };
@@ -23,7 +22,7 @@ export const FIELD_LABELS = {
 
 export function normalizeRepresenting(value) {
   if (value === 'private_listing') return 'seller';
-  if (value === 'both' || value === 'seller_and_client') return 'seller_and_buyer';
+  if (value === 'both' || value === 'seller_and_client' || value === 'seller_and_buyer') return 'seller';
   if (value === 'leasing') return 'landlord';
   if (value === 'renting') return 'tenant';
   return value || 'seller';

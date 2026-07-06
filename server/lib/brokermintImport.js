@@ -36,7 +36,7 @@ function isRentLease(transactionType) {
 export function mapBrokermintRepresenting(representing, transactionType) {
   const rep = String(representing || '').trim().toLowerCase();
   const lease = isRentLease(transactionType);
-  if (rep === 'both') return 'seller_and_buyer';
+  if (rep === 'both') return 'seller';
   if (lease) {
     if (rep === 'seller') return 'landlord';
     if (rep === 'buyer') return 'tenant';

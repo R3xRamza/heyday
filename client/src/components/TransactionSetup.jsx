@@ -412,7 +412,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
               </select>
             </div>
             <div className={`col-span-2 ${isListingSide ? '' : 'invisible pointer-events-none'}`} aria-hidden={!isListingSide}>
-              <label className="text-xs font-semibold text-on-surface-variant">Listing visibility</label>
+              <label className="text-xs font-semibold text-on-surface-variant">Listing status</label>
               <select
                 tabIndex={isListingSide ? 0 : -1}
                 value={form.listing_visibility || 'public'}

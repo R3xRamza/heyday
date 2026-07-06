@@ -2,7 +2,6 @@
 export const REPRESENTING_OPTIONS = [
   { value: 'seller', label: 'Seller' },
   { value: 'buyer', label: 'Buyer' },
-  { value: 'seller_and_buyer', label: 'Seller and Buyer' },
   { value: 'landlord', label: 'Landlord' },
   { value: 'tenant', label: 'Tenant' },
 ];
@@ -28,8 +27,9 @@ export function isComingSoonListing(tx) {
 }
 
 export function representingLabel(value) {
-  return REPRESENTING_OPTIONS.find((o) => o.value === value)?.label
-    || (value === 'both' || value === 'seller_and_client' ? 'Seller and Buyer' : value === 'leasing' ? 'Landlord' : value === 'renting' ? 'Tenant' : value);
+  const normalized = normalizeRepresenting(value);
+  return REPRESENTING_OPTIONS.find((o) => o.value === normalized)?.label
+    || (value === 'leasing' ? 'Landlord' : value === 'renting' ? 'Tenant' : value);
 }
 
 export const TRANSACTION_STAGE_OPTIONS = [
@@ -57,7 +57,7 @@ export function counterpartyNameLabel(representing) {
 }
 
 export function isDualCounterpartyRepresenting(representing) {
-  return normalizeRepresenting(representing) === 'seller_and_buyer';
+  return false;
 }
 
 export const SALE_TYPE_TRADITIONAL = 'Traditional sale';
@@ -87,7 +87,7 @@ export function normalizeSaleType(value, representing) {
 /** Map legacy DB values to current selects */
 export function normalizeRepresenting(value) {
   if (value === 'private_listing') return 'seller';
-  if (value === 'both' || value === 'seller_and_client') return 'seller_and_buyer';
+  if (value === 'both' || value === 'seller_and_client' || value === 'seller_and_buyer') return 'seller';
   if (value === 'leasing') return 'landlord';
   if (value === 'renting') return 'tenant';
   return value || 'seller';
@@ -95,7 +95,7 @@ export function normalizeRepresenting(value) {
 
 export function isListingSideRepresenting(representing) {
   const r = normalizeRepresenting(representing);
-  return r === 'seller' || r === 'seller_and_buyer' || r === 'landlord';
+  return r === 'seller' || r === 'landlord';
 }
 
 function portfolioTodayStr() {
@@ -163,7 +163,6 @@ export const TIMELINE_BY_REPRESENTING = {
 /** Critical dates timeline steps for the transaction dashboard */
 export function getTimelineSteps(representing) {
   const r = normalizeRepresenting(representing);
-  if (r === 'seller_and_buyer') return TIMELINE_BY_REPRESENTING.seller;
   return TIMELINE_BY_REPRESENTING[r] || TIMELINE_BY_REPRESENTING.seller;
 }
 
@@ -195,7 +194,6 @@ const BASE_REQUIRED = ['address', 'city', 'state', 'zip'];
 const REQUIRED_BY_REPRESENTING = {
   seller: ['listing_date', 'important_date'],
   buyer: ['close_date', 'acceptance_date', 'option_end_date'],
-  seller_and_buyer: [],
   landlord: ['listing_date'],
   tenant: ['acceptance_date', 'close_date'],
 };
@@ -211,7 +209,7 @@ export const FIELD_LABELS = {
   acceptance_date: 'Acceptance date',
   option_end_date: 'Option end date',
   representing: 'Representing',
-  listing_visibility: 'Listing visibility',
+  listing_visibility: 'Listing status',
 };
 
 export function getRequiredTransactionFields(representing, listingVisibility) {

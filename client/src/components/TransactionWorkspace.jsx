@@ -38,7 +38,7 @@ const EXTRA_FIELDS = [
   { key: 'representing', label: 'Representing', type: 'select', options: REPRESENTING_OPTIONS },
   {
     key: 'listing_visibility',
-    label: 'Listing visibility',
+    label: 'Listing status',
     type: 'select',
     options: LISTING_VISIBILITY_OPTIONS,
     listingSideOnly: true,

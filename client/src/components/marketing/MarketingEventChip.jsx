@@ -55,10 +55,13 @@ export default function MarketingEventChip({ event, onEditPost, onTaskClick }) {
   }
 
   if (event.kind === 'task') {
-    const overdue = event.raw?.is_overdue && event.raw?.status !== 'complete';
-    const chipClass = overdue
-      ? 'border-l-4 border-error bg-red-50 text-error hover:bg-red-100/80 ring-1 ring-error/20'
-      : 'border-l-4 border-l-stone-500 bg-stone-200 text-stone-900 hover:bg-stone-300/70 ring-1 ring-stone-300/80';
+    const isComplete = event.raw?.status === 'complete';
+    const overdue = !isComplete && event.raw?.is_overdue;
+    const chipClass = isComplete
+      ? 'border-l-4 border-l-stone-400 bg-stone-100 text-stone-500 hover:bg-stone-200/70 ring-1 ring-stone-200/80'
+      : overdue
+        ? 'border-l-4 border-error bg-red-50 text-error hover:bg-red-100/80 ring-1 ring-error/20'
+        : 'border-l-4 border-l-stone-500 bg-stone-200 text-stone-900 hover:bg-stone-300/70 ring-1 ring-stone-300/80';
 
     return (
       <button
@@ -67,17 +70,24 @@ export default function MarketingEventChip({ event, onEditPost, onTaskClick }) {
           e.stopPropagation();
           onTaskClick?.(event);
         }}
-        className={`block w-full text-left px-2 py-2 min-h-[44px] rounded-md transition-colors cursor-pointer shadow-sm ${chipClass}`}
+        className={`block w-full text-left px-2 py-2 min-h-[44px] rounded-md transition-colors cursor-pointer shadow-sm ${chipClass} ${
+          isComplete ? 'opacity-60' : ''
+        }`}
         title={event.subtitle ? `${event.title} — ${event.subtitle}` : event.title}
       >
         <span className="flex items-start gap-1.5">
-          <Icon name="task_alt" className="!text-[14px] shrink-0 mt-0.5 text-stone-600" />
+          <Icon
+            name={isComplete ? 'check_circle' : 'task_alt'}
+            className={`!text-[14px] shrink-0 mt-0.5 ${isComplete ? 'text-stone-500' : 'text-stone-600'}`}
+          />
           <span className="min-w-0 flex-1">
-            <span className="text-xs font-semibold line-clamp-2 block leading-snug">{event.title}</span>
+            <span className={`text-xs font-semibold line-clamp-2 block leading-snug ${isComplete ? 'line-through' : ''}`}>
+              {event.title}
+            </span>
             {event.subtitle && (
               <span
                 className={`text-[10px] line-clamp-1 block mt-0.5 ${
-                  overdue ? 'text-error/80' : 'text-stone-600'
+                  isComplete ? 'text-stone-500 line-through' : overdue ? 'text-error/80' : 'text-stone-600'
                 }`}
               >
                 {event.subtitle}

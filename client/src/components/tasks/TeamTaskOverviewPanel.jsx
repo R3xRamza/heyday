@@ -45,12 +45,12 @@ export default function TeamTaskOverviewPanel({
     <section
       className={`bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden flex flex-col h-[28rem] ${className}`}
     >
-      <div className="bg-feather px-6 py-4 flex justify-between items-center shrink-0 gap-3">
+      <div className="bg-feather px-6 h-14 flex justify-between items-center shrink-0 gap-3">
         <h3 className="text-white text-lg font-semibold flex items-center gap-2">
           <Icon name="task_alt" className="text-lemon !text-[20px]" />
           Team Task Overview
         </h3>
-        <span className="text-[10px] text-white/70 font-bold uppercase tracking-widest text-right">
+        <span className="text-[10px] text-white/70 font-bold uppercase tracking-widest text-right shrink-0">
           Open transaction tasks · team-wide
         </span>
       </div>

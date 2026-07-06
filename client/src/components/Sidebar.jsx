@@ -141,15 +141,6 @@ export default function Sidebar() {
                   {!collapsed && <span>My Transaction Tasks</span>}
                 </NavLink>
                 <NavLink
-                  to={`/tasks/${user.id}/projects`}
-                  end
-                  title={collapsed ? 'My Projects' : undefined}
-                  className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
-                >
-                  <FolderKanban size={collapsed ? 20 : 18} className="shrink-0" />
-                  {!collapsed && <span>My Projects</span>}
-                </NavLink>
-                <NavLink
                   to={`/tasks/${user.id}/admin`}
                   end
                   title={collapsed ? 'My Admin Tasks' : undefined}
@@ -157,6 +148,15 @@ export default function Sidebar() {
                 >
                   <ClipboardList size={collapsed ? 20 : 18} className="shrink-0" />
                   {!collapsed && <span>My Admin Tasks</span>}
+                </NavLink>
+                <NavLink
+                  to={`/tasks/${user.id}/projects`}
+                  end
+                  title={collapsed ? 'My Projects' : undefined}
+                  className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
+                >
+                  <FolderKanban size={collapsed ? 20 : 18} className="shrink-0" />
+                  {!collapsed && <span>My Projects</span>}
                 </NavLink>
               </>
             )}

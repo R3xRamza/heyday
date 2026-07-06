@@ -1,13 +1,15 @@
-import { useState, useEffect, useCallback, Fragment } from 'react';
+import { useState, useEffect, useCallback, Fragment, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import Icon from '../components/shared/Icon';
+import ListPagination from '../components/shared/ListPagination';
 import DateText from '../components/shared/DateText';
 import PriceInput from '../components/shared/PriceInput';
 import { formatCurrency, shortAddress } from '../utils/format';
 
 const MONTH_LABELS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const PAGE_SIZE = 50;
 
 function formatMoney(value) {
   if (value == null) return '—';
@@ -90,6 +92,17 @@ function GciEditor({ deal, onSave }) {
 function DealsTable({ title, icon, headerClass, deals, emptyText, onSaveGci, projected }) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(null);
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+    setExpanded(null);
+  }, [deals]);
+
+  const visibleDeals = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return deals.slice(start, start + PAGE_SIZE);
+  }, [deals, page]);
 
   return (
     <section className="bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden">
@@ -103,6 +116,7 @@ function DealsTable({ title, icon, headerClass, deals, emptyText, onSaveGci, pro
       {deals.length === 0 ? (
         <p className="px-4 py-6 text-xs text-on-surface-variant">{emptyText}</p>
       ) : (
+        <>
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-low border-b border-primary/5">
@@ -112,7 +126,7 @@ function DealsTable({ title, icon, headerClass, deals, emptyText, onSaveGci, pro
             </tr>
           </thead>
           <tbody className="divide-y divide-primary/5">
-            {deals.map((deal) => (
+            {visibleDeals.map((deal) => (
               <Fragment key={deal.id}>
                 <tr
                   onClick={() => deal.hasGci && setExpanded(expanded === deal.id ? null : deal.id)}
@@ -163,6 +177,8 @@ function DealsTable({ title, icon, headerClass, deals, emptyText, onSaveGci, pro
             ))}
           </tbody>
         </table>
+        <ListPagination page={page} total={deals.length} onPageChange={setPage} />
+        </>
       )}
     </section>
   );
