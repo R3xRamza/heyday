@@ -261,9 +261,13 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
     if (res.ok) onComplete(json.transaction);
   }
 
+  const isDual = isDualCounterpartyRepresenting(form.representing);
+  const isListingSide = isListingSideRepresenting(form.representing);
+  const showOptionEnd = showsOptionEndDate(form.representing);
+
   return (
-    <div className="max-w-3xl mx-auto py-8 px-4">
-      <div className="flex items-center gap-4 mb-8">
+    <div className="w-full max-w-3xl mx-auto py-8 px-4">
+      <div className="flex items-center gap-4 mb-8 w-full">
         {STEPS.map((s) => (
           <div
             key={s.key}
@@ -278,7 +282,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
 
       {step === 'details' && (
         <div
-          className="bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4 relative"
+          className="w-full bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4 relative"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
               e.preventDefault();
@@ -294,7 +298,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
               {validationError}
             </p>
           )}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 w-full min-w-0">
             <div className="col-span-2">
               <label className="text-xs font-semibold text-on-surface-variant">{fieldLabel('address', 'Address')}</label>
               <AddressAutocomplete
@@ -348,49 +352,41 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                 placeholder="1,000,000"
               />
             </div>
-            {isDualCounterpartyRepresenting(form.representing) ? (
-              <>
-                <div>
-                  <label className="text-xs font-semibold text-on-surface-variant">Seller name</label>
-                  <input
-                    value={form.seller_party_name ?? form.client_name ?? form.owner_name ?? ''}
-                    onChange={(e) => setForm({
+            <div>
+              <label className="text-xs font-semibold text-on-surface-variant">
+                {isDual ? 'Seller name' : counterpartyNameLabel(form.representing)}
+              </label>
+              <input
+                value={isDual
+                  ? (form.seller_party_name ?? form.client_name ?? form.owner_name ?? '')
+                  : (form.client_name || form.owner_name || '')}
+                onChange={(e) => {
+                  if (isDual) {
+                    setForm({
                       ...form,
                       seller_party_name: e.target.value,
                       client_name: e.target.value,
                       owner_name: e.target.value,
-                    })}
-                    autoComplete={CHROME_AUTOCOMPLETE}
-                    className="w-full mt-1 px-3 py-2 border rounded text-sm"
-                  />
-                </div>
-                {agentSelect()}
-                <div className="col-span-2">
-                  <label className="text-xs font-semibold text-on-surface-variant">Buyer name</label>
-                  <input
-                    value={form.buyer_party_name ?? ''}
-                    onChange={(e) => setForm({ ...form, buyer_party_name: e.target.value })}
-                    autoComplete={CHROME_AUTOCOMPLETE}
-                    className="w-full mt-1 px-3 py-2 border rounded text-sm"
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <label className="text-xs font-semibold text-on-surface-variant">
-                    {counterpartyNameLabel(form.representing)}
-                  </label>
-                  <input
-                    value={form.client_name || form.owner_name || ''}
-                    onChange={(e) => setForm({ ...form, client_name: e.target.value, owner_name: e.target.value })}
-                    autoComplete={CHROME_AUTOCOMPLETE}
-                    className="w-full mt-1 px-3 py-2 border rounded text-sm"
-                  />
-                </div>
-                {agentSelect()}
-              </>
-            )}
+                    });
+                  } else {
+                    setForm({ ...form, client_name: e.target.value, owner_name: e.target.value });
+                  }
+                }}
+                autoComplete={CHROME_AUTOCOMPLETE}
+                className="w-full mt-1 px-3 py-2 border rounded text-sm"
+              />
+            </div>
+            {agentSelect()}
+            <div className={`col-span-2 ${isDual ? '' : 'invisible pointer-events-none'}`} aria-hidden={!isDual}>
+              <label className="text-xs font-semibold text-on-surface-variant">Buyer name</label>
+              <input
+                tabIndex={isDual ? 0 : -1}
+                value={form.buyer_party_name ?? ''}
+                onChange={(e) => setForm({ ...form, buyer_party_name: e.target.value })}
+                autoComplete={CHROME_AUTOCOMPLETE}
+                className="w-full mt-1 px-3 py-2 border rounded text-sm"
+              />
+            </div>
             <div className="col-span-2">
               <label className="text-xs font-semibold text-on-surface-variant">Representing</label>
               <select
@@ -415,20 +411,19 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                 ))}
               </select>
             </div>
-            {isListingSideRepresenting(form.representing) && (
-              <div className="col-span-2">
-                <label className="text-xs font-semibold text-on-surface-variant">Listing visibility</label>
-                <select
-                  value={form.listing_visibility || 'public'}
-                  onChange={(e) => setForm({ ...form, listing_visibility: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border rounded text-sm"
-                >
-                  {LISTING_VISIBILITY_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className={`col-span-2 ${isListingSide ? '' : 'invisible pointer-events-none'}`} aria-hidden={!isListingSide}>
+              <label className="text-xs font-semibold text-on-surface-variant">Listing visibility</label>
+              <select
+                tabIndex={isListingSide ? 0 : -1}
+                value={form.listing_visibility || 'public'}
+                onChange={(e) => setForm({ ...form, listing_visibility: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border rounded text-sm"
+              >
+                {LISTING_VISIBILITY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="text-xs font-semibold text-on-surface-variant">Type of sale</label>
               <select
@@ -461,18 +456,17 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
                 className="w-full mt-1 px-3 py-2 border rounded text-sm"
               />
             </div>
-            {showsOptionEndDate(form.representing) && (
-              <div>
-                <label className="text-xs font-semibold text-on-surface-variant">{fieldLabel('option_end_date', 'Option End Date')}</label>
-                <input
-                  type="date"
-                  required={isRequired('option_end_date')}
-                  value={form.option_end_date || ''}
-                  onChange={(e) => setForm({ ...form, option_end_date: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 border rounded text-sm"
-                />
-              </div>
-            )}
+            <div className={showOptionEnd ? '' : 'invisible pointer-events-none'} aria-hidden={!showOptionEnd}>
+              <label className="text-xs font-semibold text-on-surface-variant">{fieldLabel('option_end_date', 'Option End Date')}</label>
+              <input
+                type="date"
+                tabIndex={showOptionEnd ? 0 : -1}
+                required={isRequired('option_end_date')}
+                value={form.option_end_date || ''}
+                onChange={(e) => setForm({ ...form, option_end_date: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border rounded text-sm"
+              />
+            </div>
             <div>
               <label className="text-xs font-semibold text-on-surface-variant">{fieldLabel('listing_date', 'Listing Date')}</label>
               <input
@@ -501,7 +495,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
       )}
 
       {step === 'template' && (
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4">
+        <div className="w-full bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4">
           <h2 className="text-xl font-bold text-primary">Pick Task Templates</h2>
           <p className="text-sm text-on-surface-variant">
             Select one or more checklists. Tasks merge without duplicates.
@@ -552,7 +546,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
       )}
 
       {step === 'assign' && (
-        <div className="bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4">
+        <div className="w-full bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4">
           <h2 className="text-xl font-bold text-primary">Assign Tasks</h2>
           <p className="text-sm text-on-surface-variant">Assign each task to a team member before launching the transaction dashboard.</p>
           {appliedChecklists.length > 1 && (
