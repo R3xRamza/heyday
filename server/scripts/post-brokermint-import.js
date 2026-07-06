@@ -8,7 +8,7 @@
 import fs from 'fs';
 
 const csvPath = process.argv[2] || '/Users/rexramza/Downloads/report.csv';
-const baseUrl = (process.argv[3] || process.env.HEYDAY_URL || 'https://heyday-production-ce72.up.railway.app').replace(/\/$/, '');
+const baseUrl = (process.argv[3] || process.env.HEYDAY_URL || 'https://hub.theheydaygroup.com').replace(/\/$/, '');
 const email = process.env.HEYDAY_EMAIL || 'admin@theheydaygroup.com';
 const password = process.env.HEYDAY_PASSWORD || 'admin123';
 
