@@ -10,11 +10,7 @@ import { fileURLToPath } from 'url';
 import { parse } from 'csv-parse';
 import Database from 'better-sqlite3';
 import { runMigrations } from '../lib/migrate.js';
-import { clearTransactionData } from '../lib/transactionSeed.js';
-import {
-  mapBrokermintRow,
-  BROKERMINT_INSERT_COLUMNS,
-} from '../lib/brokermintImport.js';
+import { runBrokermintImport } from '../lib/brokermintImport.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const defaultPath = '/Users/rexramza/Downloads/report.csv';
@@ -42,62 +38,22 @@ async function main() {
   db.pragma('foreign_keys = ON');
   runMigrations(db);
 
-  const users = db.prepare('SELECT id, email, name FROM users').all();
-  const usersByEmail = Object.fromEntries(users.map((u) => [u.email, u.id]));
-  const meredith = usersByEmail['meredith@theheydaygroup.com'];
-  const defaultAgentId = meredith ?? users[0]?.id ?? 1;
-
   console.log('Reading CSV:', csvPath);
   console.log('Database:', dbPath);
   const rawRows = await loadRows(csvPath);
   console.log('Parsed rows:', rawRows.length);
 
-  const before = {
-    transactions: db.prepare('SELECT COUNT(*) as c FROM transactions').get().c,
-    tasks: db.prepare('SELECT COUNT(*) as c FROM tasks').get().c,
-  };
-
-  clearTransactionData(db);
-  console.log(`Cleared ${before.transactions} transaction(s) and ${before.tasks} task(s)`);
-
-  const placeholders = BROKERMINT_INSERT_COLUMNS.map(() => '?').join(', ');
-  const insert = db.prepare(`
-    INSERT INTO transactions (${BROKERMINT_INSERT_COLUMNS.join(', ')})
-    VALUES (${placeholders})
-  `);
-
-  let inserted = 0;
-  let skipped = 0;
-  let errors = 0;
-
-  db.transaction(() => {
-    for (const row of rawRows) {
-      try {
-        const mapped = mapBrokermintRow(row, { usersByEmail, defaultAgentId });
-        if (!mapped) {
-          skipped++;
-          continue;
-        }
-        insert.run(...BROKERMINT_INSERT_COLUMNS.map((col) => mapped[col]));
-        inserted++;
-      } catch (e) {
-        errors++;
-        if (errors <= 5) {
-          console.error('Row error:', e.message, row.custom_id || row.full_address);
-        }
-      }
-    }
-  })();
-
-  const byStage = db.prepare('SELECT stage, COUNT(*) as c FROM transactions GROUP BY stage ORDER BY stage').all();
-  const total = db.prepare('SELECT COUNT(*) as c FROM transactions').get().c;
+  const result = runBrokermintImport(db, rawRows);
 
   console.log('\nDone.');
-  console.log('  Inserted:', inserted);
-  console.log('  Skipped:', skipped);
-  console.log('  Errors:', errors);
-  console.log('  Total in DB:', total);
-  console.log('  By stage:', Object.fromEntries(byStage.map((r) => [r.stage, r.c])));
+  if (result.before) {
+    console.log(`  Cleared ${result.before.transactions} transaction(s) and ${result.before.tasks} task(s)`);
+  }
+  console.log('  Inserted:', result.inserted);
+  console.log('  Skipped:', result.skipped);
+  console.log('  Errors:', result.errors);
+  console.log('  Total in DB:', result.total);
+  console.log('  By stage:', result.byStage);
 
   db.close();
 }

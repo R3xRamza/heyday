@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { parse } from 'csv-parse/sync';
 import db from '../db.js';
 import { recalculateTransactionTasks, anchorDatesChanged } from '../lib/recalculateTasks.js';
 import { logActivity, formatFieldChange, actorLabel } from '../lib/activity.js';
@@ -20,6 +21,7 @@ import {
 } from '../lib/transactionValidation.js';
 import { closePastDueTransactions, deriveStageFromCloseDate } from '../lib/transactionAutoClose.js';
 import { closedYtdStats, ACTIVE_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE } from '../lib/transactionScopes.js';
+import { runBrokermintImport } from '../lib/brokermintImport.js';
 
 const router = Router();
 
@@ -124,6 +126,30 @@ router.get('/', (req, res) => {
       closedYtd: closedYtdStats(db),
     },
   });
+});
+
+/** Admin-only: replace all transactions from Brokermint CSV (JSON body: { csv: "..." }). */
+router.post('/import-brokermint', (req, res) => {
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const content = req.body?.csv;
+  if (!content || typeof content !== 'string') {
+    return res.status(400).json({ error: 'Body must include csv string' });
+  }
+
+  let rawRows;
+  try {
+    rawRows = parse(content, {
+      columns: true,
+      skip_empty_lines: true,
+      relax_quotes: true,
+      relax_column_count: true,
+    });
+  } catch (e) {
+    return res.status(400).json({ error: `Invalid CSV: ${e.message}` });
+  }
+
+  const result = runBrokermintImport(db, rawRows);
+  res.json({ ok: true, ...result });
 });
 
 router.get('/:id/activity', (req, res) => {
