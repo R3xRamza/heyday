@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import TaskDeadlineFields, { getAnchorOptionsForTransaction } from './TaskDeadlineFields';
 
+const PRIORITY_OPTIONS = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'high', label: 'High' },
+];
+
 export default function CreateTaskModal({
   users,
   transactions = [],
@@ -9,9 +14,11 @@ export default function CreateTaskModal({
   lockTransaction = false,
   transaction = null,
   adminOnly = false,
+  title,
   onClose,
   onSave,
 }) {
+  const modalTitle = title || (adminOnly ? 'New Admin Task' : 'New Transaction Task');
   const showLinkedDeadline = Boolean(transaction || (lockTransaction && defaultTransactionId));
   const [deadlineMode, setDeadlineMode] = useState('fixed');
   const [timingValue, setTimingValue] = useState(0);
@@ -23,6 +30,7 @@ export default function CreateTaskModal({
     due_date: '',
     assigned_to: defaultAssignedTo ? String(defaultAssignedTo) : '',
     transaction_id: defaultTransactionId ? String(defaultTransactionId) : '',
+    priority: 'normal',
   });
   const [saving, setSaving] = useState(false);
 
@@ -49,6 +57,10 @@ export default function CreateTaskModal({
       category: adminOnly ? 'admin' : (form.transaction_id ? 'transaction' : 'admin'),
     };
 
+    if (adminOnly) {
+      payload.priority = form.priority;
+    }
+
     if (showLinkedDeadline && deadlineMode === 'relative') {
       payload.timing_value = timingValue;
       payload.timing_direction = timingDirection;
@@ -67,7 +79,7 @@ export default function CreateTaskModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-xl w-full max-w-lg">
         <div className="px-6 py-4 border-b border-outline-variant/20">
-          <h2 className="text-lg font-bold text-primary uppercase tracking-wide">New Task</h2>
+          <h2 className="text-lg font-bold text-primary uppercase tracking-wide">{modalTitle}</h2>
         </div>
         <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
           <div>
@@ -126,6 +138,20 @@ export default function CreateTaskModal({
               ))}
             </select>
           </div>
+          {adminOnly && (
+            <div>
+              <label className="text-xs font-semibold text-on-surface-variant uppercase">Priority</label>
+              <select
+                value={form.priority}
+                onChange={(e) => setForm({ ...form, priority: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
+              >
+                {PRIORITY_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
           {!lockTransaction && !adminOnly && (
             <div>
               <label className="text-xs font-semibold text-on-surface-variant uppercase">Transaction (optional)</label>

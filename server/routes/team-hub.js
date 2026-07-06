@@ -2,19 +2,10 @@ import { Router } from 'express';
 import db from '../db.js';
 import { isOverdue, isDueThisWeek } from '../lib/timing.js';
 import { celebrationsInRange, toDateStr } from '../lib/marketingCalendar.js';
-import { ACTIVE_LISTINGS_SCOPE, closedYtdStats, hubTransactionRows } from '../lib/transactionScopes.js';
+import { ACTIVE_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE, closedYtdStats, hubTransactionRows } from '../lib/transactionScopes.js';
 import { closePastDueTransactions } from '../lib/transactionAutoClose.js';
 
 const router = Router();
-
-const ACTIVE_LEAD_STAGES = [
-  'Lead',
-  'Hot Prospect (0-3 months)',
-  'Nurture (4+ months out)',
-  'Client: Actively Working',
-  'Active Listing',
-  'Under Contract',
-];
 
 const TEAM_ORDER_SQL = `
   CASE email
@@ -44,11 +35,10 @@ router.get('/stats', (_req, res) => {
     FROM transactions WHERE ${ACTIVE_LISTINGS_SCOPE}
   `).get();
 
-  const placeholders = ACTIVE_LEAD_STAGES.map(() => '?').join(', ');
-  const activeLeads = db.prepare(`
-    SELECT COUNT(*) as count FROM contacts
-    WHERE stage IN (${placeholders}) AND COALESCE(person_type, 'contact') != 'child'
-  `).get(...ACTIVE_LEAD_STAGES);
+  const comingSoonStats = db.prepare(`
+    SELECT COUNT(*) as count, COALESCE(SUM(value), 0) as volume
+    FROM transactions WHERE ${PRE_LISTINGS_SCOPE}
+  `).get();
 
   const { comingSoon, listings, pendingDeals } = hubTransactionRows(db);
 
@@ -56,7 +46,7 @@ router.get('/stats', (_req, res) => {
     closedYtd,
     pending,
     activeListings,
-    activeLeads: { count: activeLeads.count },
+    comingSoonStats,
     comingSoon,
     listings,
     pendingDeals,
@@ -127,19 +117,10 @@ router.get('/team-tasks', (_req, res) => {
     const overdueTasks = open.filter((t) => isOverdue(t.due_date, t.status));
     const activeTasks = open.filter((t) => isDueThisWeek(t.due_date, t.status, today));
 
-    overdueTasks.sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
-    activeTasks.sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999'));
-
-    const nextTasks = [...overdueTasks, ...activeTasks].slice(0, 3).map((t) => ({
-      ...t,
-      is_overdue: isOverdue(t.due_date, t.status),
-    }));
-
     return {
       ...m,
       activeCount: activeTasks.length,
       overdueCount: overdueTasks.length,
-      nextTasks,
     };
   });
 

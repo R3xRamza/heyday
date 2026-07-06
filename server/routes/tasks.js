@@ -90,6 +90,16 @@ function resolveAssignedTo(req) {
   return Number(raw) || raw;
 }
 
+const TASK_PRIORITIES = new Set(['normal', 'high']);
+
+function parseTaskPriority(value, fallback = 'normal') {
+  return TASK_PRIORITIES.has(value) ? value : fallback;
+}
+
+function taskCategory(task) {
+  return task.category ?? (task.transaction_id ? 'transaction' : 'admin');
+}
+
 router.get('/team-priority', (req, res) => {
   const filter = req.query.filter || 'all';
   const today = todayStr();
@@ -113,6 +123,53 @@ router.get('/team-priority', (req, res) => {
   sql += ' ORDER BY CASE WHEN t.due_date < ? THEN 0 ELSE 1 END, t.due_date ASC, t.id ASC LIMIT 10';
   params.push(today);
   const tasks = db.prepare(sql).all(...params).map(enrich);
+  res.json({ tasks });
+});
+
+router.get('/team-overview', (_req, res) => {
+  const today = todayStr();
+  const weekEnd = weekEndStr();
+  const limit = Math.min(50, Math.max(1, parseInt(_req.query.limit, 10) || 25));
+
+  const sql = `
+    ${TASK_SELECT}
+    WHERE t.status != 'complete'
+      AND t.due_date IS NOT NULL
+      AND COALESCE(t.category, CASE WHEN t.transaction_id IS NOT NULL THEN 'transaction' ELSE 'admin' END) = 'transaction'
+      AND (u.email IS NULL OR u.email != 'admin@theheydaygroup.com')
+    ORDER BY
+      CASE
+        WHEN t.due_date < ? THEN 0
+        WHEN t.due_date = ? THEN 1
+        WHEN t.due_date <= ? THEN 2
+        ELSE 3
+      END,
+      t.due_date ASC,
+      t.id ASC
+    LIMIT ?
+  `;
+
+  const tasks = db.prepare(sql).all(today, today, weekEnd, limit).map(enrich);
+  res.json({ tasks });
+});
+
+router.get('/team-admin-overview', (_req, res) => {
+  const limit = Math.min(50, Math.max(1, parseInt(_req.query.limit, 10) || 20));
+
+  const sql = `
+    ${TASK_SELECT}
+    WHERE t.status != 'complete'
+      AND COALESCE(t.category, CASE WHEN t.transaction_id IS NOT NULL THEN 'transaction' ELSE 'admin' END) = 'admin'
+      AND (u.email IS NULL OR u.email != 'admin@theheydaygroup.com')
+    ORDER BY
+      CASE WHEN t.priority = 'high' THEN 0 ELSE 1 END,
+      (t.due_date IS NULL),
+      t.due_date ASC,
+      t.id ASC
+    LIMIT ?
+  `;
+
+  const tasks = db.prepare(sql).all(limit).map(enrich);
   res.json({ tasks });
 });
 
@@ -188,13 +245,15 @@ router.get('/', (req, res) => {
     sql += " AND t.status = 'complete' AND date(t.completed_at) = ?";
     params.push(today);
   } else {
-    const openOnly = filter === 'active'
+    const hideCompleted = !showCompleted && (
+      filter === 'active'
       || filter === 'today'
       || filter === 'week'
       || filter === 'overdue'
-      || (!showCompleted && filter === 'all');
+      || filter === 'all'
+    );
 
-    if (openOnly) {
+    if (hideCompleted) {
       sql += " AND t.status != 'complete'";
     }
 
@@ -224,6 +283,7 @@ router.post('/', (req, res) => {
     assigned_to,
     transaction_id,
     category,
+    priority,
     timing_value,
     timing_direction,
     timing_anchor,
@@ -255,6 +315,10 @@ router.post('/', (req, res) => {
     ? 'transaction'
     : (category === 'transaction' ? 'transaction' : 'admin');
 
+  const resolvedPriority = resolvedCategory === 'admin'
+    ? parseTaskPriority(priority, 'normal')
+    : 'normal';
+
   const r = db.prepare(`
     INSERT INTO tasks (
       title, description, due_date, assigned_to, transaction_id, category,
@@ -272,7 +336,7 @@ router.post('/', (req, res) => {
     timing.timing_value,
     timing.timing_direction,
     timing.timing_anchor,
-    'normal',
+    resolvedPriority,
   );
 
   const actor = actorLabel(req.user);
@@ -317,6 +381,7 @@ router.patch('/:id', (req, res) => {
     timing_value,
     timing_direction,
     timing_anchor,
+    priority,
   } = req.body;
   const changes = [];
 
@@ -387,6 +452,13 @@ router.patch('/:id', (req, res) => {
       changes.push(formatFieldChange('Assigned to', beforeName, afterName));
     }
     db.prepare('UPDATE tasks SET assigned_to = ? WHERE id = ?').run(assigned_to || null, req.params.id);
+  }
+  if (priority !== undefined && taskCategory(task) === 'admin') {
+    const nextPriority = parseTaskPriority(priority, task.priority || 'normal');
+    if (nextPriority !== task.priority) {
+      changes.push(formatFieldChange('Priority', task.priority || 'normal', nextPriority));
+      db.prepare('UPDATE tasks SET priority = ? WHERE id = ?').run(nextPriority, req.params.id);
+    }
   }
   const actor = actorLabel(req.user);
 

@@ -17,7 +17,7 @@ const FILTERS = [
   { key: 'overdue', label: 'Overdue' },
 ];
 
-function sortMyTasks(tasks) {
+function sortMyTasks(tasks, { admin = false } = {}) {
   const today = new Date().toISOString().slice(0, 10);
   const bucket = (t) => {
     if (!t.due_date) return 3;
@@ -27,6 +27,11 @@ function sortMyTasks(tasks) {
   return [...tasks].sort((a, b) => {
     if (a.status === 'complete' && b.status !== 'complete') return 1;
     if (b.status === 'complete' && a.status !== 'complete') return -1;
+    if (admin && a.status !== 'complete' && b.status !== 'complete') {
+      const aHigh = a.priority === 'high' ? 0 : 1;
+      const bHigh = b.priority === 'high' ? 0 : 1;
+      if (aHigh !== bHigh) return aHigh - bHigh;
+    }
     const diff = bucket(a) - bucket(b);
     if (diff !== 0) return diff;
     if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
@@ -65,7 +70,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
   const [expandedId, setExpandedId] = useState(null);
   const [viewMode, setViewMode] = useState('list');
 
-  const includeCompleted = filter === 'all' && showCompleted;
+  const includeCompleted = showCompleted;
 
   const fetchMember = useCallback(async () => {
     const res = await fetch(`/api/team/${userId}`, { credentials: 'include' });
@@ -163,12 +168,11 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
   const displayedTasks = useMemo(() => {
     let list = data.tasks;
     if (!showUndated) list = list.filter((t) => t.due_date);
-    return sortMyTasks(list);
-  }, [data.tasks, showUndated]);
+    return sortMyTasks(list, { admin: category === 'admin' });
+  }, [data.tasks, showUndated, category]);
 
   function selectFilter(key) {
     setFilter(key);
-    if (key === 'overdue') setShowCompleted(false);
   }
 
   const filterLabel = (key, base) => {
@@ -195,7 +199,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
       <div className="bg-surface border-b border-outline-variant/20 shrink-0">
         <TaskHubPersonHeader
           userId={userId}
-          title={category === 'admin' ? 'Administrative Task Dashboard' : 'Daily Task Dashboard'}
+          title={category === 'admin' ? 'Admin Task Dashboard' : 'Daily Task Dashboard'}
           member={member}
           profile={profile}
           showBorder={false}
@@ -242,7 +246,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
                 onClick={() => setShowCreate(true)}
                 className="text-sm font-semibold text-secondary hover:underline"
               >
-                Create a task
+                {category === 'admin' ? 'Create an admin task' : 'Create a transaction task'}
               </button>
             </div>
           ) : (
@@ -282,9 +286,16 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
                           />
                         </td>
                         <td className={`px-4 ${rowPad}`}>
-                          <p className={`text-sm font-semibold ${isComplete ? 'text-on-surface-variant line-through' : 'text-on-surface'}`}>
-                            {task.title}
-                          </p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className={`text-sm font-semibold ${isComplete ? 'text-on-surface-variant line-through' : 'text-on-surface'}`}>
+                              {task.title}
+                            </p>
+                            {category === 'admin' && task.priority === 'high' && !isComplete && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wide bg-error/10 text-error">
+                                High
+                              </span>
+                            )}
+                          </div>
                           {task.description && (
                             <button
                               type="button"
@@ -363,7 +374,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
               className="w-full bg-primary text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 shadow-lg shadow-primary/10 hover:shadow-primary/20 transition-all hover:-translate-y-0.5"
             >
               <Icon name="add" className="!text-[24px]" />
-              <span className="text-sm">New Task</span>
+              <span className="text-sm">{category === 'admin' ? 'Add Admin Task' : 'Add Transaction Task'}</span>
             </button>
             <div className="mt-6 flex flex-col gap-1">
               <button
@@ -439,6 +450,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
         <EditTaskModal
           task={editTask}
           users={users}
+          adminOnly={category === 'admin'}
           onClose={() => setEditTask(null)}
           onSave={saveTaskEdit}
         />

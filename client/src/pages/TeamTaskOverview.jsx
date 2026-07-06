@@ -4,34 +4,150 @@ import DashboardLayout from '../components/DashboardLayout';
 import Icon from '../components/shared/Icon';
 import TeamAvatar from '../components/TeamAvatar';
 import { getTeamProfile } from '../data/teamProfiles';
-import DateText from '../components/shared/DateText';
-import { formatTaskDue, shortAddress } from '../utils/format';
+import TeamTaskOverviewPanel from '../components/tasks/TeamTaskOverviewPanel';
+import TeamAdminTasksPanel from '../components/tasks/TeamAdminTasksPanel';
 
-function taskQueueStatus(task) {
-  if (task.is_overdue) {
-    return { label: 'Overdue', className: 'bg-error/10 text-error' };
-  }
-  return { label: 'Due Soon', className: 'bg-secondary/10 text-secondary' };
+function TeamMemberCardSkeleton() {
+  return (
+    <div className="rounded-xl border border-outline-variant/15 shadow-executive bg-white p-4 animate-pulse">
+      <div className="flex items-start gap-2.5 mb-3">
+        <div className="w-9 h-9 rounded-full bg-surface-container-low shrink-0" />
+        <div className="flex-1 space-y-2 pt-0.5">
+          <div className="h-4 w-24 bg-surface-container-low rounded" />
+          <div className="h-2.5 w-16 bg-surface-container-low rounded" />
+        </div>
+      </div>
+      <div className="mb-3 space-y-1.5">
+        <div className="flex justify-between">
+          <div className="h-2.5 w-14 bg-surface-container-low rounded" />
+          <div className="h-2.5 w-10 bg-surface-container-low rounded" />
+        </div>
+        <div className="h-1.5 w-full bg-surface-container-low rounded-full" />
+      </div>
+      <div className="flex gap-1.5">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex-1 h-12 rounded-md bg-surface-container-low" />
+        ))}
+      </div>
+      <div className="mt-3 pt-3 border-t border-outline-variant/15 flex justify-between">
+        <div className="h-3 w-16 bg-surface-container-low rounded" />
+        <div className="h-3 w-20 bg-surface-container-low rounded" />
+      </div>
+    </div>
+  );
 }
 
-function dueDisplayClass(task) {
-  if (task.is_overdue) return 'text-error font-bold';
-  const label = formatTaskDue(task.due_date, task.status, task.is_overdue);
-  if (label === 'Today') return 'text-secondary font-semibold';
-  return 'text-on-surface-variant';
-}
+function TeamMemberTaskCard({ member, profile, onOpenTasks }) {
+  const { stats } = member;
+  const hasTasks = stats.total > 0;
 
-/** ~6 task rows visible; both top panels share this height */
-const TASK_PANEL_HEIGHT = 'h-[28rem]';
+  return (
+    <button
+      type="button"
+      onClick={onOpenTasks}
+      className="group w-full bg-white p-4 rounded-xl border border-outline-variant/15 shadow-executive hover:border-secondary/40 hover:-translate-y-0.5 transition-all text-left flex flex-col items-stretch"
+    >
+      <div className="flex items-start gap-2.5 mb-3">
+        <TeamAvatar
+          email={member.email}
+          name={member.name}
+          size="md"
+          borderClassName="border-2 border-surface-container"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-base text-primary truncate group-hover:text-secondary transition-colors">
+            {member.name}
+          </p>
+          <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant truncate">
+            {profile.role}
+          </p>
+        </div>
+      </div>
+
+      <div className="mb-3">
+        <div className="flex justify-between items-baseline text-[10px] mb-1">
+          <span className="text-on-surface-variant font-bold uppercase tracking-wide">Progress</span>
+          <span className="text-secondary font-black tabular-nums">
+            {hasTasks ? `${stats.complete}/${stats.total}` : '—'}
+          </span>
+        </div>
+        {hasTasks ? (
+          <div className="w-full bg-surface-container-low h-1.5 rounded-full overflow-hidden">
+            <div
+              className="bg-secondary h-full rounded-full transition-all"
+              style={{ width: `${stats.progress}%` }}
+            />
+          </div>
+        ) : (
+          <p className="text-[10px] text-on-surface-variant">No tasks</p>
+        )}
+      </div>
+
+      <div className="flex gap-1.5">
+        <div className="flex-1 rounded-md bg-surface-container-low px-2 py-1.5 text-center">
+          <div className="text-lg font-black text-primary leading-none tabular-nums">{stats.pending}</div>
+          <div className="text-[8px] uppercase font-bold text-on-surface-variant mt-0.5">Pending</div>
+        </div>
+        <div className="flex-1 rounded-md bg-secondary/10 px-2 py-1.5 text-center">
+          <div className="text-lg font-black text-secondary leading-none tabular-nums">{stats.active}</div>
+          <div className="text-[8px] uppercase font-bold text-on-surface-variant mt-0.5">Active</div>
+        </div>
+        <div
+          className={`flex-1 rounded-md px-2 py-1.5 text-center ${
+            stats.overdue > 0 ? 'bg-error/10' : 'bg-surface-container-low'
+          }`}
+        >
+          <div
+            className={`text-lg font-black leading-none tabular-nums ${
+              stats.overdue > 0 ? 'text-error' : 'text-primary'
+            }`}
+          >
+            {stats.overdue}
+          </div>
+          <div
+            className={`text-[8px] uppercase font-bold mt-0.5 ${
+              stats.overdue > 0 ? 'text-error' : 'text-on-surface-variant'
+            }`}
+          >
+            Overdue
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="mt-3 pt-3 border-t border-outline-variant/15 flex items-center justify-between gap-2"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <Link
+          to={`/tasks/${member.id}/projects`}
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-secondary hover:underline shrink-0"
+        >
+          <Icon name="folder" className="!text-[14px]" />
+          Projects
+        </Link>
+        <Link
+          to={`/tasks/${member.id}/admin`}
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-secondary hover:underline shrink-0"
+        >
+          <Icon name="assignment" className="!text-[14px]" />
+          Admin tasks
+        </Link>
+      </div>
+    </button>
+  );
+}
 
 export default function TeamTaskOverview() {
   const navigate = useNavigate();
   const [loadingTeam, setLoadingTeam] = useState(true);
   const [teamMembers, setTeamMembers] = useState([]);
-  const [priorityTasks, setPriorityTasks] = useState([]);
-  const [closings, setClosings] = useState([]);
-  const [loadingPriority, setLoadingPriority] = useState(true);
-  const [loadingClosings, setLoadingClosings] = useState(true);
+  const [overviewTasks, setOverviewTasks] = useState([]);
+  const [adminTasks, setAdminTasks] = useState([]);
+  const [loadingOverview, setLoadingOverview] = useState(true);
+  const [loadingAdmin, setLoadingAdmin] = useState(true);
 
   const fetchTeam = useCallback(() => {
     setLoadingTeam(true);
@@ -41,20 +157,20 @@ export default function TeamTaskOverview() {
       .finally(() => setLoadingTeam(false));
   }, []);
 
-  const fetchPriority = useCallback(() => {
-    setLoadingPriority(true);
-    fetch('/api/tasks/team-priority?filter=all', { credentials: 'include' })
+  const fetchOverview = useCallback(() => {
+    setLoadingOverview(true);
+    fetch('/api/tasks/team-overview', { credentials: 'include' })
       .then((r) => r.json())
-      .then((json) => setPriorityTasks(json.tasks || []))
-      .finally(() => setLoadingPriority(false));
+      .then((json) => setOverviewTasks(json.tasks || []))
+      .finally(() => setLoadingOverview(false));
   }, []);
 
-  const fetchClosings = useCallback(() => {
-    setLoadingClosings(true);
-    fetch('/api/tasks/milestones', { credentials: 'include' })
+  const fetchAdmin = useCallback(() => {
+    setLoadingAdmin(true);
+    fetch('/api/tasks/team-admin-overview', { credentials: 'include' })
       .then((r) => r.json())
-      .then((json) => setClosings(json.milestones || []))
-      .finally(() => setLoadingClosings(false));
+      .then((json) => setAdminTasks(json.tasks || []))
+      .finally(() => setLoadingAdmin(false));
   }, []);
 
   useEffect(() => {
@@ -62,19 +178,17 @@ export default function TeamTaskOverview() {
   }, [fetchTeam]);
 
   useEffect(() => {
-    fetchPriority();
-  }, [fetchPriority]);
+    fetchOverview();
+  }, [fetchOverview]);
 
   useEffect(() => {
-    fetchClosings();
-  }, [fetchClosings]);
+    fetchAdmin();
+  }, [fetchAdmin]);
 
   const emailByUserId = useMemo(
     () => Object.fromEntries(teamMembers.map((m) => [m.id, m.email])),
     [teamMembers],
   );
-
-  const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
     <DashboardLayout title="Team Task Hub" className="p-8">
@@ -82,208 +196,41 @@ export default function TeamTaskOverview() {
         <div className="grid grid-cols-12 gap-gutter items-start">
           <section className="col-span-12 mb-4">
             {loadingTeam ? (
-              <p className="text-on-surface-variant">Loading team…</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+                {[0, 1, 2, 3].map((i) => (
+                  <TeamMemberCardSkeleton key={i} />
+                ))}
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
-                {teamMembers.map((member) => {
-                  const profile = getTeamProfile(member.email);
-                  const { stats } = member;
-                  return (
-                    <button
-                      key={member.id}
-                      type="button"
-                      onClick={() => navigate(`/tasks/${member.id}`)}
-                      className="bg-white p-6 rounded-xl border border-primary/10 shadow-executive hover:border-secondary transition-all text-left cursor-pointer"
-                    >
-                      <div className="flex items-center gap-4 mb-6">
-                        <TeamAvatar
-                          email={member.email}
-                          name={member.name}
-                          size="lg"
-                          borderClassName="border-2 border-surface-container"
-                        />
-                        <div>
-                          <div className="font-bold text-primary text-xl">{member.name}</div>
-                          <div className="text-on-surface-variant text-[11px] font-bold uppercase">{profile.role}</div>
-                        </div>
-                      </div>
-                      <div className="mb-6">
-                        <div className="flex justify-between text-xs mb-1.5">
-                          <span className="text-on-surface-variant font-bold uppercase">Progress</span>
-                          <span className="text-secondary font-black">{stats.complete}/{stats.total} Complete</span>
-                        </div>
-                        <div className="w-full bg-surface-container-low h-2 rounded-full overflow-hidden">
-                          <div className="bg-secondary h-full rounded-full transition-all" style={{ width: `${stats.progress}%` }} />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="bg-white p-2 rounded border border-primary/5">
-                          <div className="text-xl font-black text-primary">{stats.pending}</div>
-                          <div className="text-[9px] uppercase font-bold text-on-surface-variant">Pending</div>
-                        </div>
-                        <div className="bg-white p-2 rounded border border-primary/5">
-                          <div className="text-xl font-black text-secondary">{stats.active}</div>
-                          <div className="text-[9px] uppercase font-bold text-on-surface-variant">Active</div>
-                        </div>
-                        <div className={`p-2 rounded border ${stats.overdue > 0 ? 'bg-error/5 border-error/10' : 'bg-white border-primary/5'}`}>
-                          <div className={`text-xl font-black ${stats.overdue > 0 ? 'text-error' : 'text-primary'}`}>{stats.overdue}</div>
-                          <div className={`text-[9px] uppercase font-bold ${stats.overdue > 0 ? 'text-error' : 'text-on-surface-variant'}`}>Overdue</div>
-                        </div>
-                      </div>
-                      <Link
-                        to={`/tasks/${member.id}/projects`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="mt-4 text-sm font-semibold text-secondary hover:underline inline-block"
-                      >
-                        Projects →
-                      </Link>
-                    </button>
-                  );
-                })}
+                {teamMembers.map((member) => (
+                  <TeamMemberTaskCard
+                    key={member.id}
+                    member={member}
+                    profile={getTeamProfile(member.email)}
+                    onOpenTasks={() => navigate(`/tasks/${member.id}`)}
+                  />
+                ))}
               </div>
             )}
           </section>
 
-          <section className={`col-span-12 lg:col-span-8 bg-white rounded-xl border border-primary/10 shadow-executive overflow-hidden flex flex-col ${TASK_PANEL_HEIGHT}`}>
-            <div className="bg-feather px-6 py-4 flex justify-between items-center shrink-0">
-              <h3 className="text-white text-xl font-semibold flex items-center gap-2">
-                <Icon name="warning" className="text-lemon" /> Urgent Task Queue
-              </h3>
-              <span className="text-[10px] text-white/70 font-bold uppercase tracking-widest">
-                Overdue tasks
-              </span>
+          <div className="col-span-12 grid grid-cols-1 lg:grid-cols-12 gap-gutter items-stretch">
+            <div className="lg:col-span-8">
+              <TeamTaskOverviewPanel
+                tasks={overviewTasks}
+                loading={loadingOverview}
+                emailByUserId={emailByUserId}
+              />
             </div>
-            {loadingPriority ? (
-              <p className="flex-1 min-h-0 px-6 py-10 text-on-surface-variant">Loading urgent tasks…</p>
-            ) : priorityTasks.length === 0 ? (
-              <p className="flex-1 min-h-0 px-6 py-10 text-on-surface-variant">
-                No overdue tasks right now.
-              </p>
-            ) : (
-              <div className="flex flex-col flex-1 min-h-0">
-                <table className="w-full table-fixed text-left border-collapse shrink-0">
-                  <colgroup>
-                    <col className="w-[42%]" />
-                    <col className="w-[16%]" />
-                    <col className="w-[22%]" />
-                    <col className="w-[20%]" />
-                  </colgroup>
-                  <thead>
-                    <tr className="bg-surface-container-low border-b border-primary/5">
-                      {['Task Title', 'Due Date', 'Assignee', 'Status'].map((h) => (
-                        <th key={h} className="px-6 py-3 text-xs font-semibold text-on-surface-variant uppercase">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                </table>
-                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar border-t border-primary/5">
-                  <table className="w-full table-fixed text-left border-collapse">
-                    <colgroup>
-                      <col className="w-[42%]" />
-                      <col className="w-[16%]" />
-                      <col className="w-[22%]" />
-                      <col className="w-[20%]" />
-                    </colgroup>
-                    <tbody className="divide-y divide-primary/5">
-                      {priorityTasks.map((task) => {
-                        const status = taskQueueStatus(task);
-                        const dueLabel = formatTaskDue(task.due_date, task.status, task.is_overdue);
-                        return (
-                          <tr
-                            key={task.id}
-                            className="hover:bg-secondary-fixed/10 transition-colors cursor-pointer"
-                            onClick={() => {
-                              if (task.assigned_to) navigate(`/tasks/${task.assigned_to}`);
-                            }}
-                          >
-                            <td className="px-6 py-3.5 align-top">
-                              <div className="font-bold text-primary">{task.title}</div>
-                              <div className="text-[11px] text-on-surface-variant">
-                                {task.transaction_id ? (
-                                  <Link
-                                    to={`/transactions/${task.transaction_id}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="hover:text-secondary hover:underline"
-                                  >
-                                    {shortAddress(task.transaction_address)}
-                                  </Link>
-                                ) : (
-                                  'Standalone task'
-                                )}
-                              </div>
-                            </td>
-                            <td className={`px-6 py-3.5 align-top whitespace-nowrap min-w-[9.5rem] ${dueDisplayClass(task)}`}>{dueLabel}</td>
-                            <td className="px-6 py-3.5 align-top">
-                              <div className="flex items-center gap-2">
-                                <TeamAvatar
-                                  email={emailByUserId[task.assigned_to]}
-                                  name={task.user_name}
-                                  size="xs"
-                                />
-                                <span className="text-sm">{task.user_name || 'Unassigned'}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-3.5 align-top">
-                              <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${status.className}`}>
-                                {status.label}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </section>
-
-          <aside className={`col-span-12 lg:col-span-4 flex flex-col ${TASK_PANEL_HEIGHT}`}>
-            <section className="bg-white rounded-xl border border-primary/10 shadow-executive flex flex-col h-full min-h-0 overflow-hidden">
-              <div className="bg-surface-container-high px-6 py-4 flex items-center gap-2 border-b border-primary/5 shrink-0">
-                <Icon name="key" className="text-secondary" />
-                <h3 className="text-xl font-semibold text-primary">Closing Soon</h3>
-              </div>
-              <div className="p-6 flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-                {loadingClosings ? (
-                  <p className="text-on-surface-variant text-sm">Loading closings…</p>
-                ) : closings.length === 0 ? (
-                  <p className="text-on-surface-variant text-sm">No closings in the next 30 days.</p>
-                ) : (
-                  <div className="relative pl-6 before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-0 before:w-px before:bg-outline-variant">
-                    {closings.map((m) => {
-                      const isToday = m.date === todayStr;
-                      return (
-                        <div key={`${m.transaction_id}-${m.date}`} className="mb-6 relative">
-                          <span
-                            className={`absolute -left-[28px] top-1.5 w-2 h-2 rounded-full border-2 border-white ${
-                              isToday ? 'bg-secondary' : 'bg-outline-variant'
-                            }`}
-                          />
-                          <div className={`text-[10px] font-black uppercase tracking-widest mb-1 whitespace-nowrap ${isToday ? 'text-secondary' : 'text-on-surface-variant'}`}>
-                            {isToday ? 'Today' : <DateText value={m.date} />}
-                          </div>
-                          <Link
-                            to={`/transactions/${m.transaction_id}`}
-                            className="font-bold text-primary hover:text-secondary block"
-                          >
-                            {m.title}
-                          </Link>
-                          <div className="text-on-surface-variant text-sm">{m.sub}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              <Link
-                to="/transactions"
-                className="m-6 mt-0 p-3 border border-outline rounded-lg text-sm font-bold hover:bg-surface-container-low text-center block shrink-0"
-              >
-                View transactions
-              </Link>
-            </section>
-          </aside>
+            <div className="lg:col-span-4">
+              <TeamAdminTasksPanel
+                tasks={adminTasks}
+                teamMembers={teamMembers}
+                loading={loadingAdmin}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </DashboardLayout>

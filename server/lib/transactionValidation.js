@@ -2,6 +2,7 @@ const BASE_REQUIRED = ['address', 'city', 'state', 'zip'];
 
 const REQUIRED_BY_REPRESENTING = {
   seller: ['listing_date', 'important_date'],
+  private_listing: ['listing_date', 'important_date'],
   buyer: ['close_date', 'acceptance_date', 'option_end_date'],
   seller_and_buyer: [],
   landlord: ['listing_date'],
