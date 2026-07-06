@@ -128,27 +128,31 @@ router.get('/', (req, res) => {
   });
 });
 
-/** Admin-only: replace all transactions from Brokermint CSV (JSON body: { csv: "..." }). */
+/** Admin-only: import Brokermint data ({ csv } or { rows, clearFirst }). */
 router.post('/import-brokermint', (req, res) => {
   if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
-  const content = req.body?.csv;
-  if (!content || typeof content !== 'string') {
-    return res.status(400).json({ error: 'Body must include csv string' });
+
+  const clearFirst = req.body?.clearFirst !== false;
+  let rawRows = req.body?.rows;
+
+  if (!Array.isArray(rawRows)) {
+    const content = req.body?.csv;
+    if (!content || typeof content !== 'string') {
+      return res.status(400).json({ error: 'Body must include csv string or rows array' });
+    }
+    try {
+      rawRows = parse(content, {
+        columns: true,
+        skip_empty_lines: true,
+        relax_quotes: true,
+        relax_column_count: true,
+      });
+    } catch (e) {
+      return res.status(400).json({ error: `Invalid CSV: ${e.message}` });
+    }
   }
 
-  let rawRows;
-  try {
-    rawRows = parse(content, {
-      columns: true,
-      skip_empty_lines: true,
-      relax_quotes: true,
-      relax_column_count: true,
-    });
-  } catch (e) {
-    return res.status(400).json({ error: `Invalid CSV: ${e.message}` });
-  }
-
-  const result = runBrokermintImport(db, rawRows);
+  const result = runBrokermintImport(db, rawRows, { clearFirst });
   res.json({ ok: true, ...result });
 });
 
