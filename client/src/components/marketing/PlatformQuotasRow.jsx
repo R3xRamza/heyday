@@ -11,6 +11,7 @@ import {
   nextWeekPostTitle,
   findGoalForPlatform,
   sortGoalPlatforms,
+  computeMarketingStatus,
 } from './quotaUtils';
 
 const LS_GOALS_COLLAPSED = 'marketing-goals-collapsed-v1';
@@ -215,6 +216,11 @@ export default function PlatformQuotasRow({ quotaPosts, goals, onSaveGoal }) {
     });
   }, [resolvedSlots, goals, quotaPosts]);
 
+  const marketingStatus = useMemo(
+    () => computeMarketingStatus(summaryItems),
+    [summaryItems],
+  );
+
   useEffect(() => {
     if (!platformOptions.length || quotaSlots !== null) return;
     const saved = loadJson(LS_QUOTA_SLOTS, null);
@@ -259,8 +265,15 @@ export default function PlatformQuotasRow({ quotaPosts, goals, onSaveGoal }) {
         <span className="text-xs font-semibold text-feather shrink-0">Weekly Goals</span>
         {collapsed && (
           <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-feather/10 text-[11px] font-semibold text-feather">
-              Marketing 82%
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+              marketingStatus.attention
+                ? 'bg-error/10 text-error'
+                : marketingStatus.goalMet
+                  ? 'bg-secondary/10 text-secondary'
+                  : 'bg-feather/10 text-feather'
+            }`}
+            >
+              Marketing {marketingStatus.percent}%
             </span>
             {summaryItems.map(({ platformKey, count, target }) => (
               <span
@@ -279,10 +292,34 @@ export default function PlatformQuotasRow({ quotaPosts, goals, onSaveGoal }) {
           <div className="bg-white border border-outline-variant/15 rounded-xl p-3 flex flex-col justify-between min-h-[88px]">
             <p className="text-xs font-semibold text-on-surface-variant">Marketing Status</p>
             <div className="flex items-end justify-between gap-2 mt-1">
-              <p className="text-xl font-bold text-feather">82%</p>
-              <Icon name="check_circle" className="!text-[28px] text-feather/30 shrink-0" filled />
+              <p className={`text-xl font-bold ${
+                marketingStatus.attention
+                  ? 'text-error'
+                  : marketingStatus.goalMet
+                    ? 'text-secondary'
+                    : 'text-feather'
+              }`}
+              >
+                {marketingStatus.percent}%
+              </p>
+              <Icon
+                name={marketingStatus.attention ? 'warning' : marketingStatus.goalMet ? 'check_circle' : 'schedule'}
+                className={`!text-[28px] shrink-0 ${
+                  marketingStatus.attention
+                    ? 'text-error/70'
+                    : marketingStatus.goalMet
+                      ? 'text-secondary/70'
+                      : 'text-feather/30'
+                }`}
+                filled={marketingStatus.goalMet}
+              />
             </div>
-            <p className="text-[10px] text-on-surface-variant mt-0.5">On-Schedule</p>
+            <p className={`text-[10px] mt-0.5 ${
+              marketingStatus.attention ? 'text-error font-semibold' : 'text-on-surface-variant'
+            }`}
+            >
+              {marketingStatus.label}
+            </p>
           </div>
 
           {resolvedSlots.map((platformKey, slotIndex) => {
