@@ -2,7 +2,6 @@ const BASE_REQUIRED = ['address', 'city', 'state', 'zip'];
 
 const REQUIRED_BY_REPRESENTING = {
   seller: ['listing_date', 'important_date'],
-  private_listing: ['listing_date', 'important_date'],
   buyer: ['close_date', 'acceptance_date', 'option_end_date'],
   seller_and_buyer: [],
   landlord: ['listing_date'],
@@ -23,13 +22,23 @@ export const FIELD_LABELS = {
 };
 
 export function normalizeRepresenting(value) {
+  if (value === 'private_listing') return 'seller';
   if (value === 'both' || value === 'seller_and_client') return 'seller_and_buyer';
   if (value === 'leasing') return 'landlord';
   if (value === 'renting') return 'tenant';
   return value || 'seller';
 }
 
-export function getRequiredTransactionFields(representing) {
+export function normalizeListingVisibility(value) {
+  if (value === 'private') return 'private';
+  if (value === 'coming_soon') return 'coming_soon';
+  return 'public';
+}
+
+export function getRequiredTransactionFields(representing, listingVisibility) {
+  if (normalizeListingVisibility(listingVisibility) === 'coming_soon') {
+    return [...BASE_REQUIRED];
+  }
   const r = normalizeRepresenting(representing);
   return [...BASE_REQUIRED, ...(REQUIRED_BY_REPRESENTING[r] || [])];
 }
@@ -39,7 +48,7 @@ function isEmpty(value) {
 }
 
 export function validateTransactionFields(record) {
-  const required = getRequiredTransactionFields(record.representing);
+  const required = getRequiredTransactionFields(record.representing, record.listing_visibility);
   const missing = required.filter((key) => isEmpty(record[key]));
   if (missing.length === 0) {
     return { ok: true, missing: [] };
@@ -66,7 +75,7 @@ export function shouldValidateSetupCompletion(body, before) {
 export function mergeTransactionForValidation(before, body) {
   const merged = { ...before };
   const keys = [
-    'address', 'city', 'state', 'zip', 'representing',
+    'address', 'city', 'state', 'zip', 'representing', 'listing_visibility',
     'listing_date', 'important_date', 'close_date', 'acceptance_date', 'option_end_date',
   ];
   for (const key of keys) {

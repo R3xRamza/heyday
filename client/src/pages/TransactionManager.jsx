@@ -4,8 +4,10 @@ import DashboardLayout from '../components/DashboardLayout';
 import TransactionSetup from '../components/TransactionSetup';
 import TransactionWorkspace from '../components/TransactionWorkspace';
 import TransactionPriceHeader from '../components/TransactionPriceHeader';
+import PrivateListingFlag from '../components/transactions/PrivateListingFlag';
 import { buildFallbackParties } from '../data/transactionParties';
 import { parseTransactionAddress } from '../utils/format';
+import { isPrivateListing } from '../constants/transactionForm';
 
 async function fetchPartiesForTransaction(id, transaction) {
   const res = await fetch(`/api/transactions/${id}/parties`, { credentials: 'include' });
@@ -255,12 +257,17 @@ export default function TransactionManager() {
     zip: transaction.zip,
   });
 
+  const privateFlag = isPrivateListing(transaction) ? <PrivateListingFlag /> : null;
+
   if (inSetup) {
     return (
-      <DashboardLayout title={street} subtitle={cityLine || undefined} className="bg-surface">
+      <DashboardLayout title={street} subtitle={cityLine || undefined} titleAddon={privateFlag} className="bg-surface">
         <div className="px-8 pt-4">
           <Link to="/transactions" className="text-sm text-secondary hover:underline">← Back to transactions</Link>
-          <h1 className="text-2xl font-bold text-primary mt-2">{street}</h1>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <h1 className="text-2xl font-bold text-primary">{street}</h1>
+            {privateFlag}
+          </div>
           {cityLine && <p className="text-sm text-on-surface-variant mt-1">{cityLine}</p>}
         </div>
         <TransactionSetup
@@ -281,6 +288,7 @@ export default function TransactionManager() {
     <DashboardLayout
       title={street}
       subtitle={cityLine || undefined}
+      titleAddon={privateFlag}
       fillViewport
       className="p-0 overflow-hidden flex flex-col"
       headerRight={

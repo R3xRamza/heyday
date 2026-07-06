@@ -5,6 +5,7 @@ import { useSidebar } from '../context/SidebarContext';
 export default function DashboardLayout({
   title,
   subtitle,
+  titleAddon,
   children,
   className = '',
   headerRight,
@@ -21,7 +22,7 @@ export default function DashboardLayout({
         }`}
         style={{ marginLeft: sidebarWidth }}
       >
-        <TopNav title={title} subtitle={subtitle} headerRight={headerRight} />
+        <TopNav title={title} subtitle={subtitle} headerRight={headerRight} titleAddon={titleAddon} />
         <main
           className={`flex-1 min-h-0 custom-scrollbar flex flex-col ${
             fillViewport ? 'overflow-hidden' : 'overflow-y-auto'

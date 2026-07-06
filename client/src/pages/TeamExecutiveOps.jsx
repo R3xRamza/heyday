@@ -24,16 +24,6 @@ const STAT_CARDS = [
     },
   },
   {
-    key: 'pending',
-    label: 'Pending',
-    icon: 'handshake',
-    accent: 'from-feather/15 to-sky/10',
-    iconBg: 'bg-feather text-lemon',
-    path: '/transactions?filter=pending',
-    volume: (s) => formatCurrency(s?.pending?.volume ?? 0),
-    sub: (s) => `${s?.pending?.count ?? 0} under contract`,
-  },
-  {
     key: 'comingSoon',
     label: 'Coming Soon',
     icon: 'schedule',
@@ -55,6 +45,16 @@ const STAT_CARDS = [
     path: '/transactions?filter=current_listings',
     volume: (s) => formatCurrency(s?.activeListings?.volume ?? 0),
     sub: (s) => `${s?.activeListings?.count ?? 0} on market`,
+  },
+  {
+    key: 'pending',
+    label: 'Pending',
+    icon: 'handshake',
+    accent: 'from-feather/15 to-sky/10',
+    iconBg: 'bg-feather text-lemon',
+    path: '/transactions?filter=pending',
+    volume: (s) => formatCurrency(s?.pending?.volume ?? 0),
+    sub: (s) => `${s?.pending?.count ?? 0} under contract`,
   },
 ];
 
@@ -177,17 +177,17 @@ function StatCard({ card, stats, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`group relative overflow-hidden bg-gradient-to-br ${card.accent} p-4 rounded-xl border border-white/60 shadow-executive text-left transition-all hover:shadow-[0_6px_20px_rgba(5,62,63,0.15)] hover:-translate-y-0.5`}
+      className={`group relative overflow-hidden bg-gradient-to-br ${card.accent} p-3 rounded-lg border border-white/60 shadow-executive text-left transition-all hover:shadow-[0_4px_14px_rgba(5,62,63,0.12)] hover:-translate-y-0.5`}
     >
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <span className={`inline-flex items-center justify-center w-9 h-9 rounded-lg shadow-sm ${card.iconBg}`}>
-          <Icon name={card.icon} className="!text-[20px]" />
+      <div className="flex items-center justify-between gap-1.5 mb-2">
+        <span className={`inline-flex items-center justify-center w-7 h-7 rounded-md shadow-sm ${card.iconBg}`}>
+          <Icon name={card.icon} className="!text-[16px]" />
         </span>
-        <Icon name="arrow_forward" className="!text-[18px] text-on-surface-variant/40 group-hover:text-secondary transition-colors" />
+        <Icon name="arrow_forward" className="!text-[15px] text-on-surface-variant/40 group-hover:text-secondary transition-colors" />
       </div>
-      <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">{card.label}</p>
-      <h2 className="text-2xl font-bold text-primary leading-tight mt-0.5">{card.volume(stats)}</h2>
-      <p className="text-[11px] text-on-surface-variant mt-1">{card.sub(stats)}</p>
+      <p className="text-[9px] font-bold text-on-surface-variant uppercase tracking-wider">{card.label}</p>
+      <h2 className="text-lg font-bold text-primary leading-tight mt-0.5">{card.volume(stats)}</h2>
+      <p className="text-[10px] text-on-surface-variant mt-0.5 leading-snug">{card.sub(stats)}</p>
     </button>
   );
 }
@@ -365,17 +365,17 @@ export default function TeamExecutiveOps() {
   return (
     <DashboardLayout title="Team Hub" className="p-5 md:p-6">
       <div className="space-y-5">
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 md:gap-3">
           {loadingStats
             ? [0, 1, 2, 3].map((i) => (
-              <div key={i} className="rounded-xl border border-outline-variant/15 shadow-executive animate-pulse h-[7.5rem] bg-white" />
+              <div key={i} className="rounded-lg border border-outline-variant/15 shadow-executive animate-pulse h-[5.25rem] bg-white" />
             ))
             : STAT_CARDS.map((card) => (
               <StatCard key={card.key} card={card} stats={stats} onClick={() => navigate(card.path)} />
             ))}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
           {TX_PANELS.map((panel) => (
             <TxPanel
               key={panel.key}
@@ -385,8 +385,13 @@ export default function TeamExecutiveOps() {
               onViewAll={() => navigate(panel.link)}
             />
           ))}
-          <ClosingSoonPanel milestones={closings} loading={loadingClosings} compact />
         </div>
+
+        <ClosingSoonPanel
+          milestones={closings}
+          loading={loadingClosings}
+          layout="horizontal"
+        />
 
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 items-start">
           {teamTasks.map((m) => {

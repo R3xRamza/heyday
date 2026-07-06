@@ -2,14 +2,17 @@ import { Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import TeamAvatar from './TeamAvatar';
 
-export default function TopNav({ title, subtitle, headerRight }) {
+export default function TopNav({ title, subtitle, headerRight, titleAddon }) {
   const { user } = useAuth();
 
   return (
     <header className="sticky top-0 z-30 shrink-0 min-h-14 py-2.5 bg-white border-b border-sky px-8 flex items-center gap-4">
       {title ? (
-        <div className="min-w-0 max-w-[360px] shrink-0">
-          <h2 className="text-xl font-bold text-feather truncate leading-tight">{title}</h2>
+        <div className="min-w-0 max-w-[min(100%,28rem)] shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <h2 className="text-xl font-bold text-feather truncate leading-tight">{title}</h2>
+            {titleAddon}
+          </div>
           {subtitle && (
             <p className="text-xs text-on-surface-variant truncate mt-0.5">{subtitle}</p>
           )}
