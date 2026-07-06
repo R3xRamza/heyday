@@ -21,7 +21,8 @@ import {
 } from '../lib/transactionValidation.js';
 import { closePastDueTransactions, deriveStageFromCloseDate } from '../lib/transactionAutoClose.js';
 import { closedYtdStats, ACTIVE_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE } from '../lib/transactionScopes.js';
-import { runBrokermintImport } from '../lib/brokermintImport.js';
+import { runBrokermintImport, fixBrokermintAgentIds } from '../lib/brokermintImport.js';
+import { parsePagination } from '../lib/pagination.js';
 
 const router = Router();
 
@@ -82,11 +83,52 @@ function pickTransaction(id) {
   `).get(id);
 }
 
+const DATE_FIELD_BY_FILTER = {
+  active_transactions: 'created_at',
+  all: 'created_at',
+  current_listings: 'listing_date',
+  coming_soon: 'listing_date',
+  all_listings: 'listing_date',
+  pending: 'close_date',
+  closed: 'close_date',
+};
+
+function transactionOrderClause(sortKey, sortDir, dateField) {
+  const dir = sortDir === 'asc' ? 'ASC' : 'DESC';
+  switch (sortKey) {
+    case 'address':
+      return `LOWER(t.address) ${dir}, LOWER(t.city) ${dir}, t.id ${dir}`;
+    case 'value':
+      return `(t.value IS NULL), t.value ${dir}, t.id ${dir}`;
+    case 'agent':
+      return `(u.name IS NULL), LOWER(u.name) ${dir}, t.id ${dir}`;
+    case 'type':
+      return `t.stage ${dir}, COALESCE(t.listing_visibility, 'public') ${dir}, (t.listing_date IS NULL), t.listing_date ${dir}, t.id ${dir}`;
+    case 'date':
+    default:
+      return `(t.${dateField} IS NULL), t.${dateField} ${dir}, t.id ${dir}`;
+  }
+}
+
 router.get('/', (req, res) => {
   closePastDueTransactions(db);
   const filter = req.query.filter || 'all';
   const search = (req.query.search || '').trim().toLowerCase();
   const where = VIEW_MAP[filter] || VIEW_MAP.all;
+  const { page, limit, offset } = parsePagination(req.query);
+  const sortKey = req.query.sort || 'date';
+  const sortDir = req.query.order === 'asc' ? 'asc' : 'desc';
+  const dateField = DATE_FIELD_BY_FILTER[filter] || 'created_at';
+
+  let countSql = `SELECT COUNT(*) as c FROM transactions t WHERE ${where}`;
+  const params = [];
+  if (search) {
+    countSql += ` AND (LOWER(t.address) LIKE ? OR LOWER(t.city) LIKE ? OR LOWER(COALESCE(t.state, '')) LIKE ? OR LOWER(COALESCE(t.zip, '')) LIKE ? OR LOWER(COALESCE(t.client_name, t.owner_name)) LIKE ?)`;
+    const q = `%${search}%`;
+    params.push(q, q, q, q, q);
+  }
+  const total = db.prepare(countSql).get(...params).c;
+
   let sql = `
     SELECT t.*, u.name as agent_name,
       (SELECT COUNT(*) FROM tasks tk WHERE tk.transaction_id = t.id AND tk.status != 'complete') as open_tasks,
@@ -95,14 +137,11 @@ router.get('/', (req, res) => {
     LEFT JOIN users u ON u.id = t.agent_id
     WHERE ${where}
   `;
-  const params = [];
   if (search) {
     sql += ` AND (LOWER(t.address) LIKE ? OR LOWER(t.city) LIKE ? OR LOWER(COALESCE(t.state, '')) LIKE ? OR LOWER(COALESCE(t.zip, '')) LIKE ? OR LOWER(COALESCE(t.client_name, t.owner_name)) LIKE ?)`;
-    const q = `%${search}%`;
-    params.push(q, q, q, q, q);
   }
-  sql += ' ORDER BY t.created_at DESC';
-  const transactions = db.prepare(sql).all(...params);
+  sql += ` ORDER BY ${transactionOrderClause(sortKey, sortDir, dateField)} LIMIT ? OFFSET ?`;
+  const transactions = db.prepare(sql).all(...params, limit, offset);
 
   const portfolioStats = db.prepare(`
     SELECT COUNT(*) as count, COALESCE(SUM(value), 0) as volume,
@@ -120,6 +159,9 @@ router.get('/', (req, res) => {
 
   res.json({
     transactions,
+    total,
+    page,
+    limit,
     stats: {
       ...portfolioStats,
       filtered,
@@ -153,6 +195,16 @@ router.post('/import-brokermint', (req, res) => {
   }
 
   const result = runBrokermintImport(db, rawRows, { clearFirst });
+  res.json({ ok: true, ...result });
+});
+
+/** Admin-only: re-map agent_id from Brokermint users column ({ rows }). */
+router.post('/fix-brokermint-agents', (req, res) => {
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  if (!Array.isArray(req.body?.rows)) {
+    return res.status(400).json({ error: 'Body must include rows array' });
+  }
+  const result = fixBrokermintAgentIds(db, req.body.rows);
   res.json({ ok: true, ...result });
 });
 

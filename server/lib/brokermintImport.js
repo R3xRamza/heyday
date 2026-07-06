@@ -4,6 +4,8 @@ import { clearTransactionData } from './transactionSeed.js';
 const SALE_TYPE_TRADITIONAL = 'Traditional sale';
 const SALE_TYPE_RENT_LEASE = 'Rent/lease';
 
+const DEAL_AGENT_FIRST_NAMES = ['meredith', 'tessa'];
+
 const FIRST_NAME_TO_EMAIL = {
   meredith: 'meredith@theheydaygroup.com',
   tessa: 'tessa@theheydaygroup.com',
@@ -56,11 +58,12 @@ export function mapBrokermintStage(status) {
 }
 
 export function resolveBrokermintAgentId(usersByEmail, usersColumn, defaultAgentId) {
-  const firstAgent = String(usersColumn || '').split(',')[0].trim().toLowerCase();
-  if (!firstAgent) return defaultAgentId;
-  const firstName = firstAgent.split(/\s+/)[0];
-  const email = FIRST_NAME_TO_EMAIL[firstName];
-  if (email && usersByEmail[email] != null) return usersByEmail[email];
+  for (const part of String(usersColumn || '').split(',')) {
+    const firstName = part.trim().split(/\s+/)[0]?.toLowerCase();
+    if (!firstName || !DEAL_AGENT_FIRST_NAMES.includes(firstName)) continue;
+    const email = FIRST_NAME_TO_EMAIL[firstName];
+    if (email && usersByEmail[email] != null) return usersByEmail[email];
+  }
   return defaultAgentId;
 }
 
@@ -175,4 +178,48 @@ export function runBrokermintImport(db, rawRows, { clearFirst = true } = {}) {
     total,
     byStage: Object.fromEntries(byStage.map((r) => [r.stage, r.c])),
   };
+}
+
+/** Re-assign agent_id on imported rows matched by transaction_name (= Brokermint custom_id). */
+export function fixBrokermintAgentIds(db, rawRows) {
+  const users = db.prepare('SELECT id, email, name FROM users').all();
+  const usersByEmail = Object.fromEntries(users.map((u) => [u.email, u.id]));
+  const meredith = usersByEmail['meredith@theheydaygroup.com'];
+  const defaultAgentId = meredith ?? users[0]?.id ?? 1;
+
+  const update = db.prepare(`
+    UPDATE transactions SET agent_id = ?
+    WHERE transaction_name = ?
+  `);
+
+  let updated = 0;
+  let skipped = 0;
+
+  db.transaction(() => {
+    for (const row of rawRows) {
+      const status = String(row.status || '').trim().toLowerCase();
+      if (status === 'cancelled') {
+        skipped++;
+        continue;
+      }
+      const customId = String(row.custom_id || '').trim();
+      if (!customId) {
+        skipped++;
+        continue;
+      }
+      const agentId = resolveBrokermintAgentId(usersByEmail, row.users, defaultAgentId);
+      const result = update.run(agentId, customId);
+      if (result.changes > 0) updated++;
+    }
+  })();
+
+  const byAgent = db.prepare(`
+    SELECT u.name as agent_name, COUNT(*) as c
+    FROM transactions t
+    LEFT JOIN users u ON u.id = t.agent_id
+    GROUP BY t.agent_id
+    ORDER BY c DESC
+  `).all();
+
+  return { updated, skipped, byAgent };
 }
