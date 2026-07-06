@@ -142,11 +142,22 @@ function sortTransactions(rows, sortKey, sortDir, dateField) {
 
 function portfolioTypeBadgeClass(tx) {
   const type = transactionPortfolioType(tx);
-  if (type === 'Coming Soon') return 'bg-lemon/35 text-feather border border-lemon/50';
-  if (type === 'Closed') return 'bg-secondary/15 text-secondary border border-secondary/25';
-  if (type === 'Pending') return 'bg-feather/10 text-feather border border-feather/20';
-  if (type === 'Active listing') return 'bg-sky/25 text-feather border border-sky/35';
-  return 'bg-secondary-container/30 text-secondary border border-secondary/20';
+  if (type === 'Coming Soon') return 'bg-lemon text-feather';
+  if (type === 'Closed') return 'bg-secondary/20 text-secondary';
+  if (type === 'Pending') return 'bg-tertiary-container/50 text-feather';
+  if (type === 'Active listing') return 'bg-sky text-feather';
+  return 'bg-secondary-container/50 text-secondary';
+}
+
+function emptyFilterMessage(filter) {
+  switch (filter) {
+    case 'coming_soon': return 'No coming soon listings.';
+    case 'current_listings': return 'No current listings.';
+    case 'pending': return 'No pending transactions.';
+    case 'closed': return 'No closed transactions.';
+    case 'all': return 'No transactions yet.';
+    default: return 'No active transactions yet.';
+  }
 }
 
 function StatCard({ label, value, sub }) {
@@ -322,8 +333,8 @@ export default function TransactionsList() {
           ))}
         </nav>
 
-        <div className="bg-white border border-outline-variant/20 shadow-executive overflow-hidden min-h-[16rem]">
-          <div className="overflow-x-auto relative">
+        <div className="bg-white border border-outline-variant/20 shadow-executive overflow-hidden rounded-xl">
+          <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-container-low border-b border-outline-variant/30">
@@ -332,7 +343,9 @@ export default function TransactionsList() {
                     return (
                       <th
                         key={col.key}
-                        className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest cursor-pointer select-none hover:text-primary"
+                        className={`px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest cursor-pointer select-none hover:text-primary ${
+                          col.key === 'type' ? 'whitespace-nowrap' : ''
+                        }`}
                         onClick={() => handleSort(col.key)}
                       >
                         {label}
@@ -347,7 +360,7 @@ export default function TransactionsList() {
                 {showInitialLoading ? (
                   <tr><td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">Loading…</td></tr>
                 ) : sortedTransactions.length === 0 ? (
-                  <tr><td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">No transactions yet. Create one to get started.</td></tr>
+                  <tr><td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant">{emptyFilterMessage(filter)}</td></tr>
                 ) : (
                   sortedTransactions.map((tx) => {
                     const { street, cityLine } = parseTransactionAddress({
@@ -379,8 +392,8 @@ export default function TransactionsList() {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${portfolioTypeBadgeClass(tx)}`}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${portfolioTypeBadgeClass(tx)}`}>
                           {transactionPortfolioType(tx)}
                         </span>
                       </td>
