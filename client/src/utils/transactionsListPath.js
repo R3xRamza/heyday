@@ -48,6 +48,13 @@ export function buildTransactionsListSearchParams({
   return params;
 }
 
+export function filterFromSearchParams(searchParams, validKeys) {
+  const filterParam = searchParams.get('filter');
+  const resolved = filterParam === 'all_listings' ? 'coming_soon' : filterParam;
+  if (!resolved) return 'active_transactions';
+  return validKeys.has(resolved) ? resolved : 'active_transactions';
+}
+
 export function parseTransactionsListSearchParams(searchParams) {
   const filterParam = searchParams.get('filter');
   const resolvedFilter = filterParam === 'all_listings' ? 'coming_soon' : filterParam;

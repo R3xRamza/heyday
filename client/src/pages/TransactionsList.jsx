@@ -17,6 +17,7 @@ import {
   hasTransactionsListQuery,
   readTransactionsListView,
   resolveTransactionsListView,
+  filterFromSearchParams,
   transactionsListPath,
   writeTransactionsListView,
 } from '../utils/transactionsListPath';
@@ -142,9 +143,7 @@ export default function TransactionsList() {
   }, [navigate, searchParams]);
 
   const listView = resolveTransactionsListView(searchParams);
-  const filterParam = searchParams.get('filter');
-  const resolvedFilter = filterParam === 'all_listings' ? 'coming_soon' : filterParam;
-  const filter = VALID_FILTER_KEYS.has(resolvedFilter) ? resolvedFilter : listView.filter;
+  const filter = filterFromSearchParams(searchParams, VALID_FILTER_KEYS);
 
   const [search, setSearch] = useState(() => listView.search);
   const [data, setData] = useState({ transactions: [], stats: {}, total: 0 });
