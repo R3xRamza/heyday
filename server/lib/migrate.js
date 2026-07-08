@@ -6,6 +6,7 @@ import {
   defaultRoleForChecklistTemplate,
 } from './checklist-templates.js';
 import { syncAllTaskAssigneesFromTemplates } from './taskAssignment.js';
+import { resyncNamedChecklistTemplates } from '../seed-data.js';
 
 export function addColumnIfMissing(db, table, column, definition) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
@@ -64,6 +65,7 @@ export function runMigrations(db) {
   migrateTemplateNicknamesV3(db);
   migrateTemplateNicknamesV4(db);
   migrateTemplateNicknamesV5(db);
+  migrateChecklistTemplatesJul2026(db);
 
   addColumnIfMissing(db, 'transactions', 'transaction_name', 'TEXT');
   addColumnIfMissing(db, 'transactions', 'sale_type', "TEXT DEFAULT 'Traditional sale'");
@@ -370,6 +372,24 @@ function migrateTemplateNicknamesV5(db) {
   })();
 
   db.prepare("INSERT INTO _migrations (name) VALUES ('template_nicknames_v5')").run();
+}
+
+function migrateChecklistTemplatesJul2026(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS _migrations (
+      name TEXT PRIMARY KEY,
+      applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  if (db.prepare("SELECT 1 FROM _migrations WHERE name = 'checklist_templates_jul2026'").get()) return;
+
+  resyncNamedChecklistTemplates(db, [
+    'Buyer (With TC)',
+    'Listing : CTC (if no TC)',
+    'Listing : CTC (With TC)',
+  ]);
+
+  db.prepare("INSERT INTO _migrations (name) VALUES ('checklist_templates_jul2026')").run();
 }
 
 function migrateBirthdayPinsTable(db) {
