@@ -7,6 +7,7 @@ import {
 } from './checklist-templates.js';
 import { syncAllTaskAssigneesFromTemplates } from './taskAssignment.js';
 import { resyncNamedChecklistTemplates } from '../seed-data.js';
+import { dedupeAllChecklistTemplates } from './checklistTaskCleanup.js';
 
 export function addColumnIfMissing(db, table, column, definition) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
@@ -66,6 +67,7 @@ export function runMigrations(db) {
   migrateTemplateNicknamesV4(db);
   migrateTemplateNicknamesV5(db);
   migrateChecklistTemplatesJul2026(db);
+  migrateChecklistTaskOrphansJul2026(db);
 
   addColumnIfMissing(db, 'transactions', 'transaction_name', 'TEXT');
   addColumnIfMissing(db, 'transactions', 'sale_type', "TEXT DEFAULT 'Traditional sale'");
@@ -390,6 +392,21 @@ function migrateChecklistTemplatesJul2026(db) {
   ]);
 
   db.prepare("INSERT INTO _migrations (name) VALUES ('checklist_templates_jul2026')").run();
+}
+
+function migrateChecklistTaskOrphansJul2026(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS _migrations (
+      name TEXT PRIMARY KEY,
+      applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  if (db.prepare("SELECT 1 FROM _migrations WHERE name = 'checklist_task_orphans_jul2026'").get()) return;
+
+  const { relinked, deleted } = dedupeAllChecklistTemplates(db);
+  console.log(`Checklist orphan cleanup: relinked ${relinked}, deleted ${deleted} duplicate/stale task(s)`);
+
+  db.prepare("INSERT INTO _migrations (name) VALUES ('checklist_task_orphans_jul2026')").run();
 }
 
 function migrateBirthdayPinsTable(db) {

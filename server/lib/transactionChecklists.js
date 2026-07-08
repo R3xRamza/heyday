@@ -92,8 +92,14 @@ export function getTransactionChecklists(db, transactionId) {
   return db.prepare(`
     SELECT tc.template_id AS id, ct.name, tc.sort_order,
       (SELECT COUNT(*) FROM tasks tk
-        INNER JOIN template_tasks tt ON tt.id = tk.template_task_id
-        WHERE tk.transaction_id = tc.transaction_id AND tt.template_id = tc.template_id) AS task_count
+        WHERE tk.transaction_id = tc.transaction_id
+          AND (
+            tk.template_task_id IN (SELECT id FROM template_tasks WHERE template_id = tc.template_id)
+            OR (
+              tk.template_task_id IS NULL
+              AND tk.title IN (SELECT title FROM template_tasks WHERE template_id = tc.template_id)
+            )
+          )) AS task_count
     FROM transaction_checklists tc
     INNER JOIN checklist_templates ct ON ct.id = tc.template_id
     WHERE tc.transaction_id = ?

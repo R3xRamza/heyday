@@ -8,6 +8,7 @@ import {
   syncTransactionChecklistLinks,
   isChecklistAppliedToTransaction,
 } from './transactionChecklists.js';
+import { dedupeChecklistTasksForTemplate } from './checklistTaskCleanup.js';
 
 /**
  * Apply one or more checklist templates to a transaction.
@@ -70,6 +71,7 @@ export function applyChecklistsToTransaction(db, transactionId, templateIds, use
       if (addedFromTemplate > 0) {
         appliedNames.push(template.name);
       }
+      dedupeChecklistTasksForTemplate(db, templateId);
     }
 
     const lastTemplateId = ids[ids.length - 1];
@@ -132,9 +134,15 @@ export function removeChecklistFromTransaction(db, transactionId, templateId, us
       COUNT(*) as total,
       SUM(CASE WHEN status = 'complete' THEN 1 ELSE 0 END) as completed
     FROM tasks t
-    INNER JOIN template_tasks tt ON tt.id = t.template_task_id
-    WHERE t.transaction_id = ? AND tt.template_id = ?
-  `).get(transactionId, templateIdNum);
+    WHERE t.transaction_id = ?
+      AND (
+        t.template_task_id IN (SELECT id FROM template_tasks WHERE template_id = ?)
+        OR (
+          t.template_task_id IS NULL
+          AND t.title IN (SELECT title FROM template_tasks WHERE template_id = ?)
+        )
+      )
+  `).get(transactionId, templateIdNum, templateIdNum);
 
   const tasksRemoved = taskStats?.total ?? 0;
 
@@ -145,15 +153,27 @@ export function removeChecklistFromTransaction(db, transactionId, templateId, us
       WHERE task_id IN (
         SELECT id FROM tasks
         WHERE transaction_id = ?
-          AND template_task_id IN (SELECT id FROM template_tasks WHERE template_id = ?)
+          AND (
+            template_task_id IN (SELECT id FROM template_tasks WHERE template_id = ?)
+            OR (
+              template_task_id IS NULL
+              AND title IN (SELECT title FROM template_tasks WHERE template_id = ?)
+            )
+          )
       )
-    `).run(transactionId, templateIdNum);
+    `).run(transactionId, templateIdNum, templateIdNum);
 
     db.prepare(`
       DELETE FROM tasks
       WHERE transaction_id = ?
-        AND template_task_id IN (SELECT id FROM template_tasks WHERE template_id = ?)
-    `).run(transactionId, templateIdNum);
+        AND (
+          template_task_id IN (SELECT id FROM template_tasks WHERE template_id = ?)
+          OR (
+            template_task_id IS NULL
+            AND title IN (SELECT title FROM template_tasks WHERE template_id = ?)
+          )
+        )
+    `).run(transactionId, templateIdNum, templateIdNum);
 
     unlinkTemplateFromTransaction(db, transactionId, templateIdNum);
 

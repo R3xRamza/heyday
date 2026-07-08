@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import { CHECKLIST_TEMPLATES, CHECKLIST_TEMPLATE_SORT_ORDER, defaultRoleForChecklistTemplate } from './lib/checklist-templates.js';
 import { deriveNickname } from './lib/deriveNickname.js';
+import { dedupeChecklistTasksForTemplate } from './lib/checklistTaskCleanup.js';
 
 export { CHECKLIST_TEMPLATES };
 
@@ -73,7 +74,9 @@ export function resyncNamedChecklistTemplates(db, names) {
       });
     })();
 
-    console.log(`Synced "${name}": ${template.tasks.length} tasks`);
+    const { relinked, deleted } = dedupeChecklistTasksForTemplate(db, templateId);
+    const dedupeNote = (relinked || deleted) ? ` (relinked ${relinked}, removed ${deleted} duplicate/stale)` : '';
+    console.log(`Synced "${name}": ${template.tasks.length} tasks${dedupeNote}`);
   }
 }
 
