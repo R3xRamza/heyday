@@ -328,7 +328,11 @@ export default function TransactionsList() {
                     return (
                     <tr
                       key={tx.id}
-                      onClick={() => navigate(`/transactions/${tx.id}`)}
+                      onClick={() => navigate(`/transactions/${tx.id}`, {
+                        state: {
+                          transactionsList: { filter, page, search, sortKey, sortDir },
+                        },
+                      })}
                       className="hover:bg-secondary/5 transition-colors cursor-pointer group"
                     >
                       <td className="px-6 py-4">

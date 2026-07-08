@@ -31,7 +31,7 @@ const STAT_CARDS = [
     icon: 'schedule',
     accent: 'from-lemon/40 to-lemon/10',
     iconBg: 'bg-lemon text-feather',
-    path: '/transactions?filter=active_transactions',
+    path: '/transactions?filter=coming_soon',
     volume: (s) => formatCurrency(s?.comingSoonStats?.volume ?? 0),
     sub: (s) => {
       const n = s?.comingSoonStats?.count ?? 0;
@@ -67,7 +67,7 @@ const TX_PANELS = [
     icon: 'schedule',
     header: 'bg-tertiary text-white',
     iconColor: 'text-light-pink',
-    link: '/transactions?filter=active_transactions',
+    link: '/transactions?filter=coming_soon',
     dateField: 'listing_date',
     dateLabel: 'Lists',
     empty: 'No upcoming listings.',

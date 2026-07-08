@@ -10,6 +10,7 @@ import { parseTransactionAddress } from '../utils/format';
 import { isPrivateListing } from '../constants/transactionForm';
 import { useAgentScope } from '../context/AgentScopeContext';
 import { appendAgentScope } from '../utils/agentScope';
+import { useTransactionsListReturn } from '../hooks/useTransactionsListReturn';
 
 async function fetchPartiesForTransaction(id, transaction, scope) {
   const res = await fetch(appendAgentScope(`/api/transactions/${id}/parties`, scope), { credentials: 'include' });
@@ -38,6 +39,7 @@ export default function TransactionManager() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { scope } = useAgentScope();
+  const { returnTo } = useTransactionsListReturn();
   const [transaction, setTransaction] = useState(null);
   const [parties, setParties] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -103,7 +105,7 @@ export default function TransactionManager() {
   }, [fetchTransaction, fetchTasks, fetchChecklists, fetchActivities]);
 
   if (!id || id === 'undefined') {
-    return <Navigate to="/transactions" replace />;
+    return <Navigate to={returnTo} replace />;
   }
 
   async function saveTransaction(payload) {
@@ -208,7 +210,7 @@ export default function TransactionManager() {
       credentials: 'include',
     });
     if (res.ok) {
-      navigate('/transactions');
+      navigate(returnTo);
       return true;
     }
     return false;
@@ -261,7 +263,7 @@ export default function TransactionManager() {
   }
 
   if (!transaction) {
-    return <Navigate to="/transactions" replace />;
+    return <Navigate to={returnTo} replace />;
   }
 
   const inSetup = transaction.workflow_status && transaction.workflow_status !== 'active';
@@ -278,7 +280,7 @@ export default function TransactionManager() {
     return (
       <DashboardLayout title={street} subtitle={cityLine || undefined} titleAddon={privateFlag} className="bg-surface">
         <div className="px-8 pt-4">
-          <Link to="/transactions" className="text-sm text-secondary hover:underline">← Back to transactions</Link>
+          <Link to={returnTo} className="text-sm text-secondary hover:underline">← Back to transactions</Link>
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <h1 className="text-2xl font-bold text-primary">{street}</h1>
             {privateFlag}
