@@ -186,9 +186,14 @@ export default function TransactionWorkspace({
   }, [checklists, transaction.checklist_template_id, transaction.template_name]);
 
   const checklistTasks = tasks.filter((t) => {
-    if (t.template_task_id == null) return true;
     if (!activeChecklistId) return true;
-    return Number(t.template_id) === Number(activeChecklistId);
+    if (t.template_task_id != null) {
+      return Number(t.template_id) === Number(activeChecklistId);
+    }
+    // Orphaned template rows (e.g. after template resync) must not appear on every checklist tab.
+    const checklistStyle = /^(CLOSE OUT|MARKETING|UNDER CONTRACT|GO LIVE|COMING SOON|LISTING|FOLLOW UP|EXECUTED|PRIOR TO|POST-OPTION|OPTION PERIOD|Social Post)/i;
+    if (checklistStyle.test(t.title || '')) return false;
+    return true;
   });
 
   const activeChecklistName = sidebarChecklists.find((c) => Number(c.id) === Number(activeChecklistId))?.name
