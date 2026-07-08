@@ -182,6 +182,21 @@ export default function TransactionManager() {
     fetchActivities();
   }
 
+  async function completeOverdueTasks() {
+    const res = await fetch('/api/tasks/bulk/complete-overdue', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ transaction_id: Number(id) }),
+    });
+    const json = await res.json();
+    if (!res.ok) return false;
+    if (json.tasks) setTasks(json.tasks);
+    else await fetchTasks();
+    fetchActivities();
+    return true;
+  }
+
   async function deleteTransaction() {
     const res = await fetch(`/api/transactions/${id}`, {
       method: 'DELETE',
@@ -315,6 +330,7 @@ export default function TransactionManager() {
         onDeleteTransaction={deleteTransaction}
         onRemoveChecklist={removeChecklist}
         onApplyChecklists={applyChecklists}
+        onCompleteOverdueTasks={completeOverdueTasks}
       />
     </DashboardLayout>
   );
