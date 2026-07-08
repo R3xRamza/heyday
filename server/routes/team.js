@@ -1,40 +1,44 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { isOverdue, isDueThisWeek } from '../lib/timing.js';
+import { isOverdue, isDueThisWeek, weekRangeSunday } from '../lib/timing.js';
 
 const router = Router();
 
 function memberStats(userId) {
   const tasks = db.prepare(`
-    SELECT status, due_date, priority FROM tasks WHERE assigned_to = ?
+    SELECT status, due_date FROM tasks WHERE assigned_to = ?
   `).all(userId);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const { start, end } = weekRangeSunday(today);
 
-  let complete = 0;
   let overdue = 0;
-  let active = 0;
-  let pending = 0;
+  let thisWeek = 0;
+  let thisWeekComplete = 0;
+  let thisWeekTotal = 0;
 
   for (const t of tasks) {
-    if (t.status === 'complete') {
-      complete += 1;
-      continue;
-    }
+    if (!t.due_date) continue;
+
     if (isOverdue(t.due_date, t.status)) {
       overdue += 1;
+      continue;
+    }
+
+    if (t.due_date < start || t.due_date > end) continue;
+
+    thisWeekTotal += 1;
+    if (t.status === 'complete') {
+      thisWeekComplete += 1;
     } else if (isDueThisWeek(t.due_date, t.status, today)) {
-      active += 1;
-    } else {
-      pending += 1;
+      thisWeek += 1;
     }
   }
 
-  const total = tasks.length;
-  const progress = total ? Math.round((complete / total) * 100) : 0;
+  const progress = thisWeekTotal ? Math.round((thisWeekComplete / thisWeekTotal) * 100) : 0;
 
-  return { total, complete, pending, active, overdue, progress };
+  return { thisWeek, overdue, thisWeekComplete, thisWeekTotal, progress };
 }
 
 router.get('/', (_req, res) => {
