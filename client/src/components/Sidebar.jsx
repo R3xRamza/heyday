@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSidebar } from '../context/SidebarContext';
-import { readTransactionsListView, transactionsListPath } from '../utils/transactionsListPath';
+import { resolveTransactionsSidebarLink } from '../utils/transactionsListPath';
 import TeamAvatar from './TeamAvatar';
 import heydayLogo from '../assets/heyday-logo.png';
 import { APP_HEADER_BORDER_CLASS, APP_HEADER_HEIGHT_CLASS } from '../constants/appHeader';
@@ -116,9 +116,7 @@ export default function Sidebar() {
 
       <nav className="flex-1 py-2 overflow-y-auto custom-scrollbar">
         {NAV_ITEMS.map(({ to, label, icon: Icon, taskHub }) => {
-          const linkTo = to === '/transactions'
-            ? transactionsListPath(readTransactionsListView() || {})
-            : to;
+          const linkTo = to === '/transactions' ? resolveTransactionsSidebarLink() : to;
           return (
           <div key={to}>
             <NavLink

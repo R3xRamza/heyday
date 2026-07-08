@@ -15,6 +15,7 @@ import TransactionManager from './pages/TransactionManager';
 import TransactionsList from './pages/TransactionsList';
 import ChecklistEditor from './pages/ChecklistEditor';
 import TeamExecutiveOps from './pages/TeamExecutiveOps';
+import TransactionsNavTracker from './components/TransactionsNavTracker';
 import { FullScreenSkeleton } from './components/shared/Skeleton';
 
 function RootRedirect() {
@@ -29,6 +30,7 @@ export default function App() {
       <SidebarProvider>
       <AgentScopeProvider>
       <BrowserRouter>
+        <TransactionsNavTracker />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<RootRedirect />} />

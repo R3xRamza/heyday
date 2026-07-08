@@ -1,4 +1,5 @@
 export const TRANSACTIONS_LIST_VIEW_KEY = 'transactions-list-view-v1';
+export const TRANSACTIONS_NAV_PATH_KEY = 'transactions-nav-path-v1';
 
 const DEFAULT_VIEW = {
   filter: 'active_transactions',
@@ -91,4 +92,27 @@ export function resolveTransactionsListView(searchParams) {
     return parseTransactionsListSearchParams(searchParams);
   }
   return readTransactionsListView() || DEFAULT_VIEW;
+}
+
+export function writeTransactionsNavPath(pathname, search = '') {
+  if (!pathname.startsWith('/transactions')) return;
+  try {
+    sessionStorage.setItem(TRANSACTIONS_NAV_PATH_KEY, `${pathname}${search}`);
+  } catch {
+    // ignore
+  }
+}
+
+export function readTransactionsNavPath() {
+  try {
+    const path = sessionStorage.getItem(TRANSACTIONS_NAV_PATH_KEY);
+    if (!path?.startsWith('/transactions')) return null;
+    return path;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveTransactionsSidebarLink() {
+  return readTransactionsNavPath() || transactionsListPath(readTransactionsListView() || {});
 }
