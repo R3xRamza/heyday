@@ -26,6 +26,7 @@ import {
   saleTypeForRepresenting,
   normalizeSaleType,
 } from '../constants/transactionForm';
+import { useTransactionsListReturn } from '../hooks/useTransactionsListReturn';
 
 const ASSET_VIEWS = [
   { key: 'details', label: 'Transaction details', icon: 'info' },
@@ -141,6 +142,7 @@ export default function TransactionWorkspace({
   onApplyChecklists,
   onCompleteOverdueTasks,
 }) {
+  const { returnTo } = useTransactionsListReturn();
   const [view, setView] = useState('details');
   const [activeChecklistId, setActiveChecklistId] = useState(null);
   const [form, setForm] = useState({ ...transaction });
@@ -388,7 +390,7 @@ export default function TransactionWorkspace({
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-2">
       <div>
         <div className="flex items-center gap-2 text-xs text-on-surface-variant mb-1 uppercase tracking-widest font-semibold">
-          <Link to="/transactions" className="hover:text-secondary">Transactions</Link>
+          <Link to={returnTo} className="hover:text-secondary">Transactions</Link>
           <Icon name="chevron_right" className="!text-[14px]" />
           <span className="text-secondary font-bold">{street?.toUpperCase()}</span>
         </div>
@@ -412,7 +414,7 @@ export default function TransactionWorkspace({
     <div className="flex flex-1 min-h-0 overflow-hidden bg-surface">
       <aside className="w-56 shrink-0 bg-surface-container-lowest border-r border-outline-variant/10 flex flex-col overflow-y-auto custom-scrollbar">
         <div className="p-4 border-b border-outline-variant/10">
-          <Link to="/transactions" className="text-xs font-bold text-secondary hover:underline flex items-center gap-1 mb-4">
+          <Link to={returnTo} className="text-xs font-bold text-secondary hover:underline flex items-center gap-1 mb-4">
             <Icon name="arrow_back" className="!text-[14px]" /> BACK
           </Link>
           <p className="text-sm font-semibold text-primary leading-snug">{street}</p>
