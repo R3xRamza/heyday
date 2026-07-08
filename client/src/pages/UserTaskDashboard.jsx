@@ -186,6 +186,12 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
     return sortMyTasks(list, { admin: category === 'admin' });
   }, [data.tasks, showUndated, category, viewMode]);
 
+  const isAdmin = category === 'admin';
+  const showPriorityColumn = isAdmin && displayedTasks.some(
+    (t) => t.priority === 'high' && t.status !== 'complete',
+  );
+  const tableColCount = isAdmin ? (showPriorityColumn ? 5 : 4) : 5;
+
   function selectFilter(key) {
     setPage(1);
     setFilter(key);
@@ -271,14 +277,32 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
             <table className="w-full text-left border-separate border-spacing-0">
               <thead className="sticky top-0 bg-surface-container-low z-10">
                 <tr>
-                  {['', 'Task Description', 'Context / Property', 'Due Date', ''].map((h, i) => (
-                    <th
-                      key={h || 'actions'}
-                      className={`${i === 0 ? 'pl-10 pr-4' : i === 4 ? 'pl-4 pr-10 text-right' : i === 3 ? 'px-4 min-w-[9.5rem] w-[9.5rem]' : 'px-4'} py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30`}
-                    >
-                      {h}
-                    </th>
-                  ))}
+                  {isAdmin ? (
+                    <>
+                      <th className="pl-10 pr-4 py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30 w-12" />
+                      <th className="px-4 py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30">
+                        Task Description
+                      </th>
+                      {showPriorityColumn && (
+                        <th className="px-4 py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30 w-28">
+                          Priority
+                        </th>
+                      )}
+                      <th className="pl-4 pr-4 py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30 text-right whitespace-nowrap min-w-[9.5rem]">
+                        Due Date
+                      </th>
+                      <th className="pl-4 pr-10 py-4 border-b border-outline-variant/30 w-24" />
+                    </>
+                  ) : (
+                    ['', 'Task Description', 'Context / Property', 'Due Date', ''].map((h, i) => (
+                      <th
+                        key={h || 'actions'}
+                        className={`${i === 0 ? 'pl-10 pr-4' : i === 4 ? 'pl-4 pr-10 text-right' : i === 3 ? 'px-4 min-w-[9.5rem] w-[9.5rem]' : 'px-4'} py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30`}
+                      >
+                        {h}
+                      </th>
+                    ))
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/20">
@@ -307,11 +331,6 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
                             <p className={`text-sm font-semibold ${isComplete ? 'text-on-surface-variant line-through' : 'text-on-surface'}`}>
                               {task.title}
                             </p>
-                            {category === 'admin' && task.priority === 'high' && !isComplete && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wide bg-error/10 text-error">
-                                High
-                              </span>
-                            )}
                           </div>
                           {task.description && (
                             <button
@@ -326,31 +345,55 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
                             </button>
                           )}
                         </td>
-                        <td className={`px-4 ${rowPad} text-sm align-top`}>
-                          {category === 'admin' ? (
-                            '—'
-                          ) : task.transaction_id ? (
-                            <Link
-                              to={`/transactions/${task.transaction_id}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-on-surface-variant/80 hover:text-secondary hover:underline line-clamp-2 leading-snug block max-w-[10.5rem]"
-                            >
-                              {shortAddress(task.transaction_address)}
-                            </Link>
-                          ) : (
-                            <span className="text-on-surface-variant/80 line-clamp-2 leading-snug block max-w-[10.5rem]">
-                              {shortAddress(task.transaction_address) || '—'}
-                            </span>
-                          )}
-                        </td>
-                        <td className={`px-4 ${rowPad} whitespace-nowrap min-w-[9.5rem]`}>
-                          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap ${dueCellClass(task)}`}>
-                            {dueLabel}
-                            {task.is_overdue && task.status !== 'complete' && task.due_date && (
-                              <span className="text-[10px] uppercase tracking-wide text-error/90">Overdue</span>
+                        {isAdmin ? (
+                          <>
+                            {showPriorityColumn && (
+                              <td className={`px-4 ${rowPad} text-sm align-top`}>
+                                {task.priority === 'high' && !isComplete ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wide bg-error/10 text-error">
+                                    High
+                                  </span>
+                                ) : (
+                                  <span className="text-on-surface-variant/30">—</span>
+                                )}
+                              </td>
                             )}
-                          </span>
-                        </td>
+                            <td className={`pl-4 pr-4 ${rowPad} whitespace-nowrap text-right min-w-[9.5rem]`}>
+                              <span className={`inline-flex items-center justify-end gap-1.5 text-xs font-semibold whitespace-nowrap ${dueCellClass(task)}`}>
+                                {dueLabel}
+                                {task.is_overdue && task.status !== 'complete' && task.due_date && (
+                                  <span className="text-[10px] uppercase tracking-wide text-error/90">Overdue</span>
+                                )}
+                              </span>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className={`px-4 ${rowPad} text-sm align-top`}>
+                              {task.transaction_id ? (
+                                <Link
+                                  to={`/transactions/${task.transaction_id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-on-surface-variant/80 hover:text-secondary hover:underline line-clamp-2 leading-snug block max-w-[10.5rem]"
+                                >
+                                  {shortAddress(task.transaction_address)}
+                                </Link>
+                              ) : (
+                                <span className="text-on-surface-variant/80 line-clamp-2 leading-snug block max-w-[10.5rem]">
+                                  {shortAddress(task.transaction_address) || '—'}
+                                </span>
+                              )}
+                            </td>
+                            <td className={`px-4 ${rowPad} whitespace-nowrap min-w-[9.5rem]`}>
+                              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap ${dueCellClass(task)}`}>
+                                {dueLabel}
+                                {task.is_overdue && task.status !== 'complete' && task.due_date && (
+                                  <span className="text-[10px] uppercase tracking-wide text-error/90">Overdue</span>
+                                )}
+                              </span>
+                            </td>
+                          </>
+                        )}
                         <td className={`pl-4 pr-10 ${rowPad} text-right`} onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
@@ -383,7 +426,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
                       </tr>
                       {expanded && task.description && (
                         <tr className="bg-surface-container-low/20">
-                          <td colSpan={5} className="px-10 pb-4 pt-0 text-sm text-on-surface-variant whitespace-pre-wrap">
+                          <td colSpan={tableColCount} className="px-10 pb-4 pt-0 text-sm text-on-surface-variant whitespace-pre-wrap">
                             {task.description}
                           </td>
                         </tr>
