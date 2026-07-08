@@ -106,7 +106,12 @@ function portfolioTodayStr() {
 export function transactionPortfolioType(tx) {
   if (!tx) return 'Active';
   if (tx.stage === 'closed') return 'Closed';
-  if (isUnderContract(tx)) return 'Pending';
+  if (isUnderContract(tx)) {
+    if (isListingSideRepresenting(normalizeRepresenting(tx.representing))) {
+      return 'Pending listing';
+    }
+    return 'Pending';
+  }
 
   const today = portfolioTodayStr();
   const representing = normalizeRepresenting(tx.representing);

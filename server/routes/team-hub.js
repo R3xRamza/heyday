@@ -2,7 +2,7 @@ import { Router } from 'express';
 import db from '../db.js';
 import { isOverdue, isDueThisWeek } from '../lib/timing.js';
 import { celebrationsInRange, toDateStr } from '../lib/marketingCalendar.js';
-import { ACTIVE_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE, closedYtdStats, hubTransactionRows } from '../lib/transactionScopes.js';
+import { ON_MARKET_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE, closedYtdStats, hubTransactionRows } from '../lib/transactionScopes.js';
 import { closePastDueTransactions } from '../lib/transactionAutoClose.js';
 import { parseAgentScope, transactionAgentScopeClause } from '../lib/agentScope.js';
 
@@ -31,7 +31,7 @@ router.get('/stats', (req, res) => {
 
   const activeListings = db.prepare(`
     SELECT COUNT(*) as count, COALESCE(SUM(value), 0) as volume
-    FROM transactions WHERE ${ACTIVE_LISTINGS_SCOPE}${scopeSql}
+    FROM transactions WHERE ${ON_MARKET_LISTINGS_SCOPE}${scopeSql}
   `).get(...scopeParams);
 
   const comingSoonStats = db.prepare(`

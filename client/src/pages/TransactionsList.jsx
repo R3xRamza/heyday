@@ -90,7 +90,7 @@ function portfolioTypeBadgeClass(tx) {
   const type = transactionPortfolioType(tx);
   if (type === 'Coming Soon') return 'bg-lemon text-feather';
   if (type === 'Closed') return 'bg-secondary/20 text-secondary';
-  if (type === 'Pending') return 'bg-tertiary-container/50 text-feather';
+  if (type === 'Pending' || type === 'Pending listing') return 'bg-tertiary-container/50 text-feather';
   if (type === 'Active listing') return 'bg-sky text-feather';
   return 'bg-secondary-container/50 text-secondary';
 }

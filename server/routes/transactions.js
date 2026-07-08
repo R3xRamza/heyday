@@ -20,7 +20,7 @@ import {
   mergeTransactionForValidation,
 } from '../lib/transactionValidation.js';
 import { closePastDueTransactions, deriveStageFromCloseDate } from '../lib/transactionAutoClose.js';
-import { closedYtdStats, ACTIVE_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE } from '../lib/transactionScopes.js';
+import { closedYtdStats, CURRENT_LISTINGS_VIEW_SCOPE, ON_MARKET_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE } from '../lib/transactionScopes.js';
 import { parseAgentScope, transactionAgentScopeClause, assertTransactionInScope } from '../lib/agentScope.js';
 import { runBrokermintImport, fixBrokermintAgentIds } from '../lib/brokermintImport.js';
 import { parsePagination } from '../lib/pagination.js';
@@ -33,7 +33,7 @@ const PENDING_COUNT = "stage = 'pending' AND close_date IS NOT NULL";
 const VIEW_MAP = {
   active_transactions: "stage IN ('active','pending')",
   all: '1=1',
-  current_listings: ACTIVE_LISTINGS_SCOPE,
+  current_listings: CURRENT_LISTINGS_VIEW_SCOPE,
   coming_soon: PRE_LISTINGS_SCOPE,
   all_listings: PRE_LISTINGS_SCOPE,
   pending: PENDING_COUNT,
@@ -149,7 +149,7 @@ router.get('/', (req, res) => {
 
   const portfolioStats = db.prepare(`
     SELECT COUNT(*) as count, COALESCE(SUM(value), 0) as volume,
-      SUM(CASE WHEN ${ACTIVE_LISTINGS_SCOPE} THEN 1 ELSE 0 END) as listings_count,
+      SUM(CASE WHEN ${ON_MARKET_LISTINGS_SCOPE} THEN 1 ELSE 0 END) as listings_count,
       SUM(CASE WHEN ${PRE_LISTINGS_SCOPE} THEN 1 ELSE 0 END) as pre_listings_count,
       SUM(CASE WHEN ${PENDING_COUNT} THEN 1 ELSE 0 END) as pending_count
     FROM transactions WHERE ${PORTFOLIO_SCOPE}${scopeSqlBare}

@@ -5,8 +5,16 @@ export const LISTING_REPRESENTING = "representing IN ('seller','seller_and_buyer
 
 const LISTING_SIDE_OPEN = `${LISTING_REPRESENTING} AND stage != 'closed' AND acceptance_date IS NULL`;
 
-/** On-market listings: listing-side, live listing date, not marked coming soon, no accepted offer, not closed. */
-export const ACTIVE_LISTINGS_SCOPE = `${LISTING_SIDE_OPEN} AND COALESCE(listing_visibility, 'public') != 'coming_soon' AND listing_date IS NOT NULL AND listing_date <= date('now')`;
+const LISTING_DATE_LIVE = "COALESCE(listing_visibility, 'public') != 'coming_soon' AND listing_date IS NOT NULL AND listing_date <= date('now')";
+
+/** Transactions Current Listings tab — includes under-contract listings still on the listing side. */
+export const CURRENT_LISTINGS_VIEW_SCOPE = `${LISTING_SIDE_OPEN} AND ${LISTING_DATE_LIVE}`;
+
+/** Team Hub Listings panel + on-market KPI — excludes pending / under contract. */
+export const ON_MARKET_LISTINGS_SCOPE = `${CURRENT_LISTINGS_VIEW_SCOPE} AND stage != 'pending' AND close_date IS NULL`;
+
+/** @deprecated Use CURRENT_LISTINGS_VIEW_SCOPE or ON_MARKET_LISTINGS_SCOPE */
+export const ACTIVE_LISTINGS_SCOPE = CURRENT_LISTINGS_VIEW_SCOPE;
 
 /** Coming soon: visibility flag or future listing date. */
 export const PRE_LISTINGS_SCOPE = `${LISTING_SIDE_OPEN} AND (
@@ -46,7 +54,7 @@ export function hubTransactionRows(db, agentScope = 'all') {
 
   const listings = db.prepare(`
     ${TX_HUB_SELECT}
-    WHERE ${ACTIVE_LISTINGS_SCOPE}${sql}
+    WHERE ${ON_MARKET_LISTINGS_SCOPE}${sql}
     ORDER BY t.listing_date DESC, t.id ASC
     LIMIT 20
   `).all(...params);
