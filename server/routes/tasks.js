@@ -311,7 +311,7 @@ router.get('/', (req, res) => {
     total = db.prepare(countSql).get(...params).c;
   }
 
-  sql += ` ORDER BY CASE WHEN t.status = 'complete' THEN 1 ELSE 0 END, t.due_date ASC, t.id ASC`;
+  sql += ` ORDER BY CASE WHEN t.status = 'complete' THEN 1 ELSE 0 END, (t.due_date IS NULL), t.due_date ASC, t.id ASC`;
   if (wantsPagination(req.query)) {
     sql += ' LIMIT ? OFFSET ?';
     params.push(limit, offset);
@@ -453,7 +453,7 @@ router.patch('/bulk/complete-overdue', (req, res) => {
     detail: overdue.map((t) => t.title).join('\n'),
   });
 
-  const tasks = db.prepare(`${TASK_SELECT} WHERE t.transaction_id = ? ORDER BY t.due_date ASC, t.id ASC`)
+  const tasks = db.prepare(`${TASK_SELECT} WHERE t.transaction_id = ? ORDER BY (t.due_date IS NULL), t.due_date ASC, t.id ASC`)
     .all(transactionId)
     .map(enrich);
 

@@ -181,8 +181,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
 
   const displayedTasks = useMemo(() => {
     let list = data.tasks;
-    if (viewMode === 'list') return list;
-    if (!showUndated) list = list.filter((t) => t.due_date);
+    if (viewMode !== 'list' && !showUndated) list = list.filter((t) => t.due_date);
     return sortMyTasks(list, { admin: category === 'admin' });
   }, [data.tasks, showUndated, category, viewMode]);
 
@@ -216,33 +215,34 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
     <DashboardLayout
       title={member ? `${member.name}'s Task Hub` : 'Task Hub'}
       fillViewport
-      className="p-0 overflow-hidden flex flex-col"
+      className="p-0 overflow-hidden"
     >
-      <div className={`bg-surface ${APP_HEADER_BORDER_CLASS} shrink-0`}>
-        <TaskHubPersonHeader
-          userId={userId}
-          title={category === 'admin' ? 'Admin Task Dashboard' : 'Daily Task Dashboard'}
-          member={member}
-          profile={profile}
-          showBorder={false}
-        >
-          <div className="flex items-center gap-2 flex-wrap pb-4">
-            {FILTERS.map((f) => (
-              <button
-                key={f.key}
-                type="button"
-                onClick={() => selectFilter(f.key)}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide transition-colors ${filterPillClass(f.key)}`}
-              >
-                {filterLabel(f.key, f.label)}
-              </button>
-            ))}
-          </div>
-        </TaskHubPersonHeader>
-      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+        <div className={`bg-surface ${APP_HEADER_BORDER_CLASS} shrink-0`}>
+          <TaskHubPersonHeader
+            userId={userId}
+            title={category === 'admin' ? 'Admin Task Dashboard' : 'Daily Task Dashboard'}
+            member={member}
+            profile={profile}
+            showBorder={false}
+          >
+            <div className="flex items-center gap-2 flex-wrap pb-4">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => selectFilter(f.key)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide transition-colors ${filterPillClass(f.key)}`}
+                >
+                  {filterLabel(f.key, f.label)}
+                </button>
+              ))}
+            </div>
+          </TaskHubPersonHeader>
+        </div>
 
-      <div className="flex-1 flex overflow-hidden min-h-0">
-        <section className="flex-1 overflow-y-auto custom-scrollbar bg-surface-container-lowest">
+        <div className="sticky top-0 z-10 h-[calc(100vh-4.25rem)] overflow-hidden flex flex-col lg:flex-row border-t border-sky bg-surface-container-lowest">
+          <section className="flex-1 min-h-0 overflow-y-auto custom-scrollbar bg-surface-container-lowest">
           {viewMode === 'calendar' ? (
             loading ? (
               <p className="p-10 text-on-surface-variant">Loading tasks…</p>
@@ -446,8 +446,8 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
           )}
         </section>
 
-        <aside className="w-80 bg-surface border-l border-outline-variant/20 p-8 flex flex-col gap-10 shrink-0 overflow-y-auto custom-scrollbar">
-          <section>
+        <aside className="w-80 bg-surface border-l border-outline-variant/20 p-8 flex flex-col shrink-0 h-full">
+          <section className="shrink-0">
             <button
               type="button"
               onClick={() => setShowCreate(true)}
@@ -481,7 +481,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
             </div>
           </section>
 
-          <section>
+          <section className="mt-10 overflow-y-auto custom-scrollbar min-h-0 pr-1">
             <h3 className="text-[11px] text-on-surface-variant/60 uppercase tracking-widest mb-4 font-semibold">Preferences</h3>
             <div className="space-y-4">
               <label className="flex items-center justify-between cursor-pointer">
@@ -524,6 +524,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
             </div>
           </section>
         </aside>
+        </div>
       </div>
 
       {editTask && (

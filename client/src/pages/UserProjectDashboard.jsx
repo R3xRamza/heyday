@@ -179,83 +179,87 @@ export default function UserProjectDashboard() {
     <DashboardLayout
       title={member ? `${member.name}'s Task Hub` : 'Task Hub'}
       fillViewport
-      className="p-0 overflow-hidden flex flex-col"
+      className="p-0 overflow-hidden"
     >
-      <TaskHubPersonHeader
-        userId={userId}
-        title="Project Dashboard"
-        member={member}
-        profile={profile}
-      />
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+        <TaskHubPersonHeader
+          userId={userId}
+          title="Project Dashboard"
+          member={member}
+          profile={profile}
+        />
 
-      {loading ? (
-        <p className="p-6 text-sm text-on-surface-variant">Loading…</p>
-      ) : (
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[380px_1fr_1fr] grid-rows-[auto_auto_1fr] gap-x-4 gap-y-0 px-6 lg:px-8 lg:pl-10 pt-2 pb-4 overflow-hidden">
-          {/* Row 1: add buttons */}
-          <div className="pr-4 lg:border-r border-outline-variant/15">
-            {showAddProject ? (
-              <AddProjectForm onSave={handleCreateProject} onCancel={() => setShowAddProject(false)} />
-            ) : (
-              <AddProjectButton onClick={() => setShowAddProject(true)} readOnly={!canWrite} />
-            )}
-          </div>
-          <div className="px-2">
-            <AddTaskRow onAdd={handleAddItem} readOnly={!canWrite} />
-          </div>
-          <div className="px-2">
-            <AddTaskSpacer />
-          </div>
+        <div className={`sticky top-0 z-10 h-[calc(100vh-4.25rem)] overflow-hidden border-t border-sky bg-surface-container-lowest`}>
+          {loading ? (
+            <p className="p-6 text-sm text-on-surface-variant">Loading…</p>
+          ) : (
+            <div className="h-full grid grid-cols-1 lg:grid-cols-[380px_1fr_1fr] grid-rows-[auto_auto_1fr] gap-x-4 gap-y-0 px-6 lg:px-8 lg:pl-10 pt-2 pb-4 overflow-hidden">
+              {/* Row 1: add buttons */}
+              <div className="pr-4 lg:border-r border-outline-variant/15">
+                {showAddProject ? (
+                  <AddProjectForm onSave={handleCreateProject} onCancel={() => setShowAddProject(false)} />
+                ) : (
+                  <AddProjectButton onClick={() => setShowAddProject(true)} readOnly={!canWrite} />
+                )}
+              </div>
+              <div className="px-2">
+                <AddTaskRow onAdd={handleAddItem} readOnly={!canWrite} />
+              </div>
+              <div className="px-2">
+                <AddTaskSpacer />
+              </div>
 
-          {/* Row 2: aligned headers */}
-          <div className="pr-4 lg:border-r border-outline-variant/15">
-            <ColumnHeader label="Projects" count={projects.length} badgeClass="bg-sky/30 text-feather" />
-          </div>
-          <div className="px-2">
-            <ColumnHeader label="In Progress" count={pending.length} badgeClass="bg-lemon text-feather" />
-          </div>
-          <div className="px-2">
-            <ColumnHeader
-              label="Done"
-              count={done.length}
-              badgeClass="bg-primary text-white"
-              trailing={doneMeta}
-            />
-          </div>
+              {/* Row 2: aligned headers */}
+              <div className="pr-4 lg:border-r border-outline-variant/15">
+                <ColumnHeader label="Projects" count={projects.length} badgeClass="bg-sky/30 text-feather" />
+              </div>
+              <div className="px-2">
+                <ColumnHeader label="In Progress" count={pending.length} badgeClass="bg-lemon text-feather" />
+              </div>
+              <div className="px-2">
+                <ColumnHeader
+                  label="Done"
+                  count={done.length}
+                  badgeClass="bg-primary text-white"
+                  trailing={doneMeta}
+                />
+              </div>
 
-          {/* Row 3: scrollable content */}
-          <div className="min-h-0 overflow-y-auto custom-scrollbar pr-4 lg:border-r border-outline-variant/15">
-            <ProjectListPanel
-              embedded
-              projects={projects}
-              onCreate={handleCreateProject}
-              onUpdate={handleUpdateProject}
-              onDelete={handleDeleteProject}
-              readOnly={!canWrite}
-            />
-          </div>
-          <div className="min-h-0 overflow-y-auto custom-scrollbar px-2 space-y-3">
-            <TodoColumnList
-              items={pending}
-              emptyMessage={canWrite ? 'No tasks in progress.' : 'No pending tasks.'}
-              onToggle={handleToggleItem}
-              onUpdate={handleUpdateItem}
-              onDelete={handleDeleteItem}
-              readOnly={!canWrite}
-            />
-          </div>
-          <div className="min-h-0 overflow-y-auto custom-scrollbar px-2 space-y-3 rounded-xl bg-sky/15">
-            <TodoColumnList
-              items={done}
-              emptyMessage="No completed tasks yet."
-              onToggle={handleToggleItem}
-              onUpdate={handleUpdateItem}
-              onDelete={handleDeleteItem}
-              readOnly={!canWrite}
-            />
-          </div>
+              {/* Row 3: scrollable content */}
+              <div className="min-h-0 overflow-y-auto custom-scrollbar pr-4 lg:border-r border-outline-variant/15">
+                <ProjectListPanel
+                  embedded
+                  projects={projects}
+                  onCreate={handleCreateProject}
+                  onUpdate={handleUpdateProject}
+                  onDelete={handleDeleteProject}
+                  readOnly={!canWrite}
+                />
+              </div>
+              <div className="min-h-0 overflow-y-auto custom-scrollbar px-2 space-y-3">
+                <TodoColumnList
+                  items={pending}
+                  emptyMessage={canWrite ? 'No tasks in progress.' : 'No pending tasks.'}
+                  onToggle={handleToggleItem}
+                  onUpdate={handleUpdateItem}
+                  onDelete={handleDeleteItem}
+                  readOnly={!canWrite}
+                />
+              </div>
+              <div className="min-h-0 overflow-y-auto custom-scrollbar px-2 space-y-3 rounded-xl bg-sky/15">
+                <TodoColumnList
+                  items={done}
+                  emptyMessage="No completed tasks yet."
+                  onToggle={handleToggleItem}
+                  onUpdate={handleUpdateItem}
+                  onDelete={handleDeleteItem}
+                  readOnly={!canWrite}
+                />
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </DashboardLayout>
   );
 }
