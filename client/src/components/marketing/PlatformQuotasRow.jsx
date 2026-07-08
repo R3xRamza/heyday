@@ -25,7 +25,6 @@ const SHORT_LABELS = {
   Podcast: 'Pod',
   'IG Grid': 'Grid',
   'IG Story': 'Story',
-  Blog: 'Blog',
   'Pop By': 'Pop By',
   Newsletters: 'News',
 };
