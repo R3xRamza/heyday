@@ -8,6 +8,7 @@
     "build": "npm run build --prefix client",
     "start": "NODE_ENV=production node server/index.js",
     "import-crm": "node server/scripts/import-fub-contacts.js",
+    "sync-crm-fub": "node server/scripts/sync-fub-contacts-api.js",
     "import-brokermint": "node server/scripts/import-brokermint-transactions.js",
     "fix-brokermint-agents": "node server/scripts/fix-brokermint-agent-ids.js",
     "post-brokermint-import": "node server/scripts/post-brokermint-import.js",

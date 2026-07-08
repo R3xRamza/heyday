@@ -56,6 +56,7 @@ npm run dev
 | `npm run build` | Production client build |
 | `npm start` | Production server (serves `client/dist`) |
 | `npm run import-crm` | Import FUB contacts |
+| `npm run sync-crm-fub` | API sync: FUB → HUB contacts (Meredith only, overwrite) |
 | `npm run seed-sample-transactions` | Sample transactions |
 | `npm run clear-transactions` | Clear transactions |
 
@@ -74,12 +75,42 @@ Config in `railway.toml`:
 | `JWT_SECRET` | long random string |
 | `CLIENT_URL` | `https://hub.theheydaygroup.com` |
 | `DATABASE_PATH` | `/data/heyday.db` (with Volume mounted at `/data`) |
+| `FUB_API_KEY` | Follow Up Boss API key (keep secret) |
+| `FUB_ASSIGNED_USER_ID` | optional numeric override for Meredith's FUB user id |
 
 Optional Gmail: see `server/README-gmail.md`.
 
 ### Data persistence
 
 SQLite defaults to `heyday.db` in the project root locally. On Railway, attach a **Volume** at `/data` and set `DATABASE_PATH=/data/heyday.db` so data survives redeploys.
+
+## Daily FUB CRM sync (contacts only)
+
+- Direction: **Follow Up Boss -> HEYDAY only** (read-only GET calls to FUB; no writes back).
+- Scope: contacts assigned to **Meredith Alderson** and active contacts only (`Trash` excluded).
+- Behavior: full overwrite each run (contacts table replaced after successful fetch).
+- Command: `npm run sync-crm-fub`
+
+### Safety checks
+
+- Script fetches all pages first, then writes to DB in one transaction.
+- Sync aborts without writing if fetched count is 0 or under 5000 (`--force` bypass available for manual recovery).
+- Expected count is around 9,092 contacts and logs warning if outside 8,500-9,500.
+
+### Railway schedule (2:00 AM America/Chicago)
+
+Use a dedicated Railway Cron service with command:
+
+```bash
+npm run sync-crm-fub
+```
+
+Use one of these UTC cron expressions:
+
+- `0 7 * * *` during CDT (UTC-5, roughly Mar-Nov)
+- `0 8 * * *` during CST (UTC-6, roughly Nov-Mar)
+
+If your cron runner supports timezone-aware schedules, set timezone to `America/Chicago` and schedule 2:00 AM daily.
 
 ## Changelog — 2026-06-18
 
