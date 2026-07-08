@@ -9,6 +9,7 @@ import { getTeamProfile } from '../data/teamProfiles';
 import TaskCalendarView from '../components/TaskCalendarView';
 import DateText from '../components/shared/DateText';
 import TaskHubPersonHeader from '../components/TaskHubPersonHeader';
+import { APP_HEADER_BORDER_CLASS } from '../constants/appHeader';
 import { shortAddress } from '../utils/format';
 
 const FILTERS = [
