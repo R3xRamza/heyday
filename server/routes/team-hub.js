@@ -17,10 +17,6 @@ const TEAM_ORDER_SQL = `
   END, name
 `;
 
-function isAdmin(user) {
-  return user?.role === 'admin';
-}
-
 router.get('/stats', (_req, res) => {
   closePastDueTransactions(db);
   const closedYtd = closedYtdStats(db);
@@ -165,9 +161,6 @@ router.post('/messages', (req, res) => {
 router.delete('/messages/:id', (req, res) => {
   const message = db.prepare('SELECT * FROM team_messages WHERE id = ?').get(req.params.id);
   if (!message) return res.status(404).json({ error: 'Not found' });
-  if (message.user_id !== req.user.id && !isAdmin(req.user)) {
-    return res.status(403).json({ error: 'Not allowed' });
-  }
   db.prepare('DELETE FROM team_messages WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
 });
@@ -178,7 +171,6 @@ router.get('/links', (_req, res) => {
 });
 
 router.post('/links', (req, res) => {
-  if (!isAdmin(req.user)) return res.status(403).json({ error: 'Admin only' });
   const label = req.body.label?.trim();
   let url = req.body.url?.trim();
   if (!label || !url) return res.status(400).json({ error: 'label and url are required' });
@@ -191,7 +183,6 @@ router.post('/links', (req, res) => {
 });
 
 router.delete('/links/:id', (req, res) => {
-  if (!isAdmin(req.user)) return res.status(403).json({ error: 'Admin only' });
   const link = db.prepare('SELECT id FROM team_links WHERE id = ?').get(req.params.id);
   if (!link) return res.status(404).json({ error: 'Not found' });
   db.prepare('DELETE FROM team_links WHERE id = ?').run(req.params.id);

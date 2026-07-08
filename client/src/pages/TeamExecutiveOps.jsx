@@ -5,7 +5,6 @@ import Icon from '../components/shared/Icon';
 import TeamAvatar from '../components/TeamAvatar';
 import DateText from '../components/shared/DateText';
 import { getTeamProfile } from '../data/teamProfiles';
-import { useAuth } from '../context/AuthContext';
 import { formatCurrency, shortAddress } from '../utils/format';
 import ClosingSoonPanel from '../components/tasks/ClosingSoonPanel';
 
@@ -279,9 +278,6 @@ function TaskStatRow({ label, activeCount, overdueCount }) {
 
 export default function TeamExecutiveOps() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
-
   const [stats, setStats] = useState(null);
   const [celebrations, setCelebrations] = useState([]);
   const [teamTasks, setTeamTasks] = useState([]);
@@ -525,15 +521,13 @@ export default function TeamExecutiveOps() {
                       </div>
                       <p className="text-xs text-on-surface mt-0.5 whitespace-pre-wrap line-clamp-3">{m.body}</p>
                     </div>
-                    {(m.user_id === user?.id || isAdmin) && (
-                      <button
-                        type="button"
-                        onClick={() => deleteMessage(m.id)}
-                        className="text-on-surface-variant/30 hover:text-error opacity-0 group-hover:opacity-100 self-start"
-                      >
-                        <Icon name="close" className="!text-[16px]" />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => deleteMessage(m.id)}
+                      className="text-on-surface-variant/30 hover:text-error opacity-0 group-hover:opacity-100 self-start"
+                    >
+                      <Icon name="close" className="!text-[16px]" />
+                    </button>
                   </div>
                 ))
               )}
@@ -546,7 +540,7 @@ export default function TeamExecutiveOps() {
               <h3 className="text-sm font-bold text-white">Quick Links</h3>
             </div>
             <div className="p-3">
-              {links.length === 0 && !isAdmin && (
+              {links.length === 0 && (
                 <p className="text-xs text-on-surface-variant py-2 text-center">No links yet.</p>
               )}
               <div className="space-y-1.5">
@@ -561,20 +555,17 @@ export default function TeamExecutiveOps() {
                       <span className="truncate">{l.label}</span>
                       <Icon name="open_in_new" className="!text-[14px] shrink-0 opacity-50" />
                     </a>
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => removeLink(l.id)}
-                        className="p-1.5 text-on-surface-variant/30 hover:text-error opacity-0 group-hover:opacity-100"
-                      >
-                        <Icon name="close" className="!text-[14px]" />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeLink(l.id)}
+                      className="p-1.5 text-on-surface-variant/30 hover:text-error opacity-0 group-hover:opacity-100"
+                    >
+                      <Icon name="close" className="!text-[14px]" />
+                    </button>
                   </div>
                 ))}
               </div>
-              {isAdmin && (
-                showAddLink ? (
+              {showAddLink ? (
                   <form onSubmit={addLink} className="mt-2 p-2.5 rounded-lg bg-surface-container-low/50 space-y-2">
                     <input
                       value={linkForm.label}
@@ -606,7 +597,7 @@ export default function TeamExecutiveOps() {
                     + Add link
                   </button>
                 )
-              )}
+              }
             </div>
           </section>
         </div>
