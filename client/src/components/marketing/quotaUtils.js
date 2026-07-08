@@ -115,23 +115,20 @@ export function findGoalForPlatform(goals, platformKey, aliases) {
 }
 
 /** Aggregate weekly quota progress for the Marketing Status card. */
-export function computeMarketingStatus(summaryItems, refDate = new Date()) {
+export function computeMarketingStatus(summaryItems) {
   const items = (summaryItems || []).filter((item) => item.target > 0);
   if (!items.length) {
-    return { percent: 0, label: 'On-Schedule', attention: false, goalMet: false };
+    return { percent: 0, label: 'On-Schedule', goalMet: false };
   }
 
   const totalCount = items.reduce((sum, item) => sum + item.count, 0);
   const totalTarget = items.reduce((sum, item) => sum + item.target, 0);
   const percent = totalTarget ? Math.min(100, Math.round((totalCount / totalTarget) * 100)) : 0;
-
-  const weekday = refDate.getDay();
-  const attention = items.some((item) => item.count === 0 && weekday >= 3);
   const goalMet = items.every((item) => item.count >= item.target);
 
-  let label = 'On-Schedule';
-  if (goalMet) label = 'Goal Met';
-  else if (attention) label = 'Attention Required';
-
-  return { percent, label, attention, goalMet };
+  return {
+    percent,
+    label: goalMet ? 'Goal Met' : 'On-Schedule',
+    goalMet,
+  };
 }

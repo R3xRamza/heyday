@@ -266,11 +266,9 @@ export default function PlatformQuotasRow({ quotaPosts, goals, onSaveGoal }) {
         {collapsed && (
           <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-              marketingStatus.attention
-                ? 'bg-error/10 text-error'
-                : marketingStatus.goalMet
-                  ? 'bg-secondary/10 text-secondary'
-                  : 'bg-feather/10 text-feather'
+              marketingStatus.goalMet
+                ? 'bg-secondary/10 text-secondary'
+                : 'bg-feather/10 text-feather'
             }`}
             >
               Marketing {marketingStatus.percent}%
@@ -293,31 +291,20 @@ export default function PlatformQuotasRow({ quotaPosts, goals, onSaveGoal }) {
             <p className="text-xs font-semibold text-on-surface-variant">Marketing Status</p>
             <div className="flex items-end justify-between gap-2 mt-1">
               <p className={`text-xl font-bold ${
-                marketingStatus.attention
-                  ? 'text-error'
-                  : marketingStatus.goalMet
-                    ? 'text-secondary'
-                    : 'text-feather'
+                marketingStatus.goalMet ? 'text-secondary' : 'text-feather'
               }`}
               >
                 {marketingStatus.percent}%
               </p>
               <Icon
-                name={marketingStatus.attention ? 'warning' : marketingStatus.goalMet ? 'check_circle' : 'schedule'}
+                name={marketingStatus.goalMet ? 'check_circle' : 'schedule'}
                 className={`!text-[28px] shrink-0 ${
-                  marketingStatus.attention
-                    ? 'text-error/70'
-                    : marketingStatus.goalMet
-                      ? 'text-secondary/70'
-                      : 'text-feather/30'
+                  marketingStatus.goalMet ? 'text-secondary/70' : 'text-feather/30'
                 }`}
                 filled={marketingStatus.goalMet}
               />
             </div>
-            <p className={`text-[10px] mt-0.5 ${
-              marketingStatus.attention ? 'text-error font-semibold' : 'text-on-surface-variant'
-            }`}
-            >
+            <p className="text-[10px] mt-0.5 text-on-surface-variant">
               {marketingStatus.label}
             </p>
           </div>
