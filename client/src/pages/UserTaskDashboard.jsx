@@ -211,7 +211,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
       fillViewport
       className="p-0 overflow-hidden flex flex-col"
     >
-      <div className="bg-surface border-b border-outline-variant/20 shrink-0">
+      <div className={`bg-surface ${APP_HEADER_BORDER_CLASS} shrink-0`}>
         <TaskHubPersonHeader
           userId={userId}
           title={category === 'admin' ? 'Admin Task Dashboard' : 'Daily Task Dashboard'}

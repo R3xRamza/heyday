@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom';
 import TaskHubTabs from './TaskHubTabs';
 import TeamAvatar from './TeamAvatar';
+import { APP_HEADER_BORDER_CLASS } from '../constants/appHeader';
 
 export default function TaskHubPersonHeader({ userId, title, member, profile, children, showBorder = true }) {
   return (
     <section
       className={`relative bg-surface px-10 py-6 shrink-0${
-        showBorder ? ' border-b border-outline-variant/20' : ''
+        showBorder ? ` ${APP_HEADER_BORDER_CLASS}` : ''
       }`}
     >
       <div className="absolute right-10 top-6 z-10">

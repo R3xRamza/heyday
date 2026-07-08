@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSidebar } from '../context/SidebarContext';
 import TeamAvatar from './TeamAvatar';
 import heydayLogo from '../assets/heyday-logo.png';
+import { APP_HEADER_BORDER_CLASS, APP_HEADER_HEIGHT_CLASS } from '../constants/appHeader';
 
 const NAV_ITEMS = [
   { to: '/team-ops', label: 'Team Hub', icon: Users },
@@ -80,31 +81,11 @@ export default function Sidebar() {
       style={{ width: sidebarWidth }}
     >
       <div
-        className={`flex items-center border-b border-feather-alt/30 shrink-0 ${
-          collapsed ? 'justify-center px-2 py-4' : 'justify-between gap-2 px-4 py-4'
+        className={`flex items-center ${APP_HEADER_BORDER_CLASS} shrink-0 ${APP_HEADER_HEIGHT_CLASS} ${
+          collapsed ? 'justify-center px-2' : 'justify-between gap-2 px-4'
         }`}
       >
-        <img
-          src={heydayLogo}
-          alt="HEYDAY"
-          className={`h-auto object-contain shrink-0 ${
-            collapsed ? 'w-10' : 'w-full max-w-[160px]'
-          }`}
-        />
-        {!collapsed && (
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            aria-label="Collapse sidebar"
-            className="p-1.5 rounded-md text-sky hover:text-lemon hover:bg-feather-alt/30 transition-colors shrink-0"
-          >
-            <PanelLeftClose size={18} />
-          </button>
-        )}
-      </div>
-
-      {collapsed && (
-        <div className="flex justify-center py-2 border-b border-feather-alt/20">
+        {collapsed ? (
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -113,8 +94,24 @@ export default function Sidebar() {
           >
             <PanelLeftOpen size={18} />
           </button>
-        </div>
-      )}
+        ) : (
+          <>
+            <img
+              src={heydayLogo}
+              alt="HEYDAY"
+              className="h-auto object-contain shrink-0 w-full max-w-[160px]"
+            />
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label="Collapse sidebar"
+              className="p-1.5 rounded-md text-sky hover:text-lemon hover:bg-feather-alt/30 transition-colors shrink-0"
+            >
+              <PanelLeftClose size={18} />
+            </button>
+          </>
+        )}
+      </div>
 
       <nav className="flex-1 py-2 overflow-y-auto custom-scrollbar">
         {NAV_ITEMS.map(({ to, label, icon: Icon, taskHub }) => (
