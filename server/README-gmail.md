@@ -19,7 +19,7 @@ Configured via `GMAIL_SYNC_MAILBOXES` (comma-separated):
    - Application type: **Web application**
    - Authorized redirect URIs:
      - `http://localhost:3001/api/gmail/callback`
-     - `https://heyday-production-ce72.up.railway.app/api/gmail/callback` (production)
+     - `https://hub.theheydaygroup.com/api/gmail/callback` (production)
 5. **OAuth consent screen**
    - For Workspace: set to **Internal** if all users are on your Google Workspace domain.
    - Add scopes: Gmail read-only, email, profile, openid.

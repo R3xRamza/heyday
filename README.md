@@ -4,7 +4,7 @@ Real estate operations platform — Express/SQLite API + React/Vite SPA.
 
 ## Status (updated 2026-06-18)
 
-**Production:** Live on [Railway](https://railway.app) at `https://heyday-production-ce72.up.railway.app`  
+**Production:** Live at [https://hub.theheydaygroup.com](https://hub.theheydaygroup.com) (hosted on [Railway](https://railway.app))  
 **Source:** [github.com/R3xRamza/heyday](https://github.com/R3xRamza/heyday) (`main` synced)  
 **Stage:** Team is starting real use. Persistent DB via Railway Volume + `DATABASE_PATH`.
 
@@ -72,7 +72,7 @@ Config in `railway.toml`:
 |----------|---------|
 | `NODE_ENV` | `production` |
 | `JWT_SECRET` | long random string |
-| `CLIENT_URL` | `https://heyday-production-ce72.up.railway.app` |
+| `CLIENT_URL` | `https://hub.theheydaygroup.com` |
 | `DATABASE_PATH` | `/data/heyday.db` (with Volume mounted at `/data`) |
 
 Optional Gmail: see `server/README-gmail.md`.

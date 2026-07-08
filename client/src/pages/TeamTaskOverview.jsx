@@ -25,7 +25,7 @@ function TeamMemberCardSkeleton() {
         <div className="h-1.5 w-full bg-surface-container-low rounded-full" />
       </div>
       <div className="flex gap-1.5">
-        {[0, 1, 2].map((i) => (
+        {[0, 1].map((i) => (
           <div key={i} className="flex-1 h-12 rounded-md bg-surface-container-low" />
         ))}
       </div>
@@ -39,7 +39,8 @@ function TeamMemberCardSkeleton() {
 
 function TeamMemberTaskCard({ member, profile, onOpenTasks }) {
   const { stats } = member;
-  const hasTasks = stats.total > 0;
+  const hasWeekTasks = stats.thisWeekTotal > 0;
+  const hasAnyTasks = hasWeekTasks || stats.overdue > 0;
 
   return (
     <button
@@ -68,10 +69,10 @@ function TeamMemberTaskCard({ member, profile, onOpenTasks }) {
         <div className="flex justify-between items-baseline text-[10px] mb-1">
           <span className="text-on-surface-variant font-bold uppercase tracking-wide">Progress</span>
           <span className="text-secondary font-black tabular-nums">
-            {hasTasks ? `${stats.complete}/${stats.total}` : '—'}
+            {hasWeekTasks ? `${stats.thisWeekComplete}/${stats.thisWeekTotal}` : '—'}
           </span>
         </div>
-        {hasTasks ? (
+        {hasWeekTasks ? (
           <div className="w-full bg-surface-container-low h-1.5 rounded-full overflow-hidden">
             <div
               className="bg-secondary h-full rounded-full transition-all"
@@ -79,18 +80,14 @@ function TeamMemberTaskCard({ member, profile, onOpenTasks }) {
             />
           </div>
         ) : (
-          <p className="text-[10px] text-on-surface-variant">No tasks</p>
+          <p className="text-[10px] text-on-surface-variant">{hasAnyTasks ? 'No tasks this week' : 'No tasks'}</p>
         )}
       </div>
 
       <div className="flex gap-1.5">
-        <div className="flex-1 rounded-md bg-surface-container-low px-2 py-1.5 text-center">
-          <div className="text-lg font-black text-primary leading-none tabular-nums">{stats.pending}</div>
-          <div className="text-[8px] uppercase font-bold text-on-surface-variant mt-0.5">Pending</div>
-        </div>
         <div className="flex-1 rounded-md bg-secondary/10 px-2 py-1.5 text-center">
-          <div className="text-lg font-black text-secondary leading-none tabular-nums">{stats.active}</div>
-          <div className="text-[8px] uppercase font-bold text-on-surface-variant mt-0.5">Active</div>
+          <div className="text-lg font-black text-secondary leading-none tabular-nums">{stats.thisWeek}</div>
+          <div className="text-[8px] uppercase font-bold text-on-surface-variant mt-0.5">This Week</div>
         </div>
         <div
           className={`flex-1 rounded-md px-2 py-1.5 text-center ${
