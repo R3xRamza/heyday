@@ -418,6 +418,48 @@ router.patch('/bulk/assign', (req, res) => {
   res.json({ ok: true });
 });
 
+router.patch('/bulk/complete-overdue', (req, res) => {
+  const transactionId = Number(req.body.transaction_id);
+  if (!transactionId) return res.status(400).json({ error: 'transaction_id is required' });
+
+  const today = todayStr();
+  const overdue = db.prepare(`
+    SELECT id, title FROM tasks
+    WHERE transaction_id = ?
+      AND status != 'complete'
+      AND due_date IS NOT NULL
+      AND due_date < ?
+  `).all(transactionId, today);
+
+  if (!overdue.length) {
+    return res.json({ completed: 0, tasks: [] });
+  }
+
+  const completedAt = new Date().toISOString();
+  const update = db.prepare("UPDATE tasks SET status = 'complete', completed_at = ? WHERE id = ?");
+
+  db.transaction(() => {
+    for (const task of overdue) {
+      update.run(completedAt, task.id);
+    }
+  })();
+
+  const actor = actorLabel(req.user);
+  logActivity({
+    transactionId,
+    userId: req.user.id,
+    eventType: 'task_updated',
+    summary: `${actor} marked ${overdue.length} overdue task${overdue.length === 1 ? '' : 's'} complete`,
+    detail: overdue.map((t) => t.title).join('\n'),
+  });
+
+  const tasks = db.prepare(`${TASK_SELECT} WHERE t.transaction_id = ? ORDER BY t.due_date ASC, t.id ASC`)
+    .all(transactionId)
+    .map(enrich);
+
+  res.json({ completed: overdue.length, tasks });
+});
+
 router.patch('/:id', (req, res) => {
   const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id);
   if (!task) return res.status(404).json({ error: 'Not found' });

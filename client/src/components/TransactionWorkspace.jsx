@@ -139,6 +139,7 @@ export default function TransactionWorkspace({
   onDeleteTransaction,
   onRemoveChecklist,
   onApplyChecklists,
+  onCompleteOverdueTasks,
 }) {
   const [view, setView] = useState('details');
   const [activeChecklistId, setActiveChecklistId] = useState(null);
@@ -154,6 +155,7 @@ export default function TransactionWorkspace({
   const [comment, setComment] = useState('');
   const [savingTx, setSavingTx] = useState(false);
   const [savedMsg, setSavedMsg] = useState('');
+  const [completingOverdue, setCompletingOverdue] = useState(false);
 
   useEffect(() => {
     const representing = normalizeRepresenting(transaction.representing);
@@ -337,6 +339,25 @@ export default function TransactionWorkspace({
     onRefreshActivities();
   }
 
+  async function handleCompleteOverdueTasks() {
+    if (!overdueTasks.length || !onCompleteOverdueTasks) return;
+    const n = overdueTasks.length;
+    if (!window.confirm(`Mark ${n} overdue task${n === 1 ? '' : 's'} as complete?`)) return;
+
+    setCompletingOverdue(true);
+    try {
+      const ok = await onCompleteOverdueTasks();
+      if (ok) {
+        if (selectedTask && overdueTasks.some((t) => t.id === selectedTask.id)) {
+          setSelectedTask((prev) => (prev ? { ...prev, status: 'complete' } : prev));
+        }
+        onRefreshActivities?.();
+      }
+    } finally {
+      setCompletingOverdue(false);
+    }
+  }
+
   const doneCount = checklistTasks.filter((t) => t.status === 'complete').length;
   const progressPct = checklistTasks.length ? Math.round((doneCount / checklistTasks.length) * 100) : 0;
   const { street, cityLine } = parseTransactionAddress({
@@ -346,6 +367,7 @@ export default function TransactionWorkspace({
     zip: form.zip,
   });
   const openTasks = tasks.filter((t) => t.status !== 'complete').length;
+  const overdueTasks = tasks.filter((t) => t.is_overdue && t.status !== 'complete');
   const timelineDates = getTimelineSteps(form.representing);
   const timelineKeySet = new Set(getTimelineDateKeys(form.representing));
   const visibleExtraFields = EXTRA_FIELDS.filter((f) => {
@@ -797,6 +819,24 @@ export default function TransactionWorkspace({
                       Post comment
                     </button>
                   </form>
+
+                  {onCompleteOverdueTasks && overdueTasks.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-outline-variant/15">
+                      <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3">
+                        Overdue tasks
+                      </p>
+                      <button
+                        type="button"
+                        disabled={completingOverdue}
+                        onClick={handleCompleteOverdueTasks}
+                        className="w-full py-2.5 text-xs font-bold text-secondary border border-secondary/30 rounded-lg hover:bg-secondary/5 transition-colors disabled:opacity-50"
+                      >
+                        {completingOverdue
+                          ? 'Completing…'
+                          : `Complete ${overdueTasks.length} overdue task${overdueTasks.length === 1 ? '' : 's'}`}
+                      </button>
+                    </div>
+                  )}
 
                   {onDeleteTransaction && (
                     <div className="mt-6 pt-6 border-t border-error/20">
