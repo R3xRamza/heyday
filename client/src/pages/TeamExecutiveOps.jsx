@@ -7,6 +7,9 @@ import DateText from '../components/shared/DateText';
 import { getTeamProfile } from '../data/teamProfiles';
 import { formatCurrency, shortAddress } from '../utils/format';
 import ClosingSoonPanel from '../components/tasks/ClosingSoonPanel';
+import AgentScopeToggle from '../components/AgentScopeToggle';
+import { useAgentScope } from '../context/AgentScopeContext';
+import { appendAgentScope } from '../utils/agentScope';
 
 const STAT_CARDS = [
   {
@@ -278,6 +281,7 @@ function TaskStatRow({ label, activeCount, overdueCount }) {
 
 export default function TeamExecutiveOps() {
   const navigate = useNavigate();
+  const { scope } = useAgentScope();
   const [stats, setStats] = useState(null);
   const [celebrations, setCelebrations] = useState([]);
   const [teamTasks, setTeamTasks] = useState([]);
@@ -307,28 +311,31 @@ export default function TeamExecutiveOps() {
   );
 
   useEffect(() => {
-    fetch('/api/team-hub/stats', { credentials: 'include' })
+    setLoadingStats(true);
+    setLoadingClosings(true);
+    setLoadingExpirations(true);
+    fetch(appendAgentScope('/api/team-hub/stats', scope), { credentials: 'include' })
       .then((r) => r.json())
       .then(setStats)
       .finally(() => setLoadingStats(false));
     fetch('/api/team-hub/celebrations?window=hub', { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setCelebrations(json.events || []));
-    fetch('/api/team-hub/team-tasks', { credentials: 'include' })
+    fetch(appendAgentScope('/api/team-hub/team-tasks', scope), { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setTeamTasks(json.members || []));
     fetch('/api/team-hub/links', { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setLinks(json.links || []));
-    fetch('/api/tasks/milestones', { credentials: 'include' })
+    fetch(appendAgentScope('/api/tasks/milestones', scope), { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setClosings(json.milestones || []))
       .finally(() => setLoadingClosings(false));
-    fetch('/api/tasks/expirations', { credentials: 'include' })
+    fetch(appendAgentScope('/api/tasks/expirations', scope), { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setExpirations(json.milestones || []))
       .finally(() => setLoadingExpirations(false));
-  }, []);
+  }, [scope]);
 
   const fetchMessages = useCallback(() => {
     fetch('/api/team-hub/messages', { credentials: 'include' })
@@ -387,7 +394,7 @@ export default function TeamExecutiveOps() {
   }
 
   return (
-    <DashboardLayout title="Team Hub" className="p-5 md:p-6">
+    <DashboardLayout title="Team Hub" headerRight={<AgentScopeToggle />} className="p-5 md:p-6">
       <div className="space-y-5">
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 md:gap-3">
           {loadingStats

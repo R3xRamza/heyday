@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SidebarProvider } from './context/SidebarContext';
+import { AgentScopeProvider } from './context/AgentScopeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import CRMHub from './pages/CRMHub';
@@ -26,6 +27,7 @@ export default function App() {
   return (
     <AuthProvider>
       <SidebarProvider>
+      <AgentScopeProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -51,6 +53,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+      </AgentScopeProvider>
       </SidebarProvider>
     </AuthProvider>
   );

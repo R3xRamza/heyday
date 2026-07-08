@@ -8,9 +8,11 @@ import PrivateListingFlag from '../components/transactions/PrivateListingFlag';
 import { buildFallbackParties } from '../data/transactionParties';
 import { parseTransactionAddress } from '../utils/format';
 import { isPrivateListing } from '../constants/transactionForm';
+import { useAgentScope } from '../context/AgentScopeContext';
+import { appendAgentScope } from '../utils/agentScope';
 
-async function fetchPartiesForTransaction(id, transaction) {
-  const res = await fetch(`/api/transactions/${id}/parties`, { credentials: 'include' });
+async function fetchPartiesForTransaction(id, transaction, scope) {
+  const res = await fetch(appendAgentScope(`/api/transactions/${id}/parties`, scope), { credentials: 'include' });
   if (res.ok) {
     const json = await res.json();
     if (json.parties?.length) return json.parties;
@@ -35,6 +37,7 @@ async function fetchPartiesForTransaction(id, transaction) {
 export default function TransactionManager() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { scope } = useAgentScope();
   const [transaction, setTransaction] = useState(null);
   const [parties, setParties] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -45,44 +48,46 @@ export default function TransactionManager() {
 
   const fetchTransaction = useCallback(async () => {
     if (!id || id === 'undefined') return;
-    const res = await fetch(`/api/transactions/${id}`, { credentials: 'include' });
+    const res = await fetch(appendAgentScope(`/api/transactions/${id}`, scope), { credentials: 'include' });
     if (res.ok) {
       const json = await res.json();
       setTransaction(json.transaction);
       const loaded = json.parties?.length
         ? json.parties
-        : await fetchPartiesForTransaction(id, json.transaction);
+        : await fetchPartiesForTransaction(id, json.transaction, scope);
       setParties(loaded);
+    } else if (res.status === 404) {
+      setTransaction(null);
     }
     setLoading(false);
-  }, [id]);
+  }, [id, scope]);
 
   const fetchTasks = useCallback(async () => {
     if (!id || id === 'undefined') return;
-    const res = await fetch(`/api/tasks?transaction_id=${id}&include_completed=true`, { credentials: 'include' });
+    const res = await fetch(appendAgentScope(`/api/tasks?transaction_id=${id}&include_completed=true`, scope), { credentials: 'include' });
     if (res.ok) {
       const json = await res.json();
       setTasks(json.tasks || []);
     }
-  }, [id]);
+  }, [id, scope]);
 
   const fetchChecklists = useCallback(async () => {
     if (!id || id === 'undefined') return;
-    const res = await fetch(`/api/transactions/${id}/checklists`, { credentials: 'include' });
+    const res = await fetch(appendAgentScope(`/api/transactions/${id}/checklists`, scope), { credentials: 'include' });
     if (res.ok) {
       const json = await res.json();
       setChecklists(json.checklists || []);
     }
-  }, [id]);
+  }, [id, scope]);
 
   const fetchActivities = useCallback(async () => {
     if (!id || id === 'undefined') return;
-    const res = await fetch(`/api/transactions/${id}/activity`, { credentials: 'include' });
+    const res = await fetch(appendAgentScope(`/api/transactions/${id}/activity`, scope), { credentials: 'include' });
     if (res.ok) {
       const json = await res.json();
       setActivities(json.activities || []);
     }
-  }, [id]);
+  }, [id, scope]);
 
   useEffect(() => {
     fetch('/api/team', { credentials: 'include' })
@@ -256,12 +261,7 @@ export default function TransactionManager() {
   }
 
   if (!transaction) {
-    return (
-      <DashboardLayout title="Transaction" className="p-8">
-        <p className="text-on-surface-variant">Transaction not found.</p>
-        <Link to="/transactions" className="text-secondary hover:underline text-sm mt-2 inline-block">← Back to portfolio</Link>
-      </DashboardLayout>
-    );
+    return <Navigate to="/transactions" replace />;
   }
 
   const inSetup = transaction.workflow_status && transaction.workflow_status !== 'active';

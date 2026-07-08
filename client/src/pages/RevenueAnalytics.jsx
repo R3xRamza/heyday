@@ -6,6 +6,8 @@ import ListPagination from '../components/shared/ListPagination';
 import DateText from '../components/shared/DateText';
 import PriceInput from '../components/shared/PriceInput';
 import { formatCurrency, shortAddress } from '../utils/format';
+import { useAgentScope } from '../context/AgentScopeContext';
+import { appendAgentScope } from '../utils/agentScope';
 
 const MONTH_LABELS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -285,14 +287,15 @@ export default function RevenueAnalytics() {
   const [data, setData] = useState(null);
   const [year, setYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
+  const { scope } = useAgentScope();
 
   const fetchData = useCallback(() => {
     setLoading(true);
-    fetch(`/api/revenue?year=${year}`, { credentials: 'include' })
+    fetch(appendAgentScope(`/api/revenue?year=${year}`, scope), { credentials: 'include' })
       .then((r) => r.json())
       .then(setData)
       .finally(() => setLoading(false));
-  }, [year]);
+  }, [year, scope]);
 
   useEffect(() => {
     fetchData();

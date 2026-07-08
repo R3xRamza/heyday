@@ -4,6 +4,7 @@ import { isOverdue, isDueThisWeek } from '../lib/timing.js';
 import { celebrationsInRange, toDateStr } from '../lib/marketingCalendar.js';
 import { ACTIVE_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE, closedYtdStats, hubTransactionRows } from '../lib/transactionScopes.js';
 import { closePastDueTransactions } from '../lib/transactionAutoClose.js';
+import { parseAgentScope, transactionAgentScopeClause } from '../lib/agentScope.js';
 
 const router = Router();
 
@@ -17,26 +18,28 @@ const TEAM_ORDER_SQL = `
   END, name
 `;
 
-router.get('/stats', (_req, res) => {
+router.get('/stats', (req, res) => {
   closePastDueTransactions(db);
-  const closedYtd = closedYtdStats(db);
+  const agentScope = parseAgentScope(req.query);
+  const { sql: scopeSql, params: scopeParams } = transactionAgentScopeClause(agentScope, '');
+  const closedYtd = closedYtdStats(db, agentScope);
 
   const pending = db.prepare(`
     SELECT COUNT(*) as count, COALESCE(SUM(value), 0) as volume
-    FROM transactions WHERE stage = 'pending' AND close_date IS NOT NULL
-  `).get();
+    FROM transactions WHERE stage = 'pending' AND close_date IS NOT NULL${scopeSql}
+  `).get(...scopeParams);
 
   const activeListings = db.prepare(`
     SELECT COUNT(*) as count, COALESCE(SUM(value), 0) as volume
-    FROM transactions WHERE ${ACTIVE_LISTINGS_SCOPE}
-  `).get();
+    FROM transactions WHERE ${ACTIVE_LISTINGS_SCOPE}${scopeSql}
+  `).get(...scopeParams);
 
   const comingSoonStats = db.prepare(`
     SELECT COUNT(*) as count, COALESCE(SUM(value), 0) as volume
-    FROM transactions WHERE ${PRE_LISTINGS_SCOPE}
-  `).get();
+    FROM transactions WHERE ${PRE_LISTINGS_SCOPE}${scopeSql}
+  `).get(...scopeParams);
 
-  const { comingSoon, listings, pendingDeals } = hubTransactionRows(db);
+  const { comingSoon, listings, pendingDeals } = hubTransactionRows(db, agentScope);
 
   res.json({
     closedYtd,
@@ -89,7 +92,17 @@ router.get('/celebrations', (req, res) => {
   res.json({ events, start: startStr, end: endStr });
 });
 
-router.get('/team-tasks', (_req, res) => {
+router.get('/team-tasks', (req, res) => {
+  const agentScope = parseAgentScope(req.query);
+  const { sql: scopeSql, params: scopeParams } = transactionAgentScopeClause(agentScope, 'tx');
+  const scopeFilter = scopeSql
+    ? ` AND (
+        COALESCE(t.category, CASE WHEN t.transaction_id IS NOT NULL THEN 'transaction' ELSE 'admin' END) != 'transaction'
+        OR t.transaction_id IS NULL
+        ${scopeSql}
+      )`
+    : '';
+
   const members = db.prepare(`
     SELECT id, name, email, role FROM users
     WHERE email != 'admin@theheydaygroup.com'
@@ -102,7 +115,8 @@ router.get('/team-tasks', (_req, res) => {
       tt.calendar_nickname
     FROM tasks t
     LEFT JOIN template_tasks tt ON tt.id = t.template_task_id
-    WHERE t.assigned_to = ? AND t.status != 'complete'
+    LEFT JOIN transactions tx ON tx.id = t.transaction_id
+    WHERE t.assigned_to = ? AND t.status != 'complete'${scopeFilter}
     ORDER BY (t.due_date IS NULL), t.due_date ASC, t.id ASC
   `);
 
@@ -115,7 +129,7 @@ router.get('/team-tasks', (_req, res) => {
   }
 
   const summary = members.map((m) => {
-    const open = openTasksStmt.all(m.id);
+    const open = openTasksStmt.all(m.id, ...scopeParams);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
