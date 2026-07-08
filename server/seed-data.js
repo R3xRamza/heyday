@@ -30,6 +30,54 @@ export function seedChecklistTemplatesIfEmpty(db) {
 }
 
 /**
+ * Replace tasks for named templates from checklist-templates.js (preserves other templates).
+ */
+export function resyncNamedChecklistTemplates(db, names) {
+  const unlink = db.prepare(
+    'UPDATE tasks SET template_task_id = NULL WHERE template_task_id IN (SELECT id FROM template_tasks WHERE template_id = ?)',
+  );
+  const del = db.prepare('DELETE FROM template_tasks WHERE template_id = ?');
+  const insert = db.prepare(`
+    INSERT INTO template_tasks (template_id, title, timing_value, timing_direction, timing_anchor, sort_order, default_role, calendar_nickname)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const name of names) {
+    const template = CHECKLIST_TEMPLATES.find((t) => t.name === name);
+    if (!template) {
+      console.error(`Template not found in seed: ${name}`);
+      continue;
+    }
+    const row = db.prepare('SELECT id FROM checklist_templates WHERE name = ?').get(name);
+    if (!row) {
+      console.error(`Template not in DB: ${name}`);
+      continue;
+    }
+    const templateId = row.id;
+    const defaultRole = defaultRoleForChecklistTemplate(name);
+
+    db.transaction(() => {
+      unlink.run(templateId);
+      del.run(templateId);
+      template.tasks.forEach((task, i) => {
+        insert.run(
+          templateId,
+          task.title,
+          task.v,
+          task.d,
+          task.anchor,
+          i,
+          defaultRole,
+          deriveNickname(task.title),
+        );
+      });
+    })();
+
+    console.log(`Synced "${name}": ${template.tasks.length} tasks`);
+  }
+}
+
+/**
  * Wipe and re-import from checklist-templates.js.
  * For admin scripts only — never call on routine server startup.
  */
