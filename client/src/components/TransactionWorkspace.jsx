@@ -27,6 +27,7 @@ import {
   normalizeSaleType,
 } from '../constants/transactionForm';
 import { useTransactionsListReturn } from '../hooks/useTransactionsListReturn';
+import { useTransactionWorkspaceView } from '../hooks/useTransactionWorkspaceView';
 
 const ASSET_VIEWS = [
   { key: 'details', label: 'Transaction details', icon: 'info' },
@@ -143,7 +144,7 @@ export default function TransactionWorkspace({
   onCompleteOverdueTasks,
 }) {
   const { returnTo } = useTransactionsListReturn();
-  const [view, setView] = useState('details');
+  const { view, setView } = useTransactionWorkspaceView();
   const [activeChecklistId, setActiveChecklistId] = useState(null);
   const [form, setForm] = useState({ ...transaction });
   const [selectedTask, setSelectedTask] = useState(null);
