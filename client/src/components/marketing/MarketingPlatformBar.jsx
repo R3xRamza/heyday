@@ -9,7 +9,6 @@ export const BAR_PLATFORM_NAMES = [
   'Podcast',
   'IG Grid',
   'IG Story',
-  'Blog',
   'Pop By',
 ];
 

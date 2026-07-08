@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ListChecks, Plus } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
@@ -12,6 +12,14 @@ import PrivateListingFlag from '../components/transactions/PrivateListingFlag';
 import ListPagination from '../components/shared/ListPagination';
 import { useAgentScope } from '../context/AgentScopeContext';
 import { appendAgentScope } from '../utils/agentScope';
+import {
+  buildTransactionsListSearchParams,
+  hasTransactionsListQuery,
+  readTransactionsListView,
+  resolveTransactionsListView,
+  transactionsListPath,
+  writeTransactionsListView,
+} from '../utils/transactionsListPath';
 
 const PAGE_SIZE = 50;
 
@@ -120,40 +128,69 @@ export default function TransactionsList() {
   const navigate = useNavigate();
   const { scope } = useAgentScope();
   const [searchParams, setSearchParams] = useSearchParams();
+  const restoredRef = useRef(false);
+  const prevFilterRef = useRef(null);
+
+  useLayoutEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    if (hasTransactionsListQuery(searchParams)) return;
+    const saved = readTransactionsListView();
+    if (saved) {
+      navigate(transactionsListPath(saved), { replace: true });
+    }
+  }, [navigate, searchParams]);
+
+  const listView = resolveTransactionsListView(searchParams);
   const filterParam = searchParams.get('filter');
   const resolvedFilter = filterParam === 'all_listings' ? 'coming_soon' : filterParam;
-  const filter = VALID_FILTER_KEYS.has(resolvedFilter) ? resolvedFilter : 'active_transactions';
+  const filter = VALID_FILTER_KEYS.has(resolvedFilter) ? resolvedFilter : listView.filter;
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => listView.search);
   const [data, setData] = useState({ transactions: [], stats: {}, total: 0 });
   const [loadedFilter, setLoadedFilter] = useState(filter);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => listView.page);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ address: '', city: '', state: '', zip: '', value: '', client_name: '' });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
-  const [sortKey, setSortKey] = useState('date');
-  const [sortDir, setSortDir] = useState('desc');
+  const [sortKey, setSortKey] = useState(() => listView.sortKey);
+  const [sortDir, setSortDir] = useState(() => listView.sortDir);
   const fetchIdRef = useRef(0);
+
+  useEffect(() => {
+    writeTransactionsListView({ filter, page, search, sortKey, sortDir });
+  }, [filter, page, search, sortKey, sortDir]);
 
   const dateColumn = DATE_COLUMN_BY_FILTER[filter] || DATE_COLUMN_BY_FILTER.all;
   const statsFilter = refreshing ? loadedFilter : filter;
 
   function handleFilterChange(key) {
     setPage(1);
-    if (key === 'active_transactions') {
-      setSearchParams({}, { replace: true });
-    } else {
-      setSearchParams({ filter: key }, { replace: true });
-    }
+    setSortKey('date');
+    setSortDir('desc');
+    setSearchParams(buildTransactionsListSearchParams({
+      filter: key,
+      page: 1,
+      search,
+      sortKey: 'date',
+      sortDir: 'desc',
+    }), { replace: true });
   }
 
   useEffect(() => {
-    setPage(1);
-    setSortKey('date');
-    setSortDir('desc');
+    if (prevFilterRef.current === null) {
+      prevFilterRef.current = filter;
+      return;
+    }
+    if (prevFilterRef.current !== filter) {
+      setPage(1);
+      setSortKey('date');
+      setSortDir('desc');
+      prevFilterRef.current = filter;
+    }
   }, [filter]);
 
   useEffect(() => {
@@ -227,7 +264,11 @@ export default function TransactionsList() {
       blurActiveElement();
       setShowCreate(false);
       setCreateError('');
-      navigate(`/transactions/${json.transaction.id}`);
+      navigate(`/transactions/${json.transaction.id}`, {
+        state: {
+          transactionsList: { filter, page, search, sortKey, sortDir },
+        },
+      });
     } else {
       setCreateError(json.error || 'Could not create transaction.');
     }
