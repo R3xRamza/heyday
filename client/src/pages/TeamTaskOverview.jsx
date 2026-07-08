@@ -6,6 +6,8 @@ import TeamAvatar from '../components/TeamAvatar';
 import { getTeamProfile } from '../data/teamProfiles';
 import TeamTaskOverviewPanel from '../components/tasks/TeamTaskOverviewPanel';
 import TeamAdminTasksPanel from '../components/tasks/TeamAdminTasksPanel';
+import { useAgentScope } from '../context/AgentScopeContext';
+import { appendAgentScope } from '../utils/agentScope';
 
 function TeamMemberCardSkeleton() {
   return (
@@ -139,6 +141,7 @@ function TeamMemberTaskCard({ member, profile, onOpenTasks }) {
 
 export default function TeamTaskOverview() {
   const navigate = useNavigate();
+  const { scope } = useAgentScope();
   const [loadingTeam, setLoadingTeam] = useState(true);
   const [teamMembers, setTeamMembers] = useState([]);
   const [overviewTasks, setOverviewTasks] = useState([]);
@@ -156,11 +159,11 @@ export default function TeamTaskOverview() {
 
   const fetchOverview = useCallback(() => {
     setLoadingOverview(true);
-    fetch('/api/tasks/team-overview', { credentials: 'include' })
+    fetch(appendAgentScope('/api/tasks/team-overview', scope), { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setOverviewTasks(json.tasks || []))
       .finally(() => setLoadingOverview(false));
-  }, []);
+  }, [scope]);
 
   const fetchAdmin = useCallback(() => {
     setLoadingAdmin(true);

@@ -21,6 +21,7 @@ import {
 } from '../lib/transactionValidation.js';
 import { closePastDueTransactions, deriveStageFromCloseDate } from '../lib/transactionAutoClose.js';
 import { closedYtdStats, ACTIVE_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE } from '../lib/transactionScopes.js';
+import { parseAgentScope, transactionAgentScopeClause, assertTransactionInScope } from '../lib/agentScope.js';
 import { runBrokermintImport, fixBrokermintAgentIds } from '../lib/brokermintImport.js';
 import { parsePagination } from '../lib/pagination.js';
 
@@ -119,9 +120,12 @@ router.get('/', (req, res) => {
   const sortKey = req.query.sort || 'date';
   const sortDir = req.query.order === 'asc' ? 'asc' : 'desc';
   const dateField = DATE_FIELD_BY_FILTER[filter] || 'created_at';
+  const agentScope = parseAgentScope(req.query);
+  const { sql: scopeSql, params: scopeParams } = transactionAgentScopeClause(agentScope, 't');
+  const { sql: scopeSqlBare, params: scopeParamsBare } = transactionAgentScopeClause(agentScope, '');
 
-  let countSql = `SELECT COUNT(*) as c FROM transactions t WHERE ${where}`;
-  const params = [];
+  let countSql = `SELECT COUNT(*) as c FROM transactions t WHERE ${where}${scopeSql}`;
+  const params = [...scopeParams];
   if (search) {
     countSql += ` AND (LOWER(t.address) LIKE ? OR LOWER(t.city) LIKE ? OR LOWER(COALESCE(t.state, '')) LIKE ? OR LOWER(COALESCE(t.zip, '')) LIKE ? OR LOWER(COALESCE(t.client_name, t.owner_name)) LIKE ?)`;
     const q = `%${search}%`;
@@ -135,7 +139,7 @@ router.get('/', (req, res) => {
       (SELECT COUNT(*) FROM tasks tk WHERE tk.transaction_id = t.id AND tk.status = 'complete') as done_tasks
     FROM transactions t
     LEFT JOIN users u ON u.id = t.agent_id
-    WHERE ${where}
+    WHERE ${where}${scopeSql}
   `;
   if (search) {
     sql += ` AND (LOWER(t.address) LIKE ? OR LOWER(t.city) LIKE ? OR LOWER(COALESCE(t.state, '')) LIKE ? OR LOWER(COALESCE(t.zip, '')) LIKE ? OR LOWER(COALESCE(t.client_name, t.owner_name)) LIKE ?)`;
@@ -148,14 +152,14 @@ router.get('/', (req, res) => {
       SUM(CASE WHEN ${ACTIVE_LISTINGS_SCOPE} THEN 1 ELSE 0 END) as listings_count,
       SUM(CASE WHEN ${PRE_LISTINGS_SCOPE} THEN 1 ELSE 0 END) as pre_listings_count,
       SUM(CASE WHEN ${PENDING_COUNT} THEN 1 ELSE 0 END) as pending_count
-    FROM transactions WHERE ${PORTFOLIO_SCOPE}
-  `).get();
+    FROM transactions WHERE ${PORTFOLIO_SCOPE}${scopeSqlBare}
+  `).get(...scopeParamsBare);
 
-  let filteredSql = `SELECT COUNT(*) as count, COALESCE(SUM(t.value), 0) as volume FROM transactions t WHERE ${where}`;
+  let filteredSql = `SELECT COUNT(*) as count, COALESCE(SUM(t.value), 0) as volume FROM transactions t WHERE ${where}${scopeSql}`;
   if (search) {
     filteredSql += ` AND (LOWER(t.address) LIKE ? OR LOWER(t.city) LIKE ? OR LOWER(COALESCE(t.state, '')) LIKE ? OR LOWER(COALESCE(t.zip, '')) LIKE ? OR LOWER(COALESCE(t.client_name, t.owner_name)) LIKE ?)`;
   }
-  const filtered = db.prepare(filteredSql).get(...(search ? params : []));
+  const filtered = db.prepare(filteredSql).get(...params);
 
   res.json({
     transactions,
@@ -165,7 +169,7 @@ router.get('/', (req, res) => {
     stats: {
       ...portfolioStats,
       filtered,
-      closedYtd: closedYtdStats(db),
+      closedYtd: closedYtdStats(db, agentScope),
     },
   });
 });
@@ -209,6 +213,7 @@ router.post('/fix-brokermint-agents', (req, res) => {
 });
 
 router.get('/:id/activity', (req, res) => {
+  if (!assertTransactionInScope(req, res, Number(req.params.id))) return;
   const activities = db.prepare(`
     SELECT a.*, u.name as user_name
     FROM transaction_activity a
@@ -241,6 +246,7 @@ router.post('/:id/activity', (req, res) => {
 });
 
 router.get('/:id/parties', (req, res) => {
+  if (!assertTransactionInScope(req, res, Number(req.params.id))) return;
   const tx = db.prepare('SELECT id FROM transactions WHERE id = ?').get(req.params.id);
   if (!tx) return res.status(404).json({ error: 'Not found' });
   const parties = getPartiesForTransaction(db, tx.id);
@@ -248,6 +254,7 @@ router.get('/:id/parties', (req, res) => {
 });
 
 router.get('/:id/checklists', (req, res) => {
+  if (!assertTransactionInScope(req, res, Number(req.params.id))) return;
   const tx = db.prepare('SELECT id FROM transactions WHERE id = ?').get(req.params.id);
   if (!tx) return res.status(404).json({ error: 'Not found' });
   const checklists = getTransactionChecklists(db, req.params.id);
@@ -268,6 +275,7 @@ router.get('/:id', (req, res) => {
   closePastDueTransactions(db);
   const transaction = pickTransaction(req.params.id);
   if (!transaction) return res.status(404).json({ error: 'Not found' });
+  if (!assertTransactionInScope(req, res, transaction.id)) return;
   const parties = getPartiesForTransaction(db, transaction.id);
   res.json({ transaction, parties });
 });

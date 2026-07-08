@@ -1,4 +1,6 @@
 /** Shared SQL scopes for transaction portfolio segments. */
+import { transactionAgentScopeClause } from './agentScope.js';
+
 export const LISTING_REPRESENTING = "representing IN ('seller','seller_and_buyer','landlord','both','seller_and_client','leasing')";
 
 const LISTING_SIDE_OPEN = `${LISTING_REPRESENTING} AND stage != 'closed' AND acceptance_date IS NULL`;
@@ -22,36 +24,39 @@ const TX_HUB_SELECT = `
   LEFT JOIN users u ON u.id = t.agent_id
 `;
 
-export function closedYtdStats(db) {
+export function closedYtdStats(db, agentScope = 'all') {
   const jan1 = `${new Date().getFullYear()}-01-01`;
+  const { sql, params } = transactionAgentScopeClause(agentScope, '');
   return db.prepare(`
     SELECT COUNT(*) as count, COALESCE(SUM(value), 0) as volume
     FROM transactions
-    WHERE stage = 'closed' AND close_date >= ?
-  `).get(jan1);
+    WHERE stage = 'closed' AND close_date >= ?${sql}
+  `).get(jan1, ...params);
 }
 
-export function hubTransactionRows(db) {
+export function hubTransactionRows(db, agentScope = 'all') {
+  const { sql, params } = transactionAgentScopeClause(agentScope, 't');
+
   const comingSoon = db.prepare(`
     ${TX_HUB_SELECT}
-    WHERE ${PRE_LISTINGS_SCOPE}
+    WHERE ${PRE_LISTINGS_SCOPE}${sql}
     ORDER BY t.listing_date ASC, t.id ASC
     LIMIT 20
-  `).all();
+  `).all(...params);
 
   const listings = db.prepare(`
     ${TX_HUB_SELECT}
-    WHERE ${ACTIVE_LISTINGS_SCOPE}
+    WHERE ${ACTIVE_LISTINGS_SCOPE}${sql}
     ORDER BY t.listing_date DESC, t.id ASC
     LIMIT 20
-  `).all();
+  `).all(...params);
 
   const pendingDeals = db.prepare(`
     ${TX_HUB_SELECT}
-    WHERE ${PENDING_DEALS_SCOPE}
+    WHERE ${PENDING_DEALS_SCOPE}${sql}
     ORDER BY (t.close_date IS NULL), t.close_date ASC, t.id ASC
     LIMIT 20
-  `).all();
+  `).all(...params);
 
   return { comingSoon, listings, pendingDeals };
 }

@@ -4,6 +4,7 @@ import { isOverdue, computeDueDate, resolveAnchorDate } from '../lib/timing.js';
 import { resolveAssigneeId, resolveTaskRole } from '../lib/taskAssignment.js';
 import { logActivity, formatFieldChange, actorLabel } from '../lib/activity.js';
 import { parsePagination, wantsPagination, buildCountSql } from '../lib/pagination.js';
+import { parseAgentScope, transactionAgentScopeClause, taskTransactionScopeClause } from '../lib/agentScope.js';
 
 const router = Router();
 
@@ -127,10 +128,12 @@ router.get('/team-priority', (req, res) => {
   res.json({ tasks });
 });
 
-router.get('/team-overview', (_req, res) => {
+router.get('/team-overview', (req, res) => {
   const today = todayStr();
   const weekEnd = weekEndStr();
-  const limit = Math.min(50, Math.max(1, parseInt(_req.query.limit, 10) || 25));
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 25));
+  const agentScope = parseAgentScope(req.query);
+  const { sql: scopeSql, params: scopeParams } = transactionAgentScopeClause(agentScope, 'tx');
 
   const sql = `
     ${TASK_SELECT}
@@ -138,6 +141,7 @@ router.get('/team-overview', (_req, res) => {
       AND t.due_date IS NOT NULL
       AND COALESCE(t.category, CASE WHEN t.transaction_id IS NOT NULL THEN 'transaction' ELSE 'admin' END) = 'transaction'
       AND (u.email IS NULL OR u.email != 'admin@theheydaygroup.com')
+      AND t.transaction_id IS NOT NULL${scopeSql}
     ORDER BY
       CASE
         WHEN t.due_date < ? THEN 0
@@ -150,7 +154,7 @@ router.get('/team-overview', (_req, res) => {
     LIMIT ?
   `;
 
-  const tasks = db.prepare(sql).all(today, today, weekEnd, limit).map(enrich);
+  const tasks = db.prepare(sql).all(...scopeParams, today, today, weekEnd, limit).map(enrich);
   res.json({ tasks });
 });
 
@@ -174,20 +178,22 @@ router.get('/team-admin-overview', (_req, res) => {
   res.json({ tasks });
 });
 
-router.get('/milestones', (_req, res) => {
+router.get('/milestones', (req, res) => {
   const today = todayStr();
   const end = new Date();
   end.setDate(end.getDate() + 30);
   const endStr = end.toISOString().slice(0, 10);
+  const agentScope = parseAgentScope(req.query);
+  const { sql: scopeSql, params: scopeParams } = transactionAgentScopeClause(agentScope, '');
 
   const rows = db.prepare(`
     SELECT id, address, city, stage, close_date
     FROM transactions
     WHERE close_date IS NOT NULL
       AND close_date >= ?
-      AND close_date <= ?
+      AND close_date <= ?${scopeSql}
     ORDER BY close_date ASC
-  `).all(today, endStr);
+  `).all(today, endStr, ...scopeParams);
 
   const milestones = rows.map((tx) => ({
     transaction_id: tx.id,
@@ -200,11 +206,13 @@ router.get('/milestones', (_req, res) => {
   res.json({ milestones });
 });
 
-router.get('/expirations', (_req, res) => {
+router.get('/expirations', (req, res) => {
   const today = todayStr();
   const end = new Date();
   end.setDate(end.getDate() + 30);
   const endStr = end.toISOString().slice(0, 10);
+  const agentScope = parseAgentScope(req.query);
+  const { sql: scopeSql, params: scopeParams } = transactionAgentScopeClause(agentScope, '');
 
   const rows = db.prepare(`
     SELECT id, address, city, stage, important_date
@@ -212,9 +220,9 @@ router.get('/expirations', (_req, res) => {
     WHERE important_date IS NOT NULL
       AND important_date >= ?
       AND important_date <= ?
-      AND stage != 'closed'
+      AND stage != 'closed'${scopeSql}
     ORDER BY important_date ASC
-  `).all(today, endStr);
+  `).all(today, endStr, ...scopeParams);
 
   const milestones = rows.map((tx) => ({
     transaction_id: tx.id,
@@ -232,9 +240,16 @@ router.get('/', (req, res) => {
   const assignedTo = resolveAssignedTo(req);
   const filter = req.query.filter || 'all';
   const showCompleted = req.query.include_completed !== 'false';
+  const agentScope = parseAgentScope(req.query);
+  const { sql: taskScopeSql, params: taskScopeParams } = taskTransactionScopeClause(agentScope, 't', 'tx');
 
   let baseSql = `${TASK_SELECT} WHERE 1=1`;
   const baseParams = [];
+
+  if (taskScopeSql) {
+    baseSql += taskScopeSql;
+    baseParams.push(...taskScopeParams);
+  }
 
   if (transactionId) {
     baseSql += ' AND t.transaction_id = ?';

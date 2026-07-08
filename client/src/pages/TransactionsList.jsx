@@ -10,6 +10,8 @@ import { blurActiveElement, CHROME_AUTOCOMPLETE, ChromeAddressDecoy } from '../c
 import { validateTransactionFields, transactionPortfolioType, isPrivateListing } from '../constants/transactionForm';
 import PrivateListingFlag from '../components/transactions/PrivateListingFlag';
 import ListPagination from '../components/shared/ListPagination';
+import { useAgentScope } from '../context/AgentScopeContext';
+import { appendAgentScope } from '../utils/agentScope';
 
 const PAGE_SIZE = 50;
 
@@ -116,6 +118,7 @@ function StatCard({ label, value, sub }) {
 
 export default function TransactionsList() {
   const navigate = useNavigate();
+  const { scope } = useAgentScope();
   const [searchParams, setSearchParams] = useSearchParams();
   const filterParam = searchParams.get('filter');
   const resolvedFilter = filterParam === 'all_listings' ? 'coming_soon' : filterParam;
@@ -181,6 +184,7 @@ export default function TransactionsList() {
       order: sortDir,
     });
     if (search) params.set('search', search);
+    appendAgentScope(params, scope);
     try {
       const res = await fetch(`/api/transactions?${params}`, { credentials: 'include' });
       const json = await res.json();
@@ -193,7 +197,7 @@ export default function TransactionsList() {
         setRefreshing(false);
       }
     }
-  }, [filter, search, page, sortKey, sortDir]);
+  }, [filter, search, page, sortKey, sortDir, scope]);
 
   useEffect(() => {
     const t = setTimeout(fetchData, search ? 300 : 0);

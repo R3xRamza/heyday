@@ -6,6 +6,7 @@ import {
   APP_HEADER_HEIGHT_CLASS,
   APP_HEADER_TITLE_CLASS,
 } from '../constants/appHeader';
+import { AgentScopeBadge } from './AgentScopeToggle';
 
 export default function TopNav({ title, subtitle, headerRight, titleAddon }) {
   const { user } = useAuth();
@@ -29,6 +30,7 @@ export default function TopNav({ title, subtitle, headerRight, titleAddon }) {
       <div className="flex-1 min-w-0" />
 
       <div className="flex items-center gap-3 shrink-0">
+        <AgentScopeBadge />
         {headerRight}
         <button
           type="button"

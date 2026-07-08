@@ -1,14 +1,9 @@
 import { Router } from 'express';
 import db from '../db.js';
 import { COMMISSION_SETTINGS, computeYearCommissions } from '../lib/commissionPlans.js';
+import { parseAgentScope, transactionAgentScopeClause } from '../lib/agentScope.js';
 
 const router = Router();
-
-const MEREDITH_EMAIL = 'meredith@theheydaygroup.com';
-
-function meredithId() {
-  return db.prepare('SELECT id FROM users WHERE email = ?').get(MEREDITH_EMAIL)?.id ?? null;
-}
 
 const DEAL_SELECT = `
   SELECT t.id, t.address, t.city, t.state, t.value, t.stage, t.representing,
@@ -21,9 +16,8 @@ router.get('/', (req, res) => {
   const year = Math.min(2100, Math.max(2000, parseInt(req.query.year, 10) || new Date().getFullYear()));
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
-  const agentId = meredithId();
-  const agentFilter = agentId ? 'AND (t.agent_id = ? OR t.agent_id IS NULL)' : '';
-  const agentParams = agentId ? [agentId] : [];
+  const agentScope = parseAgentScope(req.query);
+  const { sql: agentFilter, params: agentParams } = transactionAgentScopeClause(agentScope, 't');
 
   const closedDeals = db.prepare(`
     ${DEAL_SELECT}

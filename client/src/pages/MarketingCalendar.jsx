@@ -25,6 +25,8 @@ import {
 import { mergeQuotaPosts } from '../components/marketing/quotaUtils';
 import { shortAddress } from '../utils/format';
 import { findAdamMember } from '../constants/marketingTasks';
+import { useAgentScope } from '../context/AgentScopeContext';
+import { appendAgentScope } from '../utils/agentScope';
 
 const LS_CATEGORIES = 'marketing-categories-v4';
 const LS_CATEGORIES_LEGACY = 'marketing-categories-v2';
@@ -152,6 +154,7 @@ function normalizeEvents({
 }
 
 export default function MarketingCalendar() {
+  const { scope } = useAgentScope();
   const [viewDate, setViewDate] = useState(() => new Date());
   const [viewMode, setViewMode] = useState('month');
   const [goals, setGoals] = useState([]);
@@ -230,7 +233,10 @@ export default function MarketingCalendar() {
     const adamUserId = await fetchAdamUserId();
 
     const taskUrl = adamUserId
-      ? `/api/tasks?include_completed=true&transaction_only=true&assigned_to=${adamUserId}&due_after=${start}&due_before=${end}`
+      ? appendAgentScope(
+        `/api/tasks?include_completed=true&transaction_only=true&assigned_to=${adamUserId}&due_after=${start}&due_before=${end}`,
+        scope,
+      )
       : null;
 
     const [calRes, weekRes, lastWeekRes, bdayRes, monthBdayRes, todayBdayRes, taskRes] = await Promise.all([
@@ -277,7 +283,7 @@ export default function MarketingCalendar() {
     }
 
     setInitialLoading(false);
-  }, [range, viewDate]);
+  }, [range, viewDate, scope]);
 
   const fetchBirthdayPins = useCallback(async () => {
     const months = [...new Set([viewedMonthKey, ...monthsInDateRange(range.start, range.end)])];

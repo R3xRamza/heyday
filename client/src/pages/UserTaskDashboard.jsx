@@ -8,6 +8,8 @@ import CreateTaskModal from '../components/CreateTaskModal';
 import { getTeamProfile } from '../data/teamProfiles';
 import TaskCalendarView from '../components/TaskCalendarView';
 import DateText from '../components/shared/DateText';
+import { useAgentScope } from '../context/AgentScopeContext';
+import { appendAgentScope } from '../utils/agentScope';
 import TaskHubPersonHeader from '../components/TaskHubPersonHeader';
 import { APP_HEADER_BORDER_CLASS } from '../constants/appHeader';
 import { shortAddress } from '../utils/format';
@@ -59,6 +61,7 @@ function renderDueLabel(task) {
 
 export default function UserTaskDashboard({ category = 'transaction' }) {
   const { userId } = useParams();
+  const { scope } = useAgentScope();
   const [member, setMember] = useState(null);
   const [users, setUsers] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -98,19 +101,20 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
       params.set('page', String(page));
       params.set('limit', String(PAGE_SIZE));
     }
+    appendAgentScope(params, scope);
     const res = await fetch(`/api/tasks?${params}`, { credentials: 'include' });
     if (res.ok) setData(await res.json());
     setLoading(false);
-  }, [userId, filter, category, includeCompleted, showUndated, viewMode, page]);
+  }, [userId, filter, category, includeCompleted, showUndated, viewMode, page, scope]);
 
   useEffect(() => {
     fetch('/api/team', { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setUsers(json.members || []));
-    fetch('/api/transactions?filter=active_transactions&limit=50', { credentials: 'include' })
+    fetch(appendAgentScope('/api/transactions?filter=active_transactions&limit=50', scope), { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setTransactions(json.transactions || []));
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     fetchMember();
