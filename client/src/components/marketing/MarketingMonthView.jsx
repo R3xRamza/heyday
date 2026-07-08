@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import MarketingDayEvents from './MarketingDayEvents';
 import DayNumber from './DayNumber';
-import { buildMonthCells, MARKETING_POST_DRAG_TYPE } from './calendarUtils';
+import { buildMonthCells, MARKETING_POST_DRAG_TYPE, MARKETING_TASK_DRAG_TYPE } from './calendarUtils';
 
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
@@ -18,6 +18,7 @@ function DayCell({
   onEditPost,
   onTaskClick,
   onDropPost,
+  onDropTask,
   onNewPostForDate,
 }) {
   const dayEvents = events[cell.dateStr] || [];
@@ -50,7 +51,12 @@ function DayCell({
     e.preventDefault();
     e.stopPropagation();
     const postId = e.dataTransfer.getData(MARKETING_POST_DRAG_TYPE);
-    if (postId) onDropPost?.(Number(postId), cell.dateStr);
+    if (postId) {
+      onDropPost?.(Number(postId), cell.dateStr);
+    } else {
+      const taskId = e.dataTransfer.getData(MARKETING_TASK_DRAG_TYPE);
+      if (taskId) onDropTask?.(Number(taskId), cell.dateStr);
+    }
     onDragOverDate?.(null);
   }
 
@@ -104,6 +110,7 @@ export default function MarketingMonthView({
   onEditPost,
   onTaskClick,
   onDropPost,
+  onDropTask,
   onNewPostForDate,
 }) {
   const cells = buildMonthCells(viewDate.getFullYear(), viewDate.getMonth());
@@ -138,6 +145,7 @@ export default function MarketingMonthView({
             onEditPost={onEditPost}
             onTaskClick={onTaskClick}
             onDropPost={onDropPost}
+            onDropTask={onDropTask}
             onDragOverDate={setDragOverDate}
             onNewPostForDate={onNewPostForDate}
           />

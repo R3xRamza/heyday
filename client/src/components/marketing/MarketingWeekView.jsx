@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import MarketingDayEvents from './MarketingDayEvents';
 import DayNumber from './DayNumber';
-import { buildWeekCells, MARKETING_POST_DRAG_TYPE } from './calendarUtils';
+import { buildWeekCells, MARKETING_POST_DRAG_TYPE, MARKETING_TASK_DRAG_TYPE } from './calendarUtils';
 
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
@@ -17,6 +17,7 @@ export default function MarketingWeekView({
   onEditPost,
   onTaskClick,
   onDropPost,
+  onDropTask,
   onNewPostForDate,
 }) {
   const cells = buildWeekCells(viewDate);
@@ -71,7 +72,12 @@ export default function MarketingWeekView({
             e.preventDefault();
             e.stopPropagation();
             const postId = e.dataTransfer.getData(MARKETING_POST_DRAG_TYPE);
-            if (postId) onDropPost?.(Number(postId), cell.dateStr);
+            if (postId) {
+              onDropPost?.(Number(postId), cell.dateStr);
+            } else {
+              const taskId = e.dataTransfer.getData(MARKETING_TASK_DRAG_TYPE);
+              if (taskId) onDropTask?.(Number(taskId), cell.dateStr);
+            }
             setDragOverDate(null);
           }
 

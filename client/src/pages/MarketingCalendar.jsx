@@ -550,6 +550,44 @@ export default function MarketingCalendar() {
     );
   }
 
+  function updateTaskDateInList(list, taskId, newDate) {
+    const today = new Date().toISOString().slice(0, 10);
+    return list.map((t) => {
+      if (t.id !== taskId) return t;
+      const isComplete = t.status === 'complete';
+      return {
+        ...t,
+        due_date: newDate,
+        is_overdue: !isComplete && newDate < today,
+      };
+    });
+  }
+
+  async function rescheduleTask(taskId, newDate) {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || task.due_date === newDate) return;
+
+    const snapshot = [...tasks];
+    setTasks((prev) => updateTaskDateInList(prev, taskId, newDate));
+
+    const res = await fetch(`/api/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ due_date: newDate }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setTasks(snapshot);
+      window.alert(json.error || 'Could not move task');
+      return;
+    }
+
+    if (json.task) {
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? json.task : t)));
+    }
+  }
+
   async function reschedulePost(postId, newDate) {
     const post = posts.find((p) => p.id === postId);
     if (!post || post.scheduled_date === newDate) return;
@@ -665,6 +703,7 @@ export default function MarketingCalendar() {
               onEditPost={openEditPost}
               onTaskClick={openTaskModal}
               onDropPost={reschedulePost}
+              onDropTask={rescheduleTask}
               onNewPostForDate={openNewPostForDate}
             />
           ) : (
@@ -676,6 +715,7 @@ export default function MarketingCalendar() {
               onEditPost={openEditPost}
               onTaskClick={openTaskModal}
               onDropPost={reschedulePost}
+              onDropTask={rescheduleTask}
               onNewPostForDate={openNewPostForDate}
             />
           )}
