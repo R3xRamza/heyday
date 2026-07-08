@@ -3,6 +3,7 @@ export function pad2(n) {
 }
 
 export const MARKETING_POST_DRAG_TYPE = 'application/x-marketing-post-id';
+export const MARKETING_TASK_DRAG_TYPE = 'application/x-marketing-task-id';
 
 export function dateKey(year, monthIndex, day) {
   return `${year}-${pad2(monthIndex + 1)}-${pad2(day)}`;
