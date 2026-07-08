@@ -87,11 +87,12 @@ function mergeFilterPlatforms(barPlatforms, posts) {
   const merged = [...barPlatforms];
   for (const post of posts) {
     const platform = post.platform?.trim();
-    if (platform && !merged.some((p) => p.toLowerCase() === platform.toLowerCase())) {
+    if (!platform || platform.toLowerCase() === 'blog') continue;
+    if (!merged.some((p) => p.toLowerCase() === platform.toLowerCase())) {
       merged.push(platform);
     }
   }
-  return merged;
+  return merged.filter((p) => p.toLowerCase() !== 'blog');
 }
 
 function normalizeEvents({
