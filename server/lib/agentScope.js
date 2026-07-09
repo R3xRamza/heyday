@@ -23,6 +23,12 @@ export function parseAgentScope(query = {}) {
   return 'meredith';
 }
 
+/** Accept parsed scope or query object — avoids double-parsing. */
+export function resolveAgentScope(input) {
+  if (input === 'meredith' || input === 'all' || input === 'tessa') return input;
+  return parseAgentScope(input);
+}
+
 export function agentScopeUserId(scope) {
   if (scope === 'meredith') return userIdForEmail(SCOPE_EMAILS.meredith);
   if (scope === 'tessa') return userIdForEmail(SCOPE_EMAILS.tessa);

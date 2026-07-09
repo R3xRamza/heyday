@@ -1,5 +1,5 @@
 import { isOverdue, isDueThisWeek, weekRangeSunday } from './timing.js';
-import { parseAgentScope, transactionAgentScopeClause } from './agentScope.js';
+import { resolveAgentScope, agentScopeUserId } from './agentScope.js';
 
 export function computeTaskStats(tasks, refDate = new Date()) {
   const today = new Date(refDate);
@@ -35,15 +35,17 @@ export function computeTaskStats(tasks, refDate = new Date()) {
 }
 
 export function assignedTasksForMember(db, userId, agentScope) {
-  const scope = parseAgentScope(agentScope);
-  const { sql: scopeSql, params: scopeParams } = transactionAgentScopeClause(scope, 'tx');
-  const scopeFilter = scopeSql
+  const scope = resolveAgentScope(agentScope);
+  const scopeUserId = agentScopeUserId(scope);
+  const scopeFilter = scopeUserId
     ? ` AND (
         COALESCE(t.category, CASE WHEN t.transaction_id IS NOT NULL THEN 'transaction' ELSE 'admin' END) != 'transaction'
         OR t.transaction_id IS NULL
-        ${scopeSql}
+        OR tx.agent_id = ?
       )`
     : '';
+
+  const params = scopeUserId ? [userId, scopeUserId] : [userId];
 
   return db.prepare(`
     SELECT t.status, t.due_date,
@@ -51,7 +53,7 @@ export function assignedTasksForMember(db, userId, agentScope) {
     FROM tasks t
     LEFT JOIN transactions tx ON tx.id = t.transaction_id
     WHERE t.assigned_to = ?${scopeFilter}
-  `).all(userId, ...scopeParams);
+  `).all(...params);
 }
 
 export function memberTaskSummary(db, userId, agentScope) {
