@@ -123,7 +123,7 @@ router.get('/team-tasks', (req, res) => {
   function countsForCategory(open, category, today) {
     const tasks = open.filter((t) => t.category === category);
     return {
-      activeCount: tasks.filter((t) => isDueThisWeek(t.due_date, t.status, today)).length,
+      thisWeekCount: tasks.filter((t) => isDueThisWeek(t.due_date, t.status, today)).length,
       overdueCount: tasks.filter((t) => isOverdue(t.due_date, t.status)).length,
     };
   }
@@ -138,7 +138,7 @@ router.get('/team-tasks', (req, res) => {
 
     return {
       ...m,
-      activeCount: transaction.activeCount + admin.activeCount,
+      thisWeekCount: transaction.thisWeekCount + admin.thisWeekCount,
       overdueCount: transaction.overdueCount + admin.overdueCount,
       transaction,
       admin,
