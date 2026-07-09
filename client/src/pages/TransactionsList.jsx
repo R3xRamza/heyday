@@ -88,6 +88,18 @@ const SORTABLE_COLUMNS_BASE = [
   { key: 'date', label: null },
 ];
 
+const DATE_COLUMN_CELL_CLASS = 'px-6 py-4 text-sm whitespace-nowrap min-w-[9.5rem]';
+const TRAILING_COLUMN_CELL_CLASS = 'px-6 py-4 text-sm w-28 max-w-28';
+
+function columnHeaderClass(col) {
+  const base = 'px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest cursor-pointer select-none hover:text-primary';
+  if (col.key === 'type') return `${base} whitespace-nowrap`;
+  if (col.key === 'agent' || col.key === 'expiration') {
+    return `${base} whitespace-nowrap w-28 max-w-28`;
+  }
+  return base;
+}
+
 function tableColumns(filter) {
   const dateColumn = DATE_COLUMN_BY_FILTER[filter] || DATE_COLUMN_BY_FILTER.all;
   const columns = SORTABLE_COLUMNS_BASE.map((col) => (
@@ -96,7 +108,7 @@ function tableColumns(filter) {
       : col
   ));
   if (filter === 'current_listings') {
-    columns.push({ key: 'expiration', label: 'Expiration Date', field: 'important_date' });
+    columns.push({ key: 'expiration', label: 'Expiration', field: 'important_date' });
   } else {
     columns.push({ key: 'agent', label: 'Agent' });
   }
@@ -350,9 +362,7 @@ export default function TransactionsList() {
                   {columns.map((col) => (
                       <th
                         key={col.key}
-                        className={`px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest cursor-pointer select-none hover:text-primary ${
-                          col.key === 'type' ? 'whitespace-nowrap' : ''
-                        }`}
+                        className={columnHeaderClass(col)}
                         onClick={() => handleSort(col.key)}
                       >
                         {col.label}
@@ -407,16 +417,24 @@ export default function TransactionsList() {
                         </span>
                       </td>
                       <td className="px-6 py-4 font-semibold">{formatCurrency(tx.value)}</td>
-                      {columns.filter((col) => col.key === 'date' || col.key === 'expiration').map((col) => {
+                      {columns.filter((col) => col.key === 'date').map((col) => {
                         const dateValue = transactionDateValue(tx, col.field);
                         return (
-                          <td key={col.key} className="px-6 py-4 text-sm whitespace-nowrap min-w-[9.5rem]">
+                          <td key={col.key} className={DATE_COLUMN_CELL_CLASS}>
+                            {dateValue ? <DateText value={dateValue} /> : '—'}
+                          </td>
+                        );
+                      })}
+                      {columns.filter((col) => col.key === 'expiration').map((col) => {
+                        const dateValue = transactionDateValue(tx, col.field);
+                        return (
+                          <td key={col.key} className={TRAILING_COLUMN_CELL_CLASS}>
                             {dateValue ? <DateText value={dateValue} /> : '—'}
                           </td>
                         );
                       })}
                       {filter !== 'current_listings' && (
-                        <td className="px-6 py-4 text-sm">{tx.agent_name || '—'}</td>
+                        <td className={TRAILING_COLUMN_CELL_CLASS}>{tx.agent_name || '—'}</td>
                       )}
                       <td className="px-6 py-4 text-right">
                         <ArrowRight size={18} className="text-on-surface-variant group-hover:text-primary inline" />
