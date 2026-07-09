@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { isOverdue, isDueThisWeek } from '../lib/timing.js';
 import { celebrationsInRange, toDateStr } from '../lib/marketingCalendar.js';
 import { ON_MARKET_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE, closedYtdStats, hubTransactionRows } from '../lib/transactionScopes.js';
 import { closePastDueTransactions } from '../lib/transactionAutoClose.js';
 import { parseAgentScope, transactionAgentScopeClause } from '../lib/agentScope.js';
+import { memberTaskSummary } from '../lib/memberTaskStats.js';
 
 const router = Router();
 
@@ -94,14 +94,6 @@ router.get('/celebrations', (req, res) => {
 
 router.get('/team-tasks', (req, res) => {
   const agentScope = parseAgentScope(req.query);
-  const { sql: scopeSql, params: scopeParams } = transactionAgentScopeClause(agentScope, 'tx');
-  const scopeFilter = scopeSql
-    ? ` AND (
-        COALESCE(t.category, CASE WHEN t.transaction_id IS NOT NULL THEN 'transaction' ELSE 'admin' END) != 'transaction'
-        OR t.transaction_id IS NULL
-        ${scopeSql}
-      )`
-    : '';
 
   const members = db.prepare(`
     SELECT id, name, email, role FROM users
@@ -109,39 +101,20 @@ router.get('/team-tasks', (req, res) => {
     ORDER BY ${TEAM_ORDER_SQL}
   `).all();
 
-  const openTasksStmt = db.prepare(`
-    SELECT t.id, t.title, t.due_date, t.status, t.transaction_id,
-      COALESCE(t.category, CASE WHEN t.transaction_id IS NOT NULL THEN 'transaction' ELSE 'admin' END) AS category,
-      tt.calendar_nickname
-    FROM tasks t
-    LEFT JOIN template_tasks tt ON tt.id = t.template_task_id
-    LEFT JOIN transactions tx ON tx.id = t.transaction_id
-    WHERE t.assigned_to = ? AND t.status != 'complete'${scopeFilter}
-    ORDER BY (t.due_date IS NULL), t.due_date ASC, t.id ASC
-  `);
-
-  function countsForCategory(open, category, today) {
-    const tasks = open.filter((t) => t.category === category);
-    return {
-      thisWeekCount: tasks.filter((t) => isDueThisWeek(t.due_date, t.status, today)).length,
-      overdueCount: tasks.filter((t) => isOverdue(t.due_date, t.status)).length,
-    };
-  }
-
   const summary = members.map((m) => {
-    const open = openTasksStmt.all(m.id, ...scopeParams);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const transaction = countsForCategory(open, 'transaction', today);
-    const admin = countsForCategory(open, 'admin', today);
-
+    const { stats, transaction, admin } = memberTaskSummary(db, m.id, agentScope);
     return {
       ...m,
-      thisWeekCount: transaction.thisWeekCount + admin.thisWeekCount,
-      overdueCount: transaction.overdueCount + admin.overdueCount,
-      transaction,
-      admin,
+      thisWeekCount: stats.thisWeek,
+      overdueCount: stats.overdue,
+      transaction: {
+        thisWeekCount: transaction.thisWeek,
+        overdueCount: transaction.overdue,
+      },
+      admin: {
+        thisWeekCount: admin.thisWeek,
+        overdueCount: admin.overdue,
+      },
     };
   });
 
