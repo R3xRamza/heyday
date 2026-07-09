@@ -257,14 +257,14 @@ function TxPanel({ panel, rows, onRowClick, onViewAll }) {
   );
 }
 
-function TaskStatRow({ label, activeCount, overdueCount }) {
+function TaskStatRow({ label, thisWeekCount, overdueCount }) {
   return (
     <div>
       <p className="text-[8px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">{label}</p>
       <div className="flex gap-1.5">
         <div className="flex-1 rounded-md bg-secondary/10 px-2 py-1 text-center">
-          <div className="text-lg font-black text-secondary leading-none tabular-nums">{activeCount}</div>
-          <div className="text-[8px] uppercase font-bold text-on-surface-variant">Active</div>
+          <div className="text-lg font-black text-secondary leading-none tabular-nums">{thisWeekCount}</div>
+          <div className="text-[8px] uppercase font-bold text-on-surface-variant">This Week</div>
         </div>
         <div className={`flex-1 rounded-md px-2 py-1 text-center ${overdueCount > 0 ? 'bg-error/10' : 'bg-surface-container-low'}`}>
           <div className={`text-lg font-black leading-none tabular-nums ${overdueCount > 0 ? 'text-error' : 'text-primary'}`}>
@@ -460,12 +460,12 @@ export default function TeamExecutiveOps() {
                 <div className="space-y-2">
                   <TaskStatRow
                     label="Transaction tasks"
-                    activeCount={m.transaction?.activeCount ?? 0}
+                    thisWeekCount={m.transaction?.thisWeekCount ?? 0}
                     overdueCount={m.transaction?.overdueCount ?? 0}
                   />
                   <TaskStatRow
                     label="Admin tasks"
-                    activeCount={m.admin?.activeCount ?? 0}
+                    thisWeekCount={m.admin?.thisWeekCount ?? 0}
                     overdueCount={m.admin?.overdueCount ?? 0}
                   />
                 </div>
