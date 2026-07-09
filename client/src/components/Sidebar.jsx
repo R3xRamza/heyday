@@ -10,6 +10,7 @@ import {
   BarChart2,
   Building2,
   Megaphone,
+  MessageSquare,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { to: '/revenue', label: 'Revenue', icon: BarChart2 },
   { to: '/transactions', label: 'Transactions', icon: Building2 },
   { to: '/marketing', label: 'Marketing', icon: Megaphone },
+  { to: '/feedback', label: 'Feedback', icon: MessageSquare },
 ];
 
 function navLinkClasses(isActive, { compact = false, collapsed = false } = {}) {

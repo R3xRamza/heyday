@@ -135,6 +135,24 @@ export function runMigrations(db) {
   migrateUserEmailsToHeydayGroup(db);
   migrateTaskCategory(db);
   migrateTeamHubTables(db);
+  migrateHubDocItemsTable(db);
+}
+
+function migrateHubDocItemsTable(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS hub_doc_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      section TEXT NOT NULL CHECK(section IN ('feedback', 'hub_edits')),
+      body TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      created_by INTEGER REFERENCES users(id),
+      updated_by INTEGER REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_hub_doc_items_section ON hub_doc_items(section, sort_order, id);
+  `);
 }
 
 function migrateTeamHubTables(db) {
