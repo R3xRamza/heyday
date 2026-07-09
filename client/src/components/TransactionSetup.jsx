@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import DateText from './shared/DateText';
 import { buildAssignments } from '../utils/taskAssignment';
+import { useAgentScope } from '../context/AgentScopeContext';
+import { appendAgentScope } from '../utils/agentScope';
 import {
   REPRESENTING_OPTIONS,
   LISTING_VISIBILITY_OPTIONS,
@@ -41,7 +43,8 @@ function hydrateForm(transaction) {
   };
 }
 
-export default function TransactionSetup({ transaction, onUpdate, onComplete }) {
+export default function TransactionSetup({ transaction, onUpdate, onComplete, onCancelSetup }) {
+  const { scope } = useAgentScope();
   const [step, setStep] = useState(transaction.workflow_status || 'details');
   const [form, setForm] = useState(hydrateForm(transaction));
   const [templates, setTemplates] = useState([]);
@@ -53,6 +56,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
   const [activeAssignTemplateId, setActiveAssignTemplateId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const [cancelError, setCancelError] = useState('');
 
   const requiredFields = getRequiredTransactionFields(form.representing, form.listing_visibility);
   const isRequired = (key) => requiredFields.includes(key);
@@ -76,11 +80,26 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
     if (step !== 'details' || users.length === 0) return;
     setForm((prev) => {
       if (prev.agent_id) return prev;
-      const meredith = users.find((u) => u.email === 'meredith@theheydaygroup.com');
-      const defaultId = meredith?.id ?? users[0]?.id;
+      const email = scope === 'tessa'
+        ? 'tessa@theheydaygroup.com'
+        : 'meredith@theheydaygroup.com';
+      const agent = users.find((u) => u.email === email);
+      const defaultId = agent?.id ?? users[0]?.id;
       return defaultId ? { ...prev, agent_id: defaultId } : prev;
     });
-  }, [users, step]);
+  }, [users, step, scope]);
+
+  async function handleCancelSetup() {
+    if (!onCancelSetup) return;
+    if (!window.confirm('Cancel setup? This transaction will be permanently deleted.')) return;
+    setSaving(true);
+    setCancelError('');
+    const result = await onCancelSetup();
+    setSaving(false);
+    if (result?.ok === false) {
+      setCancelError(result.error || 'Could not cancel setup.');
+    }
+  }
 
   function agentSelect() {
     return (
@@ -102,8 +121,8 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
 
   async function loadAssignStepData(members) {
     const [tasksRes, checklistsRes] = await Promise.all([
-      fetch(`/api/tasks?transaction_id=${transaction.id}`, { credentials: 'include' }),
-      fetch(`/api/transactions/${transaction.id}/checklists`, { credentials: 'include' }),
+      fetch(appendAgentScope(`/api/tasks?transaction_id=${transaction.id}&include_completed=true`, scope), { credentials: 'include' }),
+      fetch(appendAgentScope(`/api/transactions/${transaction.id}/checklists`, scope), { credentials: 'include' }),
     ]);
     const tasksJson = await tasksRes.json();
     const checklistsJson = await checklistsRes.json();
@@ -121,10 +140,10 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
   useEffect(() => {
     if (step !== 'assign' || users.length === 0) return;
     loadAssignStepData(users);
-  }, [step, transaction.id, users]);
+  }, [step, transaction.id, users, scope]);
 
   async function persistWorkflow(status) {
-    const res = await fetch(`/api/transactions/${transaction.id}`, {
+    const res = await fetch(appendAgentScope(`/api/transactions/${transaction.id}`, scope), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -144,7 +163,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
     }
     setValidationError('');
     setSaving(true);
-    const res = await fetch(`/api/transactions/${transaction.id}`, {
+    const res = await fetch(appendAgentScope(`/api/transactions/${transaction.id}`, scope), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -177,7 +196,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
           return p;
         });
       }
-      await fetch(`/api/transactions/${transaction.id}/parties`, {
+      await fetch(appendAgentScope(`/api/transactions/${transaction.id}/parties`, scope), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -201,7 +220,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
   async function applyTemplates() {
     if (selectedTemplateIds.length === 0) return;
     setSaving(true);
-    const res = await fetch(`/api/transactions/${transaction.id}/apply-checklists`, {
+    const res = await fetch(appendAgentScope(`/api/transactions/${transaction.id}/apply-checklists`, scope), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -255,7 +274,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
         })),
       }),
     });
-    const res = await fetch(`/api/transactions/${transaction.id}/complete-setup`, { method: 'POST', credentials: 'include' });
+    const res = await fetch(appendAgentScope(`/api/transactions/${transaction.id}/complete-setup`, scope), { method: 'POST', credentials: 'include' });
     const json = await res.json();
     setSaving(false);
     if (res.ok) onComplete(json.transaction);
@@ -279,6 +298,25 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete }) 
           </div>
         ))}
       </div>
+
+      {cancelError && (
+        <p className="text-sm text-error font-medium bg-error/10 border border-error/20 rounded-lg px-3 py-2 mb-4" role="alert">
+          {cancelError}
+        </p>
+      )}
+
+      {onCancelSetup && (
+        <div className="flex justify-end mb-4">
+          <button
+            type="button"
+            onClick={handleCancelSetup}
+            disabled={saving}
+            className="text-sm text-error font-medium hover:underline disabled:opacity-50"
+          >
+            Cancel setup
+          </button>
+        </div>
+      )}
 
       {step === 'details' && (
         <div

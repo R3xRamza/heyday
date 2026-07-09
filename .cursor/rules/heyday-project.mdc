@@ -5,180 +5,156 @@ alwaysApply: true
 
 # HEYDAY project context
 
-**GOAL** — You are working on HEYDAY, a real estate operations platform (Express/SQLite API + React/Vite SPA). Path: `/Users/rexramza/Desktop/heyday`. User requirements are acceptance criteria, not nice-to-haves. Match mockups/screenshots exactly when provided.
+**READ FIRST** — Skim this file + `heyday-workflow.mdc` before coding. User requirements are acceptance criteria, not nice-to-haves. Mockups/screenshots are acceptance tests. Trust ROUTES, API, and DOMAIN sections here over stale README changelogs.
+
+**GOAL** — Real estate operations platform (Express/SQLite API + React/Vite SPA). Path: `/Users/rexramza/Desktop/heyday`.
 
 ## STACK
 
-- Monorepo root: `package.json` runs `npm run dev` (nodemon API :3001 + Vite client :5173)
-- Server: Node ESM, Express, better-sqlite3 (`heyday.db` or `DATABASE_PATH`), JWT auth via cookie, `foreign_keys ON`
-- Client: React 18, React Router, Tailwind, Vite proxy `/api` → localhost:3001
-- Build: `npm run build` (client only). No commits unless user asks.
+- Root `npm run dev` → nodemon API `:3001` + Vite `:5173` (proxy `/api`)
+- Server: Node ESM, Express, better-sqlite3, JWT cookie auth, `foreign_keys ON`
+- Client: React 18, React Router, Tailwind
+- Build: `npm run build` (client only). **No commits unless user asks.**
 
-## DEPLOY (Railway — live)
+## DEPLOY
 
 - Repo: `github.com/R3xRamza/heyday`
-- URL: `https://heyday-production-ce72.up.railway.app`
-- `railway.toml`: build client + `npm start` (production serves SPA from `client/dist`)
-- Env: `NODE_ENV=production`, `JWT_SECRET`, `CLIENT_URL` (full `https://` URL), `DATABASE_PATH=/data/heyday.db` with Volume at `/data`
-- Local `heyday.db` is gitignored; Railway starts fresh unless volume seeded or data imported
+- Production: `https://hub.theheydaygroup.com` (Railway)
+- `railway.toml`: install + build client + `npm start` (serves `client/dist`)
+- Env: `NODE_ENV=production`, `JWT_SECRET`, `CLIENT_URL` (full `https://` URL), `DATABASE_PATH=/data/heyday.db` + Volume at `/data`
+- Optional: `FUB_API_KEY`, Gmail vars — see `README.md`, `server/README-gmail.md`
 
 ## DEV
 
-- `npm run dev` from heyday root
-- Default login seeded: `admin@theheydaygroup.com` / `admin123`
-- Scripts: `clear-transactions`, `import-crm`, `seed-sample-transactions`
-
-## REPO LAYOUT
-
-- `server/index.js` — app entry, mounts `/api/*` routes with `authMiddleware`
-- `server/routes/` — auth, crm, tasks, transactions, marketing, checklists, team, revenue, gmail, **projects**, **user-todos**
-- `server/lib/` — migrate.js, business logic (transactionParties, applyChecklists, marketingCalendar, activity, etc.)
-- `server/db.js` — SQLite init + `runMigrations()`; `DATABASE_PATH` env overrides default `heyday.db` path
-- `client/src/App.jsx` — all routes
-- `client/src/pages/` — screen-level components
-- `client/src/components/` — shared UI (Sidebar, DashboardLayout, TopNav, **TaskHubTabs**, **TaskHubPersonHeader**, **TeamAvatar**, marketing/*, projects/*, etc.)
-- `client/src/data/teamProfiles.js` — per-email role + profile photo paths
-- `client/src/assets/team/` — team profile photos (.jpg)
-- `client/src/context/SidebarContext.jsx` — collapsible sidebar state (`sidebar-collapsed-v1`)
-- `client/src/utils/taskDisplay.js` — `displayTaskTitle(task)` (calendar nickname || title)
-- `client/src/utils/format.js` — formatDate, formatCurrency, shortAddress, DateText pattern
-- `client/src/index.css` — global + `.calendar-grid` (7 cols), `.marketing-calendar-*` styles
+- `npm run dev` from repo root
+- Login: `admin@theheydaygroup.com` / `admin123` (team: `heyday123`)
+- Local DB: `heyday.db` (gitignored); migrations run on server start
 
 ## ROUTES (client)
 
-- `/login`, `/crm`, `/crm/:id` (contacts)
-- `/tasks`, `/tasks/:userId` (team overview + per-user Daily Task Dashboard, calendar view)
-- `/tasks/:userId/projects` (per-user **Project Dashboard** — projects + personal todos)
-- `/transactions`, `/transactions/:id` (list + TransactionManager workspace)
-- `/marketing` (Marketing Calendar)
-- `/checklists` (template editor)
-- `/revenue`, `/team-ops`
+| Path | Page |
+|------|------|
+| `/login` | Login |
+| `/` | Redirect → `/team-ops` or `/login` |
+| `/team-ops` | Team Executive Ops (home) |
+| `/tasks` | Team Task Overview |
+| `/tasks/:userId` | Daily Task Dashboard (transaction tasks) |
+| `/tasks/:userId/admin` | Admin Task Dashboard |
+| `/tasks/:userId/projects` | Project Dashboard |
+| `/crm`, `/crm/:id` | CRM Hub, contact detail |
+| `/transactions`, `/transactions/:id` | Transactions list, TransactionManager |
+| `/marketing` | Marketing Calendar |
+| `/revenue` | Revenue Analytics |
+| `/checklists` | Checklist template editor |
+| `/feedback` | Shared team bullet list |
 
-## API (server; all except `/api/auth` need session cookie)
+## SIDEBAR
 
-- `/api/crm` — contacts (FUB import fields: birthday, anniversary, etc.)
-- `/api/tasks` — team tasks; query: `assigned_to`, `transaction_id`, `due_after`, `due_before`, `transaction_only`
-- `/api/transactions` — CRUD, parties, activity, checklists, DELETE (delete activity before tasks — FK)
-- `/api/marketing` — calendar posts, platform-goals, birthdays range, birthday-pins
-- `/api/checklists` — template + template_tasks CRUD (`calendar_nickname`, `default_role`)
-- `/api/projects` — per-user projects CRUD (`?user_id=`); title + description only
-- `/api/user-todos` — per-user personal todos CRUD; GET purges completed items older than 7 days
-- `/api/team` — members + stats; list ordered Tessa → Adam → Margaret → Meredith
+Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · CRM Hub · Revenue · Transactions · Marketing · **Feedback**
 
-## AUTH
+- Collapse: `SidebarContext`, `sidebar-collapsed-v1` (260px ↔ 72px)
+- Task Hub `NavLink` uses `end` — `/tasks/:userId` must not highlight Task Hub
+- Sidebar label **Marketing**; page title **Marketing Calendar**
+- Logo: import `client/src/assets/heyday-logo.png` (sidebar). Favicon: `client/public/favicon*.png` via `index.html`
 
-- Client fetch: always `credentials: 'include'`
-- `ProtectedRoute` wraps authenticated pages
-- `DashboardLayout` = Sidebar + TopNav + main; sidebar 260px expanded / 72px collapsed; main margin follows `sidebarWidth`
-- `SidebarContext` in `App.jsx`; collapse persisted in `sidebar-collapsed-v1`
+## API (auth cookie required except `/api/auth`)
 
-## DESIGN SYSTEM
+| Mount | Purpose |
+|-------|---------|
+| `/api/auth` | Login, logout, session |
+| `/api/crm` | Contacts (birthday, anniversary, FUB fields) |
+| `/api/tasks` | Tasks; filters: `assigned_to`, `transaction_id`, dates, `include_completed` |
+| `/api/transactions` | CRUD, parties, activity, checklists, import |
+| `/api/marketing` | Posts, platform-goals, birthdays, birthday-pins |
+| `/api/checklists` | Template + template_tasks CRUD |
+| `/api/projects` | Per-user projects (`?user_id=`) |
+| `/api/user-todos` | Per-user todos; purges completed >7 days |
+| `/api/team` | Members + stats (Tessa → Adam → Margaret → Meredith) |
+| `/api/team-hub` | Team ops stats, celebrations, messages, links |
+| `/api/revenue` | Revenue analytics |
+| `/api/gmail` | OAuth + CRM email sync |
+| `/api/address` | Address autocomplete |
+| `/api/hub-docs` | Shared feedback bullets (`section=feedback`) |
 
-- Brand: feather (#134041), feather-alt, sky, lemon, off-white bg
-- Tailwind tokens: primary-container, secondary, surface-*, on-surface-variant
-- `html` font-size 18px (`index.css`)
-- Logo: import from `client/src/assets/heyday-logo.png` (NOT `/public` path alone)
-- Sidebar width 260px expanded, 72px collapsed; main `marginLeft` from `SidebarContext` (not hardcoded)
-- Task Hub NavLink uses `end` — `/tasks/:userId` (“My tasks”) must not activate `/tasks`
-- Sidebar label **Marketing**; marketing page TopNav title **Marketing Calendar**
-- Icons: `shared/Icon.jsx` (Material Symbols) + lucide in Sidebar
-- Reuse `DashboardLayout`, `DateText` for non-wrapping dates
+**Agent scope** — `?agent_scope=` / `scope` on transactions, revenue, team-hub, marketing, tasks. `AgentScopeContext` + `appendAgentScope()` on client.
+
+## LAYOUT & DESIGN
+
+- `DashboardLayout` = Sidebar + TopNav + main; `marginLeft` from `sidebarWidth`
+- Brand: feather (#134041), sky, lemon; Tailwind tokens `primary-container`, `secondary`, `surface-*`
+- `html` font-size 18px. Icons: `shared/Icon.jsx` + lucide in Sidebar
+- Full-bleed pages: no `max-w` caps that leave dead right margin on main content
+- Reuse `DateText`, `TeamAvatar`, `DashboardLayout`
 
 ## DOMAIN — Transactions
 
-- Representing types: seller, buyer, landlord, tenant, seller_and_buyer
-- Parties: counterparty model (not separate client/seller rows)
-- TransactionWorkspace views: details (timeline + parties), checklist, activity
-- Checklists applied per transaction; tasks tied to template_tasks
-- `workflow_status`: setup flow via TransactionSetup until active
+- Representing: seller, buyer, landlord, tenant (legacy `seller_and_buyer` normalized)
+- Parties: counterparty model. `workflow_status`: setup via `TransactionSetup` until active
+- Key dates: `listing_date`, `important_date` (expiration), `close_date`, `acceptance_date`, `option_end_date`
+- **List filters** (`TransactionsList.jsx`): Active Transactions, Coming Soon, Current Listings, Pending, Closed, All
+- **Current Listings columns:** Address, Type, Price, Listing Date, **Expiration** (`important_date`) — no Agent column
+- **Listings KPI card** subtitle: **Active**
+- **Create (step 1):** address/city/state/zip only — `validateCreateTransaction`; full fields in setup later
+- **Delete:** detach `transaction_activity.task_id` → delete tasks → delete transaction (FK-safe)
+- **Checklist view** (`TransactionWorkspace.jsx`): scrollable panel ~32rem min height; task rows `font-medium`; complete = strikethrough only (no COMPLETED label); click row → detail sidebar
+- List view state: `transactions-list-view-v1` sessionStorage; `TransactionsNavTracker`
 
 ## DOMAIN — Tasks
 
-- Statuses: pending, complete; `due_date`; `transaction_id` optional
-- **TeamTaskOverview** (`/tasks`) — team workload cards, priority tasks, closing milestones
-- **UserTaskDashboard** (`/tasks/:userId`) — filters, stats, task table + calendar (`TaskCalendarView.jsx`)
-- **TaskHubTabs** — toggle Tasks | Projects on person dashboards
-- **TaskHubPersonHeader** — shared back link, title, avatar, subtitle, optional children (filters)
+- Status: pending | complete; optional `transaction_id`, `due_date`, template link
+- **TeamTaskOverview** `/tasks` — workload cards, milestones
+- **UserTaskDashboard** `/tasks/:userId` — filters, table/calendar; categories: transaction + admin
+- **TaskHubTabs** + **TaskHubPersonHeader** on person dashboards
+- Calendar display: `displayTaskTitle()` → nickname || title
 
 ## DOMAIN — Project Dashboard
 
-- Page: `/tasks/:userId/projects` — `UserProjectDashboard.jsx`
-- Layout: 3-column grid — projects list | Pending todos | Done todos
-- **Projects** (`/api/projects`): independent of transactions; expand/edit on click/double-click
-- **User todos** (`/api/user-todos`): personal kanban; separate from transaction tasks
-- Write access: owning user or `admin`
-- Components: `client/src/components/projects/*` (`ProjectListPanel`, `ProjectTodoBoard`, etc.)
-
-## DOMAIN — Team profiles
-
-- `teamProfiles.js` maps `email` → `{ role, img }`
-- `TeamAvatar.jsx` — circular photo or initials fallback; used in Sidebar, TopNav, Task Hub
+- `/tasks/:userId/projects` — projects list + personal todo kanban (Pending | Done)
+- Write: owner or admin. Components: `client/src/components/projects/*`
 
 ## DOMAIN — CRM
 
-- `contacts` table with birthday, anniversary (recurring month-day)
-- Contact detail at `/crm/:id`
+- Contacts with birthday, anniversary, partner fields. Gmail sync → `contact_activity`
+- Detail: `/crm/:id`
 
 ## DOMAIN — Checklists
 
-- Page: `/checklists` — `ChecklistEditor.jsx`
-- `template_tasks`: title, timing_*, `default_role`, `calendar_nickname`, sort_order
-- UI: multi-line title, nickname input, default assignee select (team roles), timing row (days / before|after / anchor)
-- `server/lib/deriveNickname.js` — auto-generates short nicknames from titles on migrate/seed
-- Applied tasks inherit assignee via `applyChecklists.js` + `default_role`; calendar display joins nickname from `template_tasks`
+- `/checklists` — `ChecklistEditor.jsx`: multi-line title, calendar nickname, default assignee, timing
+- `template_tasks`: `default_role`, `calendar_nickname`, timing_* → applied via `applyChecklists.js`
+- Multiple checklists per transaction (`transaction_checklists` junction)
 
-## DOMAIN — Marketing Calendar (DONE)
+## DOMAIN — Marketing Calendar
 
-- Page: `/marketing` — `MarketingCalendar.jsx` + `client/src/components/marketing/*`
-- Layout: slim header, collapsible weekly goals (`PlatformQuotasRow`), single-row toolbar, hero month/week calendar grid
-- Weekly goals: 5 platform quota slots, LAST WK counts, current-week progress, NEXT post title
-- Calendar: Sun–Sat grid; social post drag-and-drop reschedule; platform filter; category pills (Social | Tasks | Milestones)
-- Day cell order: **Social → Tasks → Milestones** (`MarketingDayEvents.jsx`)
-- Friday toolbar milestones popover: Fri celebrations, separator, Sat+Sun (`partitionFridayCelebrations`, fetch through Sunday)
-- **Birthdays** toolbar button always visible; empty state when none today; **Plan {Mon} birthdays** opens `MonthBirthdaysModal`
-- Birthday pins: `marketing_birthday_pins` (month + contact_id); only pinned CRM birthdays render on grid when Milestones on
-- Double-click day cell → `MarketingPostModal` (new post, date pre-filled); **platform dropdown uses `filterPlatforms`** (same as toolbar — TikTok, Instagram, Facebook, LinkedIn, YouTube, Podcast, IG Grid, IG Story, Blog, Pop By)
-- Social posts: platform-colored chips; `status: done` shows crossed-out; `PATCH /api/marketing/posts/:id` for date/status
-- Tasks: Adam-assigned transaction tasks; grey chips; nickname via `displayTaskTitle`; complete via `MarketingTaskModal`
-- Data: `marketing_posts`, `marketing_platform_goals`, `marketing_birthday_pins`, CRM birthdays/anniversaries, `GET /api/tasks` (assigned_to + date range)
-- localStorage: `marketing-categories-v4`, `marketing-platform-filter-v1`, `marketing-quota-slots-v1`, `marketing-goals-collapsed-v1`, `sidebar-collapsed-v1`
+- Sun–Sat grid; day order: **Social → Tasks → Milestones**
+- Weekly quota cards (`PlatformQuotasRow`), platform filter, category pills
+- Birthday pins (`marketing_birthday_pins`); `MonthBirthdaysModal`
+- Double-click day → new post; platforms match toolbar `filterPlatforms`
+- Social done = crossed-out chips. Task chips use calendar nickname
 
-## RECENT (2026-06-18)
+## DOMAIN — Feedback
 
-- **Project Dashboard** at `/tasks/:userId/projects` with `projects` + `user_todos` APIs
-- **Task Hub**: `TaskHubTabs`, `TaskHubPersonHeader`, sidebar My tasks / My projects
-- **Team avatars** + local photos in `client/src/assets/team/`
-- Marketing post modal platforms aligned with toolbar filter
-- Team overview order: Tessa first
+- `/feedback` — `HubFeedback.jsx` + `HubDocList.jsx`
+- Shared bullet list for all auth users; `hub_doc_items` table, `section='feedback'`
+- Enter adds row; auto-save; empty row removes on blur
 
-## RECENT (2026-06-15)
+## DOMAIN — Team
 
-- `main` on GitHub synced with production deploy
-- Checklist editor: nicknames, default assignee, multi-line titles
-- Marketing: birthday planner/pins, double-click new post, social done chips, task nicknames on calendar
-- Collapsible sidebar + compact footer/logout
-- Team logins: admin `admin123`; team `heyday123` (see README.md)
+- `teamProfiles.js` → role + photo. `TeamAvatar.jsx` everywhere
+- **Team Hub** `/team-ops` — stats, listings panels, expirations, team task cards
 
 ## CODE CONVENTIONS
 
-- Minimal diff; match surrounding style; no over-engineering
-- ESM imports (.js server, .jsx client)
-- Migrations in `server/lib/migrate.js` (add tables/columns idempotently)
-- Activity logging via `server/lib/activity.js`
-- When user asks for "agent prompt", use detailed spec: GOAL, REFERENCE, LAYOUT, COMPONENTS, DATA, INTERACTIONS, DO NOT, ACCEPTANCE [ ], VERIFY
+- Minimal diff; match surrounding style
+- Migrations: `server/lib/migrate.js` idempotently
+- Activity: `logActivity()` in `server/lib/activity.js`
+- Agent prompts: GOAL · REFERENCE · LAYOUT · COMPONENTS · DATA · INTERACTIONS · DO NOT · ACCEPTANCE · VERIFY
 
 ## DO NOT
 
-- Skip stated requirements to ship faster
-- Treat mockup match as polish pass
-- Mon–Sat or Mon-first week grids
-- Duplicate TopNav title on marketing-style pages without reason
-- Commit unless explicitly asked
-- Force push, amend commits, or update git config
+- Skip stated requirements · treat mockups as polish · Mon-first calendar grids
+- Duplicate TopNav title without reason · commit unless asked · force push / amend / git config changes
 
 ## VERIFY
 
 - `npm run build` must pass
-- For UI: confirm layout against acceptance criteria
-
-When uncertain about product intent, ask once — do not silently drop features.
+- UI: match acceptance criteria / screenshots
