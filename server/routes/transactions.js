@@ -105,6 +105,8 @@ function transactionOrderClause(sortKey, sortDir, dateField) {
       return `(u.name IS NULL), LOWER(u.name) ${dir}, t.id ${dir}`;
     case 'type':
       return `t.stage ${dir}, COALESCE(t.listing_visibility, 'public') ${dir}, (t.listing_date IS NULL), t.listing_date ${dir}, t.id ${dir}`;
+    case 'expiration':
+      return `(t.important_date IS NULL), t.important_date ${dir}, t.id ${dir}`;
     case 'date':
     default:
       return `(t.${dateField} IS NULL), t.${dateField} ${dir}, t.id ${dir}`;

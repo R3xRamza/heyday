@@ -229,6 +229,19 @@ function isEmpty(value) {
   return value === undefined || value === null || String(value).trim() === '';
 }
 
+export function validateCreateTransaction(form) {
+  const missing = BASE_REQUIRED.filter((key) => isEmpty(form[key]));
+  if (missing.length === 0) {
+    return { ok: true, missing: [] };
+  }
+  const labels = missing.map((k) => FIELD_LABELS[k] || k);
+  return {
+    ok: false,
+    missing,
+    message: `Please fill in required fields: ${labels.join(', ')}`,
+  };
+}
+
 export function validateTransactionFields(form) {
   const required = getRequiredTransactionFields(form.representing, form.listing_visibility);
   const missing = required.filter((key) => isEmpty(form[key]));
