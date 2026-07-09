@@ -1,6 +1,21 @@
 import db from '../db.js';
 import { computeDueDate, resolveAnchorDate } from './timing.js';
 
+export function recalculateTemplateTaskDueDate(db, taskId, transaction) {
+  const row = db.prepare(`
+    SELECT
+      COALESCE(t.timing_value, tt.timing_value) AS timing_value,
+      COALESCE(t.timing_direction, tt.timing_direction) AS timing_direction,
+      COALESCE(t.timing_anchor, tt.timing_anchor) AS timing_anchor
+    FROM tasks t
+    LEFT JOIN template_tasks tt ON tt.id = t.template_task_id
+    WHERE t.id = ?
+  `).get(taskId);
+  if (!row?.timing_anchor) return null;
+  const anchor = resolveAnchorDate(transaction, row.timing_anchor);
+  return computeDueDate(anchor, row.timing_value, row.timing_direction);
+}
+
 export function recalculateTransactionTasks(transactionId) {
   const transaction = db.prepare('SELECT * FROM transactions WHERE id = ?').get(transactionId);
   if (!transaction) return 0;
@@ -13,6 +28,7 @@ export function recalculateTransactionTasks(transactionId) {
     FROM tasks t
     LEFT JOIN template_tasks tt ON tt.id = t.template_task_id
     WHERE t.transaction_id = ?
+      AND COALESCE(t.due_date_override, 0) = 0
       AND (t.template_task_id IS NOT NULL OR t.timing_anchor IS NOT NULL)
   `).all(transactionId);
 

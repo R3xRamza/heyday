@@ -8,6 +8,7 @@ import CreateTaskModal from '../components/CreateTaskModal';
 import { getTeamProfile } from '../data/teamProfiles';
 import TaskCalendarView from '../components/TaskCalendarView';
 import DateText from '../components/shared/DateText';
+import TwoLineFitText from '../components/shared/TwoLineFitText';
 import { useAgentScope } from '../context/AgentScopeContext';
 import { appendAgentScope } from '../utils/agentScope';
 import TaskHubPersonHeader from '../components/TaskHubPersonHeader';
@@ -77,8 +78,13 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
   const [expandedId, setExpandedId] = useState(null);
   const [viewMode, setViewMode] = useState('list');
   const [page, setPage] = useState(1);
+  const [statusOverrides, setStatusOverrides] = useState({});
 
   const includeCompleted = showCompleted;
+
+  const clearStatusOverrides = useCallback(() => {
+    setStatusOverrides({});
+  }, []);
 
   const fetchMember = useCallback(async () => {
     const res = await fetch(`/api/team/${userId}`, { credentials: 'include' });
@@ -125,10 +131,14 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
   }, [fetchTasks]);
 
   useEffect(() => {
+    clearStatusOverrides();
+  }, [userId, filter, page, category, viewMode, includeCompleted, clearStatusOverrides]);
+
+  useEffect(() => {
     setPage(1);
   }, [userId, filter, showUndated, includeCompleted, viewMode]);
 
-  async function patchTask(taskId, body) {
+  async function patchTask(taskId, body, { refresh = true } = {}) {
     const res = await fetch(`/api/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -136,17 +146,37 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
       body: JSON.stringify(body),
     });
     if (res.ok) {
-      await fetchTasks();
-      await fetchMember();
-      return (await res.json()).task;
+      const json = await res.json();
+      if (refresh) {
+        clearStatusOverrides();
+        await fetchTasks();
+        await fetchMember();
+      }
+      return json.task;
     }
     return null;
   }
 
   async function toggleTask(task, e) {
     e?.stopPropagation();
-    const status = task.status === 'complete' ? 'pending' : 'complete';
-    await patchTask(task.id, { status });
+    const currentStatus = statusOverrides[task.id] ?? task.status;
+    const nextStatus = currentStatus === 'complete' ? 'pending' : 'complete';
+
+    setStatusOverrides((prev) => ({ ...prev, [task.id]: nextStatus }));
+
+    const updated = await patchTask(task.id, { status: nextStatus }, { refresh: showCompleted });
+    if (!updated) {
+      setStatusOverrides((prev) => {
+        const next = { ...prev };
+        if (currentStatus === task.status) {
+          delete next[task.id];
+        } else {
+          next[task.id] = currentStatus;
+        }
+        return next;
+      });
+      window.alert('Could not update task.');
+    }
   }
 
   async function saveTaskEdit(formData) {
@@ -174,6 +204,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
     if (!window.confirm(`Delete "${task.title}"?`)) return;
     await fetch(`/api/tasks/${task.id}`, { method: 'DELETE', credentials: 'include' });
     if (editTask?.id === task.id) setEditTask(null);
+    clearStatusOverrides();
     await fetchTasks();
     await fetchMember();
   }
@@ -184,10 +215,18 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
   const { stats } = data;
 
   const displayedTasks = useMemo(() => {
-    let list = data.tasks;
+    let list = data.tasks.map((task) => {
+      const override = statusOverrides[task.id];
+      if (!override) return task;
+      return {
+        ...task,
+        status: override,
+        is_overdue: override === 'complete' ? false : task.is_overdue,
+      };
+    });
     if (viewMode !== 'list' && !showUndated) list = list.filter((t) => t.due_date);
     return sortMyTasks(list, { admin: category === 'admin' });
-  }, [data.tasks, showUndated, category, viewMode]);
+  }, [data.tasks, statusOverrides, showUndated, category, viewMode]);
 
   const isAdmin = category === 'admin';
   const showPriorityColumn = isAdmin && displayedTasks.some(
@@ -298,7 +337,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
                       <th className="pl-4 pr-10 py-4 border-b border-outline-variant/30 w-24" />
                     </>
                   ) : (
-                    ['', 'Task Description', 'Context / Property', 'Due Date', ''].map((h, i) => (
+                    ['', 'Task Description', 'Property', 'Due Date', ''].map((h, i) => (
                       <th
                         key={h || 'actions'}
                         className={`${i === 0 ? 'pl-10 pr-4' : i === 4 ? 'pl-4 pr-10 text-right' : i === 3 ? 'px-4 min-w-[9.5rem] w-[9.5rem]' : 'px-4'} py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30`}
@@ -373,19 +412,20 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
                           </>
                         ) : (
                           <>
-                            <td className={`px-4 ${rowPad} text-sm align-top`}>
+                            <td className={`px-4 ${rowPad} text-sm align-top min-w-0 whitespace-normal`}>
                               {task.transaction_id ? (
-                                <Link
+                                <TwoLineFitText
+                                  as={Link}
                                   to={`/transactions/${task.transaction_id}`}
                                   onClick={(e) => e.stopPropagation()}
-                                  className="text-on-surface-variant/80 hover:text-secondary hover:underline line-clamp-2 leading-snug block max-w-[10.5rem]"
+                                  className="text-on-surface-variant/80 hover:text-secondary hover:underline"
                                 >
                                   {shortAddress(task.transaction_address)}
-                                </Link>
+                                </TwoLineFitText>
                               ) : (
-                                <span className="text-on-surface-variant/80 line-clamp-2 leading-snug block max-w-[10.5rem]">
+                                <TwoLineFitText className="text-on-surface-variant/80">
                                   {shortAddress(task.transaction_address) || '—'}
-                                </span>
+                                </TwoLineFitText>
                               )}
                             </td>
                             <td className={`px-4 ${rowPad} whitespace-nowrap min-w-[9.5rem]`}>

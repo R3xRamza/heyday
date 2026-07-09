@@ -58,7 +58,6 @@ export default function TaskDeadlineFields({
         <div className="mt-2 flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={readOnlyRelative}
             onClick={() => onDeadlineModeChange('fixed')}
             className={`rounded-full px-3 py-1 text-xs font-semibold border transition-colors ${
               deadlineMode === 'fixed'
@@ -70,7 +69,6 @@ export default function TaskDeadlineFields({
           </button>
           <button
             type="button"
-            disabled={readOnlyRelative}
             onClick={() => onDeadlineModeChange('relative')}
             className={`rounded-full px-3 py-1 text-xs font-semibold border transition-colors ${
               deadlineMode === 'relative'
