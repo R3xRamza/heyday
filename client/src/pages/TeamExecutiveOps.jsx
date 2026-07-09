@@ -321,7 +321,7 @@ export default function TeamExecutiveOps() {
     fetch('/api/team-hub/celebrations?window=hub', { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setCelebrations(json.events || []));
-    fetch(appendAgentScope('/api/team-hub/team-tasks', scope), { credentials: 'include' })
+    fetch(appendAgentScope('/api/team', scope), { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setTeamTasks(json.members || []));
     fetch('/api/team-hub/links', { credentials: 'include' })
@@ -460,13 +460,13 @@ export default function TeamExecutiveOps() {
                 <div className="space-y-2">
                   <TaskStatRow
                     label="Transaction tasks"
-                    thisWeekCount={m.transaction?.thisWeekCount ?? 0}
-                    overdueCount={m.transaction?.overdueCount ?? 0}
+                    thisWeekCount={m.transaction?.thisWeek ?? 0}
+                    overdueCount={m.transaction?.overdue ?? 0}
                   />
                   <TaskStatRow
                     label="Admin tasks"
-                    thisWeekCount={m.admin?.thisWeekCount ?? 0}
-                    overdueCount={m.admin?.overdueCount ?? 0}
+                    thisWeekCount={m.admin?.thisWeek ?? 0}
+                    overdueCount={m.admin?.overdue ?? 0}
                   />
                 </div>
               </button>

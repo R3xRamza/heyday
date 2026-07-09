@@ -151,11 +151,11 @@ export default function TeamTaskOverview() {
 
   const fetchTeam = useCallback(() => {
     setLoadingTeam(true);
-    fetch('/api/team', { credentials: 'include' })
+    fetch(appendAgentScope('/api/team', scope), { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => setTeamMembers(json.members || []))
       .finally(() => setLoadingTeam(false));
-  }, []);
+  }, [scope]);
 
   const fetchOverview = useCallback(() => {
     setLoadingOverview(true);
