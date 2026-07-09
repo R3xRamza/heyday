@@ -123,6 +123,7 @@ export function runMigrations(db) {
   addColumnIfMissing(db, 'tasks', 'timing_value', 'INTEGER');
   addColumnIfMissing(db, 'tasks', 'timing_direction', 'TEXT');
   addColumnIfMissing(db, 'tasks', 'timing_anchor', 'TEXT');
+  addColumnIfMissing(db, 'tasks', 'due_date_override', 'INTEGER DEFAULT 0');
   migrateCrmActivityAndGmail(db);
   migrateMarketingTables(db);
   migrateBirthdayPinsTable(db);

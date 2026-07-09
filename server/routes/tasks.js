@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db from '../db.js';
 import { isOverdue, computeDueDate, resolveAnchorDate } from '../lib/timing.js';
+import { recalculateTemplateTaskDueDate } from '../lib/recalculateTasks.js';
 import { resolveAssigneeId, resolveTaskRole } from '../lib/taskAssignment.js';
 import { logActivity, formatFieldChange, actorLabel } from '../lib/activity.js';
 import { parsePagination, wantsPagination, buildCountSql } from '../lib/pagination.js';
@@ -522,10 +523,49 @@ router.patch('/:id', (req, res) => {
       };
 
     if (task.template_task_id) {
-      const resolvedDueDate = due_date !== undefined ? (due_date || null) : task.due_date;
-      if (resolvedDueDate !== task.due_date) {
-        changes.push(formatFieldChange('Deadline', task.due_date, resolvedDueDate));
+      if (req.body.due_date_override === true && due_date !== undefined) {
+        const override = Boolean(due_date);
+        if (due_date !== task.due_date || override !== Boolean(task.due_date_override)) {
+          changes.push(formatFieldChange('Deadline', task.due_date, due_date || null));
+        }
+        db.prepare(`
+          UPDATE tasks
+          SET due_date = ?, due_date_override = 1,
+              timing_value = NULL, timing_direction = NULL, timing_anchor = NULL
+          WHERE id = ?
+        `).run(due_date || null, req.params.id);
+      } else if (timingTouched) {
+        const timing = parseTaskTiming({
+          timing_value: timing_value ?? task.timing_value,
+          timing_direction: timing_direction ?? task.timing_direction,
+          timing_anchor: timing_anchor !== undefined ? timing_anchor : task.timing_anchor,
+        });
+        const resolvedDueDate = resolveTaskDueDate(transaction, timing);
+        if (resolvedDueDate !== task.due_date) {
+          changes.push(formatFieldChange('Deadline', task.due_date, resolvedDueDate));
+        }
+        db.prepare(`
+          UPDATE tasks
+          SET due_date = ?, timing_value = ?, timing_direction = ?, timing_anchor = ?, due_date_override = 0
+          WHERE id = ?
+        `).run(
+          resolvedDueDate,
+          timing.timing_value,
+          timing.timing_direction,
+          timing.timing_anchor,
+          req.params.id,
+        );
+      } else if (req.body.due_date_override === false) {
+        db.prepare(`
+          UPDATE tasks
+          SET timing_value = NULL, timing_direction = NULL, timing_anchor = NULL, due_date_override = 0
+          WHERE id = ?
+        `).run(req.params.id);
+        const resolvedDueDate = recalculateTemplateTaskDueDate(db, task.id, transaction);
         db.prepare('UPDATE tasks SET due_date = ? WHERE id = ?').run(resolvedDueDate, req.params.id);
+        if (resolvedDueDate !== task.due_date) {
+          changes.push(formatFieldChange('Deadline', task.due_date, resolvedDueDate));
+        }
       }
     } else {
       const resolvedDueDate = resolveTaskDueDate(transaction, {

@@ -1,19 +1,25 @@
 import { useState, useEffect } from 'react';
 import TaskDeadlineFields from './TaskDeadlineFields';
+import { computeTaskDueDate } from '../utils/taskTiming';
 
 const PRIORITY_OPTIONS = [
   { value: 'normal', label: 'Normal' },
   { value: 'high', label: 'High' },
 ];
 
+function resolveDeadlineMode(task) {
+  if (task.due_date_override) return 'fixed';
+  const isTemplateTask = Boolean(task.template_task_id);
+  if (task.task_timing_anchor || (isTemplateTask && task.timing_anchor)) return 'relative';
+  return 'fixed';
+}
+
 export default function EditTaskModal({ task, users, transaction = null, adminOnly = false, onClose, onSave }) {
   const isTemplateTask = Boolean(task.template_task_id);
   const showLinkedDeadline = Boolean(transaction);
-  const initialMode = (task.task_timing_anchor || (isTemplateTask && task.timing_anchor))
-    ? 'relative'
-    : 'fixed';
+  const templateLinkedTiming = isTemplateTask && Boolean(task.timing_anchor);
 
-  const [deadlineMode, setDeadlineMode] = useState(initialMode);
+  const [deadlineMode, setDeadlineMode] = useState(() => resolveDeadlineMode(task));
   const [timingValue, setTimingValue] = useState(task.timing_value ?? 0);
   const [timingDirection, setTimingDirection] = useState(task.timing_direction || 'A');
   const [timingAnchor, setTimingAnchor] = useState(task.timing_anchor || '');
@@ -27,10 +33,7 @@ export default function EditTaskModal({ task, users, transaction = null, adminOn
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const mode = (task.task_timing_anchor || (task.template_task_id && task.timing_anchor))
-      ? 'relative'
-      : 'fixed';
-    setDeadlineMode(mode);
+    setDeadlineMode(resolveDeadlineMode(task));
     setTimingValue(task.timing_value ?? 0);
     setTimingDirection(task.timing_direction || 'A');
     setTimingAnchor(task.timing_anchor || '');
@@ -43,6 +46,16 @@ export default function EditTaskModal({ task, users, transaction = null, adminOn
     });
   }, [task]);
 
+  function handleDeadlineModeChange(mode) {
+    if (mode === 'fixed' && !form.due_date && transaction && timingAnchor) {
+      const preview = computeTaskDueDate(transaction, timingValue, timingDirection, timingAnchor);
+      if (preview) {
+        setForm((prev) => ({ ...prev, due_date: preview }));
+      }
+    }
+    setDeadlineMode(mode);
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
@@ -52,7 +65,17 @@ export default function EditTaskModal({ task, users, transaction = null, adminOn
       assigned_to: form.assigned_to || null,
     };
 
-    if (showLinkedDeadline && !isTemplateTask) {
+    if (isTemplateTask) {
+      if (deadlineMode === 'fixed') {
+        payload.due_date = form.due_date || null;
+        payload.due_date_override = true;
+      } else {
+        payload.timing_value = timingValue;
+        payload.timing_direction = timingDirection;
+        payload.timing_anchor = timingAnchor || null;
+        payload.due_date_override = false;
+      }
+    } else if (showLinkedDeadline) {
       if (deadlineMode === 'relative') {
         payload.timing_value = timingValue;
         payload.timing_direction = timingDirection;
@@ -103,16 +126,15 @@ export default function EditTaskModal({ task, users, transaction = null, adminOn
           </div>
           {showLinkedDeadline ? (
             <>
-              {isTemplateTask && task.timing_anchor && (
+              {templateLinkedTiming && (
                 <p className="text-xs text-on-surface-variant bg-surface-container-low/60 border border-outline-variant/20 rounded px-3 py-2">
-                  This checklist task is linked to transaction dates via the checklist template.
-                  You can override the due date below; it will update again if transaction dates change.
+                  Linked to transaction dates. Edit days, before/after, and milestone below, or switch to <strong>Fixed date</strong> for a one-off due date.
                 </p>
               )}
               <TaskDeadlineFields
                 transaction={transaction}
                 deadlineMode={deadlineMode}
-                onDeadlineModeChange={setDeadlineMode}
+                onDeadlineModeChange={handleDeadlineModeChange}
                 dueDate={form.due_date}
                 onDueDateChange={(value) => setForm({ ...form, due_date: value })}
                 timingValue={timingValue}
@@ -121,7 +143,6 @@ export default function EditTaskModal({ task, users, transaction = null, adminOn
                 onTimingDirectionChange={setTimingDirection}
                 timingAnchor={timingAnchor}
                 onTimingAnchorChange={setTimingAnchor}
-                readOnlyRelative={isTemplateTask && Boolean(task.timing_anchor) && deadlineMode === 'relative'}
               />
             </>
           ) : (
