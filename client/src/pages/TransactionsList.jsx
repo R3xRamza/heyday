@@ -36,7 +36,7 @@ const FILTERS = [
 const VALID_FILTER_KEYS = new Set(FILTERS.map((f) => f.key));
 
 const KPI_CARDS = [
-  { key: 'listings', label: 'Listings', value: (s) => s?.listings_count ?? 0, sub: 'On market' },
+  { key: 'listings', label: 'Listings', value: (s) => s?.listings_count ?? 0, sub: 'Active' },
   { key: 'comingSoon', label: 'Coming Soon', value: (s) => s?.pre_listings_count ?? 0, sub: 'Future listings' },
   { key: 'pending', label: 'Pending', value: (s) => s?.pending_count ?? 0, sub: 'Under contract' },
 ];
