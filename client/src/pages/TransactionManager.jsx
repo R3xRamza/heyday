@@ -211,9 +211,10 @@ export default function TransactionManager() {
     });
     if (res.ok) {
       navigate(returnTo);
-      return true;
+      return { ok: true };
     }
-    return false;
+    const json = await res.json().catch(() => ({}));
+    return { ok: false, error: json.error || 'Could not delete transaction' };
   }
 
   async function removeChecklist(templateId) {

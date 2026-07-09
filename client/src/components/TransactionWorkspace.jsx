@@ -205,9 +205,8 @@ export default function TransactionWorkspace({
 
   useEffect(() => {
     if (view !== 'checklist') return;
-    if (checklistTasks.length && !selectedTask) setSelectedTask(checklistTasks[0]);
     if (selectedTask && !checklistTasks.find((t) => t.id === selectedTask.id)) {
-      setSelectedTask(checklistTasks[0] || null);
+      setSelectedTask(null);
     }
   }, [checklistTasks, selectedTask, view]);
 
@@ -631,17 +630,16 @@ export default function TransactionWorkspace({
         )}
 
         {view === 'checklist' && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-6">
-            {dashboardHeader}
-            <div className="grid grid-cols-12 gap-6">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+            <div className="grid grid-cols-12 gap-6 items-start">
               <div className="col-span-12 lg:col-span-8">
-                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive flex flex-col max-h-[calc(100vh-280px)]">
-                  <div className="p-6 border-b border-outline-variant/10 flex justify-between items-center shrink-0 gap-4">
-                    <div>
-                      <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive flex flex-col min-h-[32rem] max-h-[calc(100vh-12.5rem)]">
+                  <div className="px-5 py-4 border-b border-outline-variant/10 flex justify-between items-center shrink-0 gap-4">
+                    <div className="min-w-0">
+                      <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest truncate">
                         Checklist: {activeChecklistName}
                       </h3>
-                      <p className="text-[11px] text-on-surface-variant mt-1">{doneCount} of {checklistTasks.length} Tasks Completed</p>
+                      <p className="text-xs text-on-surface-variant mt-1">{doneCount} of {checklistTasks.length} tasks completed</p>
                     </div>
                     <button
                       type="button"
@@ -652,7 +650,7 @@ export default function TransactionWorkspace({
                       Add task
                     </button>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar min-h-0">
+                  <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 custom-scrollbar min-h-0">
                     {checklistTasks.length === 0 ? (
                       <div className="text-center py-8">
                         <p className="text-sm text-on-surface-variant">No tasks on this checklist.</p>
@@ -676,12 +674,14 @@ export default function TransactionWorkspace({
                             tabIndex={0}
                             onClick={() => setSelectedTask(task)}
                             onKeyDown={(e) => e.key === 'Enter' && setSelectedTask(task)}
-                            className={`flex items-center gap-4 p-4 rounded-lg border transition-colors group cursor-pointer ${
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors group cursor-pointer ${
                               isActive
-                                ? 'bg-primary-container/[0.03] border-primary-container/10'
+                                ? 'bg-primary-container/[0.04] border-primary-container/20 shadow-sm'
                                 : isOverdue
-                                  ? 'bg-red-50/50 border-red-200'
-                                  : 'hover:bg-surface-container-low border-outline-variant/5'
+                                  ? 'bg-red-50/60 border-red-200/80'
+                                  : isComplete
+                                    ? 'bg-surface-container-low/40 border-outline-variant/10'
+                                    : 'bg-white hover:bg-surface-container-low border-outline-variant/15'
                             }`}
                           >
                             <input
@@ -689,37 +689,35 @@ export default function TransactionWorkspace({
                               checked={isComplete}
                               onChange={(e) => { e.stopPropagation(); toggleTask(task); }}
                               onClick={(e) => e.stopPropagation()}
-                              className="w-5 h-5 rounded text-secondary focus:ring-secondary border-outline-variant shrink-0"
+                              className="w-4 h-4 rounded text-secondary focus:ring-secondary border-outline-variant shrink-0"
                             />
                             <div className="flex-1 min-w-0">
-                              <p className={`text-sm font-bold ${isComplete ? 'line-through opacity-50' : 'text-on-surface'} ${isOverdue ? 'text-red-600' : ''}`}>
+                              <p className={`text-sm font-medium leading-relaxed ${isComplete ? 'line-through text-on-surface-variant' : 'text-on-surface/90'} ${!isComplete && isOverdue ? 'text-red-600/90' : ''}`}>
                                 {task.title}
                               </p>
-                              <div className="flex flex-nowrap items-center gap-2 mt-1 overflow-hidden">
-                                {task.due_date && (
-                                  <span className={`text-[10px] flex items-center gap-1 whitespace-nowrap shrink-0 ${isOverdue ? 'text-red-600 font-bold' : 'text-on-surface-variant'}`}>
-                                    <Icon name="calendar_month" className="!text-[12px]" />
-                                    {isOverdue ? 'Overdue · ' : 'Due '}
-                                    <DateText value={task.due_date} />
-                                  </span>
-                                )}
-                                {task.user_name && (
-                                  <span className="text-[10px] text-on-surface-variant">Assigned: {task.user_name}</span>
-                                )}
-                              </div>
+                              {(task.due_date || task.user_name) && (
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
+                                  {task.due_date && (
+                                    <span className={`text-xs flex items-center gap-1 ${!isComplete && isOverdue ? 'text-red-600/90 font-medium' : 'text-on-surface-variant/80'}`}>
+                                      <Icon name="calendar_month" className="!text-[14px]" />
+                                      {isOverdue ? 'Overdue · ' : 'Due '}
+                                      <DateText value={task.due_date} />
+                                    </span>
+                                  )}
+                                  {task.user_name && (
+                                    <span className="text-xs text-on-surface-variant/80">Assigned: {task.user_name}</span>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); setEditTask(task); }}
-                                className="p-1 hover:bg-surface-container-highest rounded"
-                              >
-                                <Icon name="edit" className="!text-[18px]" />
-                              </button>
-                            </div>
-                            {isComplete && (
-                              <p className="text-[11px] text-on-surface-variant font-bold uppercase shrink-0">Completed</p>
-                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setEditTask(task); }}
+                              className="p-1.5 hover:bg-surface-container-highest rounded-md opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                              aria-label="Edit task"
+                            >
+                              <Icon name="edit" className="!text-[18px]" />
+                            </button>
                           </div>
                         );
                       })
@@ -730,8 +728,10 @@ export default function TransactionWorkspace({
 
               {selectedTask && (
                 <aside className="col-span-12 lg:col-span-4">
-                  <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive sticky top-0">
-                    <h3 className="text-base font-bold text-primary leading-snug">{selectedTask.title}</h3>
+                  <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-5 shadow-executive sticky top-0">
+                    <h3 className={`text-base font-semibold text-primary leading-snug ${selectedTask.status === 'complete' ? 'line-through text-on-surface-variant' : ''}`}>
+                      {selectedTask.title}
+                    </h3>
                     <dl className="mt-4 space-y-3 text-sm">
                       <div>
                         <dt className="text-xs text-on-surface-variant uppercase tracking-wide">Assigned to</dt>
@@ -858,7 +858,10 @@ export default function TransactionWorkspace({
                           if (!window.confirm(
                             `Remove ${label}? All tasks and activity for this transaction will be permanently deleted.`,
                           )) return;
-                          await onDeleteTransaction();
+                          const result = await onDeleteTransaction();
+                          if (result?.ok === false) {
+                            window.alert(result.error || 'Could not delete transaction.');
+                          }
                         }}
                         className="w-full py-2.5 text-xs font-bold text-error border border-error/30 rounded-lg hover:bg-error/5 transition-colors"
                       >
