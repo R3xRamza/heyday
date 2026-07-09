@@ -456,12 +456,22 @@ router.delete('/:id', (req, res) => {
   const tx = db.prepare('SELECT id FROM transactions WHERE id = ?').get(req.params.id);
   if (!tx) return res.status(404).json({ error: 'Not found' });
 
-  db.transaction(() => {
-    db.prepare('DELETE FROM tasks WHERE transaction_id = ?').run(tx.id);
-    db.prepare('DELETE FROM transactions WHERE id = ?').run(tx.id);
-  })();
-
-  res.json({ ok: true });
+  try {
+    db.transaction(() => {
+      // Detach activity from tasks before delete (FK: transaction_activity.task_id → tasks.id).
+      db.prepare(`
+        UPDATE transaction_activity SET task_id = NULL
+        WHERE transaction_id = ?
+           OR task_id IN (SELECT id FROM tasks WHERE transaction_id = ?)
+      `).run(tx.id, tx.id);
+      db.prepare('DELETE FROM tasks WHERE transaction_id = ?').run(tx.id);
+      db.prepare('DELETE FROM transactions WHERE id = ?').run(tx.id);
+    })();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Delete transaction failed:', err);
+    res.status(500).json({ error: 'Could not delete transaction' });
+  }
 });
 
 router.post('/:id/apply-checklist', (req, res) => {
