@@ -7,7 +7,7 @@ import { formatCurrency, parseTransactionAddress } from '../utils/format';
 import PriceInput from '../components/shared/PriceInput';
 import AddressAutocomplete from '../components/shared/AddressAutocomplete';
 import { blurActiveElement, CHROME_AUTOCOMPLETE, ChromeAddressDecoy } from '../components/shared/chromeFormGuards';
-import { validateTransactionFields, transactionPortfolioType, isPrivateListing } from '../constants/transactionForm';
+import { validateCreateTransaction, transactionPortfolioType, isPrivateListing } from '../constants/transactionForm';
 import PrivateListingFlag from '../components/transactions/PrivateListingFlag';
 import ListPagination from '../components/shared/ListPagination';
 import { useAgentScope } from '../context/AgentScopeContext';
@@ -81,13 +81,27 @@ const DATE_COLUMN_BY_FILTER = {
   closed: { label: 'Closing Date', field: 'close_date' },
 };
 
-const SORTABLE_COLUMNS = [
+const SORTABLE_COLUMNS_BASE = [
   { key: 'address', label: 'Address' },
   { key: 'type', label: 'Type' },
   { key: 'value', label: 'Price' },
   { key: 'date', label: null },
-  { key: 'agent', label: 'Agent' },
 ];
+
+function tableColumns(filter) {
+  const dateColumn = DATE_COLUMN_BY_FILTER[filter] || DATE_COLUMN_BY_FILTER.all;
+  const columns = SORTABLE_COLUMNS_BASE.map((col) => (
+    col.key === 'date'
+      ? { ...col, label: dateColumn.label, field: dateColumn.field }
+      : col
+  ));
+  if (filter === 'current_listings') {
+    columns.push({ key: 'expiration', label: 'Expiration Date', field: 'important_date' });
+  } else {
+    columns.push({ key: 'agent', label: 'Agent' });
+  }
+  return columns;
+}
 
 function transactionDateValue(tx, field) {
   const raw = tx[field];
@@ -163,7 +177,7 @@ export default function TransactionsList() {
     writeTransactionsListView({ filter, page, search, sortKey, sortDir });
   }, [filter, page, search, sortKey, sortDir]);
 
-  const dateColumn = DATE_COLUMN_BY_FILTER[filter] || DATE_COLUMN_BY_FILTER.all;
+  const columns = tableColumns(filter);
   const statsFilter = refreshing ? loadedFilter : filter;
 
   function handleFilterChange(key) {
@@ -241,7 +255,7 @@ export default function TransactionsList() {
   }, [fetchData, search]);
 
   async function handleCreate() {
-    const validation = validateTransactionFields(form);
+    const validation = validateCreateTransaction(form);
     if (!validation.ok) {
       setCreateError(validation.message);
       return;
@@ -333,9 +347,7 @@ export default function TransactionsList() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-container-low border-b border-outline-variant/30">
-                  {SORTABLE_COLUMNS.map((col) => {
-                    const label = col.key === 'date' ? dateColumn.label : col.label;
-                    return (
+                  {columns.map((col) => (
                       <th
                         key={col.key}
                         className={`px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest cursor-pointer select-none hover:text-primary ${
@@ -343,19 +355,18 @@ export default function TransactionsList() {
                         }`}
                         onClick={() => handleSort(col.key)}
                       >
-                        {label}
+                        {col.label}
                         {sortKey === col.key && (sortDir === 'asc' ? ' ↑' : ' ↓')}
                       </th>
-                    );
-                  })}
+                    ))}
                   <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest" aria-hidden />
                 </tr>
               </thead>
               <tbody className={`divide-y divide-outline-variant/10 transition-opacity ${refreshing ? 'opacity-50' : ''}`}>
                 {showInitialLoading ? (
-                  <tr><td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">Loading…</td></tr>
+                  <tr><td colSpan={columns.length + 1} className="px-6 py-8 text-center text-on-surface-variant">Loading…</td></tr>
                 ) : transactions.length === 0 ? (
-                  <tr><td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant">{emptyFilterMessage(filter)}</td></tr>
+                  <tr><td colSpan={columns.length + 1} className="px-6 py-12 text-center text-on-surface-variant">{emptyFilterMessage(filter)}</td></tr>
                 ) : (
                   transactions.map((tx) => {
                     const { street, cityLine } = parseTransactionAddress({
@@ -364,7 +375,6 @@ export default function TransactionsList() {
                       state: tx.state,
                       zip: tx.zip,
                     });
-                    const dateValue = transactionDateValue(tx, dateColumn.field);
                     return (
                     <tr
                       key={tx.id}
@@ -397,10 +407,17 @@ export default function TransactionsList() {
                         </span>
                       </td>
                       <td className="px-6 py-4 font-semibold">{formatCurrency(tx.value)}</td>
-                      <td className="px-6 py-4 text-sm whitespace-nowrap min-w-[9.5rem]">
-                        {dateValue ? <DateText value={dateValue} /> : '—'}
-                      </td>
-                      <td className="px-6 py-4 text-sm">{tx.agent_name || '—'}</td>
+                      {columns.filter((col) => col.key === 'date' || col.key === 'expiration').map((col) => {
+                        const dateValue = transactionDateValue(tx, col.field);
+                        return (
+                          <td key={col.key} className="px-6 py-4 text-sm whitespace-nowrap min-w-[9.5rem]">
+                            {dateValue ? <DateText value={dateValue} /> : '—'}
+                          </td>
+                        );
+                      })}
+                      {filter !== 'current_listings' && (
+                        <td className="px-6 py-4 text-sm">{tx.agent_name || '—'}</td>
+                      )}
                       <td className="px-6 py-4 text-right">
                         <ArrowRight size={18} className="text-on-surface-variant group-hover:text-primary inline" />
                       </td>
