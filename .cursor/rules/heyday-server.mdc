@@ -6,24 +6,61 @@ alwaysApply: false
 
 # HEYDAY server
 
-- ESM (`import`/`export`); default export `db` from `server/db.js`
-- DB path: `process.env.DATABASE_PATH` or default `heyday.db` at repo root (Railway: `/data/heyday.db` on mounted volume)
-- New tables/columns: add to `runMigrations()` in `server/lib/migrate.js` idempotently
-- Routes: `server/routes/*.js`, mounted in `server/index.js` under `/api/*`
-- Protected routes use `authMiddleware`; `req.user` available after auth
-- Use `db.transaction()` for multi-step deletes; respect FK order with `foreign_keys ON`
-- Activity: `logActivity()` from `server/lib/activity.js`
+- ESM (`import`/`export`); `db` from `server/db.js`
+- DB: `DATABASE_PATH` env or `heyday.db` at repo root (Railway: `/data/heyday.db`)
+- Migrations: `runMigrations()` in `server/lib/migrate.js` — idempotent only
+- Routes: `server/routes/*.js` → mounted in `server/index.js` under `/api/*`
+- Auth: `authMiddleware` on protected routes; `req.user` after auth
+- Multi-step writes/deletes: `db.transaction()`; `foreign_keys ON`
+- Errors: `{ error: string }`. Activity: `logActivity()` from `server/lib/activity.js`
 
-When adding endpoints, match existing JSON shapes and error `{ error: string }` pattern.
+## Route mounts (`server/index.js`)
 
-## Checklist templates
+`auth`, `gmail`, `crm`, `tasks`, `revenue`, `transactions`, `marketing`, `team`, `team-hub`, `checklists`, `projects`, `user-todos`, `address`, `hub-docs`
 
-- `template_tasks` columns: title, timing_*, sort_order, `default_role`, `calendar_nickname`
-- `server/lib/deriveNickname.js` — short nicknames from titles; backfill via `_migrations` in migrate.js
-- `checklists.js` — CRUD includes nickname + default_role on task POST/PUT
-- `tasks.js` TASK_SELECT joins `tt.calendar_nickname` for calendar display
+## Agent scope
+
+- `server/lib/agentScope.js` — `parseAgentScope(query)`, `transactionAgentScopeClause(scope, alias)`
+- Used on transactions, revenue, team-hub, marketing, tasks list endpoints
+- Client passes `agent_scope` via `appendAgentScope()`
+
+## Transactions
+
+- CRUD + parties + activity + checklists + brokermint import
+- **Create** (`POST /`): `validateCreateTransaction` — address, city, state, zip only; `workflow_status: details`
+- **Update/setup complete**: `validateTransactionFields` — representing-specific required dates
+- **Delete** (`DELETE /:id`): must run in transaction:
+  1. `UPDATE transaction_activity SET task_id = NULL WHERE transaction_id = ? OR task_id IN (SELECT id FROM tasks WHERE transaction_id = ?)`
+  2. `DELETE FROM tasks WHERE transaction_id = ?`
+  3. `DELETE FROM transactions WHERE id = ?`
+- `important_date` = listing expiration; `important_date_label` often `expires`
+- List filters: scopes in `server/lib/transactionScopes.js` (`CURRENT_LISTINGS_VIEW_SCOPE`, etc.)
+- Sort keys include `expiration` → `important_date`
+
+## Tasks
+
+- Join `template_tasks.calendar_nickname` in TASK_SELECT for calendar display
+- Delete single task: null `transaction_activity.task_id` first (FK)
+- Checklist remove: same pattern in `applyChecklists.js`
+
+## Checklists
+
+- `template_tasks`: title, timing_*, `sort_order`, `default_role`, `calendar_nickname`
+- `transaction_checklists` junction — multiple templates per transaction
+- `checklists.js` CRUD; `applyChecklists.js` applies templates + creates tasks
+- `deriveNickname.js` — backfill nicknames on migrate
+
+## Hub docs (feedback)
+
+- Table `hub_doc_items`: `section` (`feedback` | `hub_edits`), `body`, `sort_order`, `created_by`, `updated_by`
+- `server/routes/hub-docs.js` — GET `?section=`, POST, PATCH, DELETE; any auth user can write
 
 ## Marketing
 
-- `marketing_birthday_pins` — `(month, contact_id)` PK; `GET/PUT /api/marketing/birthday-pins`
-- `PATCH /api/crm/:id` — `birthday`, `anniversary` in PATCH_FIELDS for contact edits from UI
+- `marketing_posts`, `marketing_platform_goals`, `marketing_birthday_pins`
+- `PATCH /api/crm/:id` — `birthday`, `anniversary` for marketing modals
+
+## Team hub
+
+- `team_messages`, `team_links` tables
+- `/api/team-hub/stats`, `/celebrations`, `/team-tasks`, messages CRUD

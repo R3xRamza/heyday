@@ -6,32 +6,73 @@ alwaysApply: false
 
 # HEYDAY client
 
-- Pages in `client/src/pages/`; feature components in `client/src/components/`
-- Wrap authenticated screens in `ProtectedRoute`; use `DashboardLayout` for app shell
-- Shared: `Icon` (Material Symbols), `DateText`, `format.js` helpers
-- Task calendar labels: `displayTaskTitle()` from `client/src/utils/taskDisplay.js` (nickname || title)
-- Calendar grids: `.calendar-grid` in `index.css` — `grid-template-columns: repeat(7, 1fr)`; header row must also be 7 columns (`grid-cols-7`)
-- Avoid `overflow-hidden` on calendar wrapper if it clips the Saturday column
+- Pages: `client/src/pages/` · components: `client/src/components/`
+- Auth: `ProtectedRoute` + `credentials: 'include'` on all `/api` fetches
+- Shell: `DashboardLayout` (Sidebar + TopNav); `marginLeft` from `SidebarContext`
+- Shared: `Icon`, `DateText`, `format.js`, `TeamAvatar`
 
-Add new routes in `App.jsx` and nav in `Sidebar.jsx` when creating pages.
+Add routes in `App.jsx` + nav in `Sidebar.jsx`.
 
-## Sidebar (2026-06-15)
+## Sidebar
 
-- `SidebarContext` — `collapsed`, `toggleCollapsed`, `sidebarWidth` (260 | 72); `sidebar-collapsed-v1` in localStorage
-- `DashboardLayout` — `style={{ marginLeft: sidebarWidth }}` with transition; do not hardcode `ml-[260px]`
-- Task Hub `NavLink` has `end={taskHub}` so `/tasks/:userId` only highlights “My tasks”
-- Footer: compact user + small logout; collapsed = avatar + icon logout
+- `SidebarContext` — `collapsed`, `sidebarWidth` (260 | 72), `sidebar-collapsed-v1`
+- Nav: Team Hub, Task Hub (+ nested My Transaction/Admin/Projects), CRM, Revenue, Transactions, Marketing, Feedback
+- Task Hub `NavLink` `end={taskHub}`; Transactions link uses `resolveTransactionsSidebarLink()`
+- Logo: `import heydayLogo from '../assets/heyday-logo.png'`
 
-## Checklist editor (`ChecklistEditor.jsx`)
+## Favicon
 
-- Task card: textarea full title, nickname input, default assignee select, timing row (days / when / anchor)
-- Timing grid: `sm:grid-cols-12` — nickname 3, assignee 3, days 1, when 2, anchor 3
-- Save sends `calendar_nickname` + `default_role` to checklists API
+- Assets: `client/public/favicon.png`, `favicon-32.png`, `apple-touch-icon.png`
+- Linked in `client/index.html` — Vite serves `/public` at root
+
+## Agent scope
+
+- `AgentScopeProvider` in `App.jsx`
+- `AgentScopeToggle` / `AgentScopeBadge` in TopNav
+- `appendAgentScope(params, scope)` on fetch URLs for transactions, revenue, marketing, tasks
+
+## Transactions
+
+- **List** `TransactionsList.jsx` — filter tabs, sortable columns, KPI row, pagination
+- Current Listings: columns include **Expiration** (`important_date`), not Agent
+- Create modal step 1: `validateCreateTransaction` (address fields only)
+- List state: `transactionsListPath.js`, `TransactionsNavTracker`, sessionStorage `transactions-list-view-v1`
+- **Workspace** `TransactionManager.jsx` → `TransactionWorkspace.jsx`
+  - Views: details, checklist, activity
+  - Checklist: compact rows, `font-medium` titles, complete = strikethrough (no COMPLETED label)
+  - Panel: `min-h-[32rem] max-h-[calc(100vh-12.5rem)]`; click row → detail sidebar
+  - Delete transaction: show alert on failure (`deleteTransaction` returns `{ ok, error }`)
+
+## Task Hub
+
+- `TaskHubTabs.jsx` — Transaction Tasks | Admin Tasks | Projects
+- `TaskHubPersonHeader.jsx` — back link, avatar, title, optional filter children
+- `displayTaskTitle()` from `taskDisplay.js` for calendar chips
+- `TaskCalendarView.jsx` — `.calendar-grid` 7 cols Sun–Sat
+
+## Feedback
+
+- `HubFeedback.jsx` — `DashboardLayout` title "Feedback"
+- `HubDocList.jsx` — fetch `/api/hub-docs?section=feedback`, inline edit, Enter adds bullet
+
+## Checklist editor
+
+- `ChecklistEditor.jsx` — textarea title, nickname, default assignee select, timing row
+- Save sends `calendar_nickname` + `default_role` to API
 
 ## Marketing calendar
 
-- `MarketingDayEvents` section order: Social → Tasks → Milestones
-- `fridayCelebrationFetchEnd` / `partitionFridayCelebrations` in `calendarUtils.js` for toolbar popover
-- `MonthBirthdaysModal` — pin CRM birthdays per month; add birthday via CRM search + `PATCH /api/crm/:id`
-- Double-click day cell (empty area) → new post modal; chips stop propagation on buttons/links only
-- Marketing page wrapper: `select-none` with `[&_input]:select-text` exception
+- `MarketingDayEvents` order: Social → Tasks → Milestones
+- `PlatformQuotasRow` — weekly goals; collapsible via localStorage
+- Double-click empty day cell → `MarketingPostModal`; platforms = `filterPlatforms`
+- Birthday pins + `MonthBirthdaysModal`; social `done` = crossed-out chips
+
+## Project dashboard
+
+- `UserProjectDashboard.jsx` — 3-column: projects | pending todos | done todos
+- Components in `client/src/components/projects/`
+
+## Calendar CSS
+
+- `.calendar-grid` in `index.css` — `repeat(7, 1fr)`; header must be 7 columns
+- Avoid `overflow-hidden` on calendar wrapper if it clips Saturday column

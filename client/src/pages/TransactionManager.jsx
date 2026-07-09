@@ -22,7 +22,7 @@ async function fetchPartiesForTransaction(id, transaction, scope) {
   const fallback = buildFallbackParties(transaction);
   const seed = fallback.map(({ role, name, user_id }) => ({ role, name, user_id }));
 
-  const putRes = await fetch(`/api/transactions/${id}/parties`, {
+  const putRes = await fetch(appendAgentScope(`/api/transactions/${id}/parties`, scope), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -109,7 +109,7 @@ export default function TransactionManager() {
   }
 
   async function saveTransaction(payload) {
-    const res = await fetch(`/api/transactions/${id}`, {
+    const res = await fetch(appendAgentScope(`/api/transactions/${id}`, scope), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -127,7 +127,7 @@ export default function TransactionManager() {
   }
 
   async function saveParties(partiesPayload) {
-    const res = await fetch(`/api/transactions/${id}/parties`, {
+    const res = await fetch(appendAgentScope(`/api/transactions/${id}/parties`, scope), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -180,7 +180,7 @@ export default function TransactionManager() {
   }
 
   async function addComment(text) {
-    await fetch(`/api/transactions/${id}/activity`, {
+    await fetch(appendAgentScope(`/api/transactions/${id}/activity`, scope), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -218,7 +218,7 @@ export default function TransactionManager() {
   }
 
   async function removeChecklist(templateId) {
-    const res = await fetch(`/api/transactions/${id}/checklists/${templateId}`, {
+    const res = await fetch(appendAgentScope(`/api/transactions/${id}/checklists/${templateId}`, scope), {
       method: 'DELETE',
       credentials: 'include',
     });
@@ -235,7 +235,7 @@ export default function TransactionManager() {
   }
 
   async function applyChecklists(templateIds) {
-    const res = await fetch(`/api/transactions/${id}/apply-checklists`, {
+    const res = await fetch(appendAgentScope(`/api/transactions/${id}/apply-checklists`, scope), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -297,6 +297,7 @@ export default function TransactionManager() {
             fetchChecklists();
             fetchActivities();
           }}
+          onCancelSetup={deleteTransaction}
         />
       </DashboardLayout>
     );

@@ -153,7 +153,7 @@ function StatCard({ label, value, sub }) {
 
 export default function TransactionsList() {
   const navigate = useNavigate();
-  const { scope } = useAgentScope();
+  const { scope, scopeAgentId } = useAgentScope();
   const [searchParams, setSearchParams] = useSearchParams();
   const restoredRef = useRef(false);
   const prevFilterRef = useRef(null);
@@ -274,14 +274,18 @@ export default function TransactionsList() {
     }
     setCreateError('');
     setCreating(true);
-    const res = await fetch('/api/transactions', {
+    const createBody = {
+      ...form,
+      value: form.value != null && form.value !== '' ? Number(form.value) : null,
+    };
+    if (scope === 'tessa' && scopeAgentId) {
+      createBody.agent_id = scopeAgentId;
+    }
+    const res = await fetch(appendAgentScope('/api/transactions', scope), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({
-        ...form,
-        value: form.value != null && form.value !== '' ? Number(form.value) : null,
-      }),
+      body: JSON.stringify(createBody),
     });
     const json = await res.json();
     setCreating(false);

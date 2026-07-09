@@ -21,7 +21,7 @@ import {
 } from '../lib/transactionValidation.js';
 import { closePastDueTransactions, deriveStageFromCloseDate } from '../lib/transactionAutoClose.js';
 import { closedYtdStats, CURRENT_LISTINGS_VIEW_SCOPE, ON_MARKET_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE } from '../lib/transactionScopes.js';
-import { parseAgentScope, transactionAgentScopeClause, assertTransactionInScope } from '../lib/agentScope.js';
+import { parseAgentScope, transactionAgentScopeClause, assertTransactionInScope, agentScopeUserId } from '../lib/agentScope.js';
 import { runBrokermintImport, fixBrokermintAgentIds } from '../lib/brokermintImport.js';
 import { parsePagination } from '../lib/pagination.js';
 
@@ -283,6 +283,7 @@ router.get('/:id', (req, res) => {
 });
 
 router.put('/:id/parties', (req, res) => {
+  if (!assertTransactionInScope(req, res, Number(req.params.id))) return;
   const tx = db.prepare('SELECT id FROM transactions WHERE id = ?').get(req.params.id);
   if (!tx) return res.status(404).json({ error: 'Not found' });
   if (!Array.isArray(req.body.parties)) return res.status(400).json({ error: 'parties array required' });
@@ -298,8 +299,21 @@ router.post('/', (req, res) => {
 
   const name = (req.body.client_name || req.body.owner_name)?.trim() || null;
   const normalized = normalizeAddressFields(req.body);
-  const meredith = db.prepare("SELECT id FROM users WHERE email = 'meredith@theheydaygroup.com'").get();
-  const defaultAgentId = meredith?.id ?? req.user.id;
+  const scope = parseAgentScope({ agent_scope: req.query.agent_scope ?? req.body.agent_scope });
+  let agentId;
+  if (req.body.agent_id != null && req.body.agent_id !== '') {
+    agentId = Number(req.body.agent_id);
+    const agent = db.prepare('SELECT id FROM users WHERE id = ?').get(agentId);
+    if (!agent) return res.status(400).json({ error: 'Invalid agent_id' });
+  } else {
+    const scopeUserId = agentScopeUserId(scope);
+    if (scopeUserId) {
+      agentId = scopeUserId;
+    } else {
+      const meredith = db.prepare("SELECT id FROM users WHERE email = 'meredith@theheydaygroup.com'").get();
+      agentId = meredith?.id ?? req.user.id;
+    }
+  }
   const result = db.prepare(`
     INSERT INTO transactions (address, city, state, zip, value, owner_name, client_name, agent_id, workflow_status, stage)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'details', 'active')
@@ -311,7 +325,7 @@ router.post('/', (req, res) => {
     req.body.value ? Number(req.body.value) : null,
     name,
     name,
-    defaultAgentId,
+    agentId,
   );
 
   const transaction = db.prepare('SELECT * FROM transactions WHERE id = ?').get(result.lastInsertRowid);
@@ -326,6 +340,7 @@ router.post('/', (req, res) => {
 });
 
 router.put('/:id', (req, res) => {
+  if (!assertTransactionInScope(req, res, Number(req.params.id))) return;
   const before = db.prepare('SELECT * FROM transactions WHERE id = ?').get(req.params.id);
   if (!before) return res.status(404).json({ error: 'Not found' });
 
@@ -475,6 +490,7 @@ router.delete('/:id', (req, res) => {
 });
 
 router.post('/:id/apply-checklist', (req, res) => {
+  if (!assertTransactionInScope(req, res, Number(req.params.id))) return;
   const { template_id, template_ids } = req.body;
   const ids = template_ids?.length
     ? template_ids
@@ -490,6 +506,7 @@ router.post('/:id/apply-checklist', (req, res) => {
 });
 
 router.post('/:id/apply-checklists', (req, res) => {
+  if (!assertTransactionInScope(req, res, Number(req.params.id))) return;
   const { template_ids } = req.body;
   if (!Array.isArray(template_ids) || template_ids.length === 0) {
     return res.status(400).json({ error: 'template_ids array required' });
@@ -503,6 +520,7 @@ router.post('/:id/apply-checklists', (req, res) => {
 });
 
 router.post('/:id/complete-setup', (req, res) => {
+  if (!assertTransactionInScope(req, res, Number(req.params.id))) return;
   db.prepare("UPDATE transactions SET workflow_status = 'active' WHERE id = ?").run(req.params.id);
   const transaction = pickTransaction(req.params.id);
   res.json({ transaction });

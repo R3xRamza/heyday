@@ -7,17 +7,20 @@ alwaysApply: true
 
 ## Requirements
 
-- Everything the user states in a task is **acceptance criteria**, not nice-to-have
+- Everything the user states is **acceptance criteria**, not nice-to-have
 - Mockups/screenshots are the **acceptance test**, not inspiration
 - If ambiguous, ask once — do not silently drop scope
+- **Read `heyday-project.mdc`** before implementing; do not rely on chat memory or stale README changelogs
 
 ## Agent prompts (when user asks for one)
 
-Use a copy-paste block with:
+Copy-paste block:
 
+```
 GOAL · REFERENCE · LAYOUT (numbered) · COMPONENTS (path → duty) · DATA (fields + formulas) · INTERACTIONS · DO NOT · ACCEPTANCE [ ] · VERIFY
+```
 
-Use **behavior-level bullets**, not vague labels. Example quality:
+Use **behavior-level bullets**, not vague labels. Example:
 
 ```
 Weekly quota cards (PlatformQuotasRow.jsx):
@@ -29,22 +32,24 @@ Weekly quota cards (PlatformQuotasRow.jsx):
 
 End with: `npm run build must pass. No commit unless asked.`
 
-## UI pages
+## UI conventions
 
-- Marketing calendar (done): weekly quota cards + hero calendar grid — see `client/src/components/marketing/`
-- Checklist editor (`/checklists`): template tasks with full title, nickname, default assignee, timing
-- `DashboardLayout compactHeader` for full-bleed pages (no duplicate TopNav title/search)
 - Full width main content — no `max-w` caps that leave dead right margin
+- Marketing: slim header, hero calendar — `client/src/components/marketing/`
+- Checklists editor: multi-line title, nickname, default assignee, timing row
+- `DashboardLayout` + `fillViewport` for transaction workspace and full-bleed pages
 
 ## Session handoff
 
-Prefer one slice per agent session (single feature/fix). User may start new chats with this rules folder loaded — do not assume prior chat memory.
+One slice per session (single feature/fix). New chats load rules from `.cursor/rules/` — do not assume prior chat memory.
 
-### Last session (2026-06-15)
+### Last session (2026-07-09)
 
-- **Deploy:** `main` pushed to GitHub; Railway live at heyday-production-ce72.up.railway.app
-- **Sidebar:** collapse + footer fix (`SidebarContext`, `sidebar-collapsed-v1`)
-- **Checklists:** multi-line titles, calendar nicknames, default assignee per template task (`/checklists`)
-- **Marketing:** birthday planner + pins, double-click new post, social done chips, task nicknames on calendar
-- **Nav:** Task Hub `end` prop; Marketing sidebar label vs page title
-- See `README.md` for status, logins, env vars
+- **Feedback** `/feedback` — shared bullet list, `/api/hub-docs`, sidebar link
+- **Favicon** — HUB circle logo in `client/public/`
+- **Transactions list** — Expiration column on Current Listings (replaces Agent); create step 1 address-only validation
+- **Transactions** — delete fix (activity FK); checklist UI density + strikethrough complete (no COMPLETED label)
+- **Listings KPI** — subtitle "Active"
+- **Docs** — this rules refresh
+
+See `heyday-project.mdc` for full current routes, APIs, and domain behavior.
