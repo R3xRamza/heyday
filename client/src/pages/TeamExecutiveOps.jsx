@@ -222,6 +222,37 @@ function TxRow({ tx, dateField, dateLabel, onClick }) {
 const TX_PANEL_HEIGHT = 'h-[21rem]';
 const HUB_SIDE_PANEL_HEIGHT = 'h-[22rem]';
 
+function isPinnedMessage(m) {
+  return m?.pinned === 1 || m?.pinned === true;
+}
+
+function sortMessages(list) {
+  return [...list].sort((a, b) => {
+    const ap = isPinnedMessage(a) ? 1 : 0;
+    const bp = isPinnedMessage(b) ? 1 : 0;
+    if (ap !== bp) return bp - ap;
+    if (ap && bp) {
+      const at = a.pinned_at || '';
+      const bt = b.pinned_at || '';
+      if (at !== bt) return bt.localeCompare(at);
+    }
+    const ac = a.created_at || '';
+    const bc = b.created_at || '';
+    if (ac !== bc) return bc.localeCompare(ac);
+    return (b.id || 0) - (a.id || 0);
+  });
+}
+
+function moveItemToIndex(list, fromId, insertIndex) {
+  const from = list.findIndex((item) => item.id === fromId);
+  if (from < 0 || insertIndex == null) return list;
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  const clamped = Math.max(0, Math.min(insertIndex, next.length));
+  next.splice(clamped, 0, item);
+  return next;
+}
+
 function TxPanel({ panel, rows, onRowClick, onViewAll }) {
   return (
     <section className={`bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden flex flex-col ${TX_PANEL_HEIGHT}`}>
@@ -299,10 +330,16 @@ export default function TeamExecutiveOps() {
   const [showAddLink, setShowAddLink] = useState(false);
   const [linkForm, setLinkForm] = useState({ label: '', url: '' });
   const [dragLinkId, setDragLinkId] = useState(null);
+  const [dragInsertIndex, setDragInsertIndex] = useState(null);
   const [linkOrderError, setLinkOrderError] = useState('');
+  const [editingLinkId, setEditingLinkId] = useState(null);
+  const [editLinkForm, setEditLinkForm] = useState({ label: '', url: '' });
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [editMessageBody, setEditMessageBody] = useState('');
   const linksRef = useRef(links);
   const linksBeforeDragRef = useRef(null);
   const dragLinkIdRef = useRef(null);
+  const dragInsertIndexRef = useRef(null);
 
   useEffect(() => {
     linksRef.current = links;
@@ -350,7 +387,7 @@ export default function TeamExecutiveOps() {
   const fetchMessages = useCallback(() => {
     fetch('/api/team-hub/messages', { credentials: 'include' })
       .then((r) => r.json())
-      .then((json) => setMessages(json.messages || []));
+      .then((json) => setMessages(sortMessages(json.messages || [])));
   }, []);
 
   useEffect(() => {
@@ -371,14 +408,54 @@ export default function TeamExecutiveOps() {
     if (res.ok) {
       const json = await res.json();
       setComposer('');
-      setMessages((prev) => [json.message, ...prev]);
+      setMessages((prev) => sortMessages([json.message, ...prev]));
     }
     setPosting(false);
   }
 
   async function deleteMessage(id) {
     const res = await fetch(`/api/team-hub/messages/${id}`, { method: 'DELETE', credentials: 'include' });
-    if (res.ok) setMessages((prev) => prev.filter((m) => m.id !== id));
+    if (res.ok) {
+      setMessages((prev) => prev.filter((m) => m.id !== id));
+      if (editingMessageId === id) {
+        setEditingMessageId(null);
+        setEditMessageBody('');
+      }
+    }
+  }
+
+  async function patchMessage(id, payload) {
+    const res = await fetch(`/api/team-hub/messages/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    setMessages((prev) => sortMessages(prev.map((m) => (m.id === id ? json.message : m))));
+    return json.message;
+  }
+
+  async function togglePinMessage(m) {
+    await patchMessage(m.id, { pinned: !isPinnedMessage(m) });
+  }
+
+  function startEditMessage(m) {
+    setEditingMessageId(m.id);
+    setEditMessageBody(m.body || '');
+  }
+
+  function cancelEditMessage() {
+    setEditingMessageId(null);
+    setEditMessageBody('');
+  }
+
+  async function saveEditMessage(id) {
+    const body = editMessageBody.trim();
+    if (!body) return;
+    const updated = await patchMessage(id, { body });
+    if (updated) cancelEditMessage();
   }
 
   async function addLink(e) {
@@ -400,27 +477,52 @@ export default function TeamExecutiveOps() {
 
   async function removeLink(id) {
     const res = await fetch(`/api/team-hub/links/${id}`, { method: 'DELETE', credentials: 'include' });
-    if (res.ok) setLinks((prev) => prev.filter((l) => l.id !== id));
+    if (res.ok) {
+      setLinks((prev) => prev.filter((l) => l.id !== id));
+      if (editingLinkId === id) {
+        setEditingLinkId(null);
+        setEditLinkForm({ label: '', url: '' });
+      }
+    }
   }
 
-  function moveLinkBefore(fromId, toId) {
-    setLinks((prev) => {
-      const from = prev.findIndex((l) => l.id === fromId);
-      const to = prev.findIndex((l) => l.id === toId);
-      if (from < 0 || to < 0 || from === to) return prev;
-      const next = [...prev];
-      const [item] = next.splice(from, 1);
-      next.splice(to, 0, item);
-      return next;
+  function startEditLink(l) {
+    setEditingLinkId(l.id);
+    setEditLinkForm({ label: l.label || '', url: l.url || '' });
+  }
+
+  function cancelEditLink() {
+    setEditingLinkId(null);
+    setEditLinkForm({ label: '', url: '' });
+  }
+
+  async function saveEditLink(e) {
+    e.preventDefault();
+    if (!editingLinkId) return;
+    const label = editLinkForm.label.trim();
+    const url = editLinkForm.url.trim();
+    if (!label || !url) return;
+    const res = await fetch(`/api/team-hub/links/${editingLinkId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ label, url }),
     });
+    if (!res.ok) return;
+    const json = await res.json();
+    setLinks((prev) => prev.map((l) => (l.id === editingLinkId ? json.link : l)));
+    cancelEditLink();
   }
 
   function handleLinkDragStart(e, id) {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', String(id));
     linksBeforeDragRef.current = linksRef.current;
+    const fromIndex = linksRef.current.findIndex((l) => l.id === id);
     dragLinkIdRef.current = id;
+    dragInsertIndexRef.current = fromIndex;
     setDragLinkId(id);
+    setDragInsertIndex(fromIndex);
     setLinkOrderError('');
   }
 
@@ -428,36 +530,59 @@ export default function TeamExecutiveOps() {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     const fromId = dragLinkIdRef.current;
-    if (fromId == null || fromId === overId) return;
-    moveLinkBefore(fromId, overId);
+    if (fromId == null) return;
+
+    const list = linksRef.current;
+    const fromIndex = list.findIndex((l) => l.id === fromId);
+    const overIndex = list.findIndex((l) => l.id === overId);
+    if (fromIndex < 0 || overIndex < 0) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    let insertIndex = after ? overIndex + 1 : overIndex;
+    if (fromIndex < insertIndex) insertIndex -= 1;
+    insertIndex = Math.max(0, Math.min(list.length - 1, insertIndex));
+
+    if (dragInsertIndexRef.current === insertIndex) return;
+    dragInsertIndexRef.current = insertIndex;
+    setDragInsertIndex(insertIndex);
   }
 
   async function handleLinkDragEnd() {
-    const dragging = dragLinkIdRef.current;
+    const fromId = dragLinkIdRef.current;
+    const insertIndex = dragInsertIndexRef.current;
     dragLinkIdRef.current = null;
+    dragInsertIndexRef.current = null;
     setDragLinkId(null);
-    if (dragging == null) return;
+    setDragInsertIndex(null);
+    if (fromId == null || insertIndex == null) return;
 
-    const orderedIds = linksRef.current.map((l) => l.id);
-    const previous = linksBeforeDragRef.current;
-    const unchanged = previous
-      && previous.length === orderedIds.length
-      && previous.every((l, i) => l.id === orderedIds[i]);
+    const previous = linksBeforeDragRef.current || linksRef.current;
+    const next = moveItemToIndex(previous, fromId, insertIndex);
+    const unchanged = previous.length === next.length
+      && previous.every((l, i) => l.id === next[i].id);
     if (unchanged) return;
+
+    setLinks(next);
+    linksRef.current = next;
 
     const res = await fetch('/api/team-hub/links/reorder', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ ordered_ids: orderedIds }),
+      body: JSON.stringify({ ordered_ids: next.map((l) => l.id) }),
     });
     if (!res.ok) {
-      if (previous) setLinks(previous);
+      setLinks(previous);
+      linksRef.current = previous;
       setLinkOrderError('Could not save link order');
       return;
     }
     const json = await res.json();
-    if (json.links) setLinks(json.links);
+    if (json.links) {
+      setLinks(json.links);
+      linksRef.current = json.links;
+    }
   }
 
   return (
@@ -585,25 +710,88 @@ export default function TeamExecutiveOps() {
               {messages.length === 0 ? (
                 <p className="py-4 text-xs text-on-surface-variant text-center">No messages yet.</p>
               ) : (
-                messages.map((m) => (
-                  <div key={m.id} className="group flex gap-2 rounded-lg bg-surface-container-low/40 px-2.5 py-2 hover:bg-surface-container-low transition-colors">
-                    <TeamAvatar email={m.user_email} name={m.user_name} size="xs" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-1.5">
-                        <p className="font-bold text-xs text-primary">{m.user_name || 'Team'}</p>
-                        <p className="text-[10px] text-on-surface-variant">{relativeTime(m.created_at)}</p>
-                      </div>
-                      <p className="text-xs text-on-surface mt-0.5 whitespace-pre-wrap">{m.body}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => deleteMessage(m.id)}
-                      className="text-on-surface-variant/30 hover:text-error opacity-0 group-hover:opacity-100 self-start"
+                messages.map((m) => {
+                  const pinned = isPinnedMessage(m);
+                  const editing = editingMessageId === m.id;
+                  return (
+                    <div
+                      key={m.id}
+                      className={`group flex gap-2 rounded-lg px-2.5 py-2 transition-colors ${
+                        pinned ? 'bg-lemon/15 border border-lemon/30' : 'bg-surface-container-low/40 hover:bg-surface-container-low'
+                      }`}
                     >
-                      <Icon name="close" className="!text-[16px]" />
-                    </button>
-                  </div>
-                ))
+                      <TeamAvatar email={m.user_email} name={m.user_name} size="xs" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <p className="font-bold text-xs text-primary">{m.user_name || 'Team'}</p>
+                          <p className="text-[10px] text-on-surface-variant">{relativeTime(m.created_at)}</p>
+                          {pinned && (
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-feather/70">Pinned</span>
+                          )}
+                        </div>
+                        {editing ? (
+                          <div className="mt-1 space-y-1.5">
+                            <textarea
+                              value={editMessageBody}
+                              onChange={(e) => setEditMessageBody(e.target.value)}
+                              rows={3}
+                              className="w-full bg-white border border-outline-variant/20 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-secondary/25 outline-none resize-y"
+                            />
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                type="button"
+                                onClick={cancelEditMessage}
+                                className="px-2 py-1 text-[10px] font-semibold text-on-surface-variant"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => saveEditMessage(m.id)}
+                                disabled={!editMessageBody.trim()}
+                                className="px-3 py-1 bg-feather text-white rounded text-[10px] font-semibold disabled:opacity-50"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-on-surface mt-0.5 whitespace-pre-wrap">{m.body}</p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-center gap-0.5 shrink-0 self-start">
+                        <button
+                          type="button"
+                          onClick={() => togglePinMessage(m)}
+                          aria-label={pinned ? 'Unpin message' : 'Pin message'}
+                          title={pinned ? 'Unpin' : 'Pin'}
+                          className={`p-0.5 rounded ${pinned ? 'text-feather opacity-100' : 'text-on-surface-variant/40 opacity-0 group-hover:opacity-100 hover:text-feather'}`}
+                        >
+                          <Icon name="push_pin" className="!text-[15px]" filled={pinned} />
+                        </button>
+                        {!editing && (
+                          <button
+                            type="button"
+                            onClick={() => startEditMessage(m)}
+                            aria-label="Edit message"
+                            title="Edit"
+                            className="p-0.5 text-on-surface-variant/40 hover:text-secondary opacity-0 group-hover:opacity-100"
+                          >
+                            <Icon name="edit" className="!text-[15px]" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => deleteMessage(m.id)}
+                          aria-label="Delete message"
+                          className="p-0.5 text-on-surface-variant/30 hover:text-error opacity-0 group-hover:opacity-100"
+                        >
+                          <Icon name="close" className="!text-[16px]" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </section>
@@ -621,40 +809,84 @@ export default function TeamExecutiveOps() {
                 <p className="text-[11px] text-error mb-2">{linkOrderError}</p>
               )}
               <div className="space-y-1.5">
-                {links.map((l) => (
-                  <div
-                    key={l.id}
-                    onDragOver={(e) => handleLinkDragOver(e, l.id)}
-                    onDrop={(e) => e.preventDefault()}
-                    className={`group flex items-center gap-0.5 ${dragLinkId === l.id ? 'opacity-60' : ''}`}
-                  >
-                    <button
-                      type="button"
-                      draggable
-                      onDragStart={(e) => handleLinkDragStart(e, l.id)}
-                      onDragEnd={handleLinkDragEnd}
-                      aria-label={`Reorder ${l.label}`}
-                      title="Drag to reorder"
-                      className="p-1.5 text-on-surface-variant/40 hover:text-on-surface-variant cursor-grab active:cursor-grabbing shrink-0"
+                {links.map((l, index) => (
+                  <div key={l.id}>
+                    {dragLinkId != null && dragInsertIndex === index && (
+                      <div className="h-0.5 mb-1 rounded bg-secondary" aria-hidden />
+                    )}
+                    <div
+                      onDragOver={(e) => handleLinkDragOver(e, l.id)}
+                      onDrop={(e) => e.preventDefault()}
+                      className={`group flex items-start gap-0.5 ${dragLinkId === l.id ? 'opacity-50' : ''}`}
                     >
-                      <Icon name="drag_indicator" className="!text-[16px]" />
-                    </button>
-                    <a
-                      href={l.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex-1 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-surface-container-low/60 text-xs font-semibold text-primary hover:bg-secondary/10 hover:text-secondary transition-colors"
-                    >
-                      <span className="truncate">{l.label}</span>
-                      <Icon name="open_in_new" className="!text-[14px] shrink-0 opacity-50" />
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => removeLink(l.id)}
-                      className="p-1.5 text-on-surface-variant/30 hover:text-error opacity-0 group-hover:opacity-100"
-                    >
-                      <Icon name="close" className="!text-[14px]" />
-                    </button>
+                      <button
+                        type="button"
+                        draggable
+                        onDragStart={(e) => handleLinkDragStart(e, l.id)}
+                        onDragEnd={handleLinkDragEnd}
+                        aria-label={`Reorder ${l.label}`}
+                        title="Drag to reorder"
+                        className="p-1.5 mt-0.5 text-on-surface-variant/40 hover:text-on-surface-variant cursor-grab active:cursor-grabbing shrink-0"
+                      >
+                        <Icon name="drag_indicator" className="!text-[16px]" />
+                      </button>
+                      {editingLinkId === l.id ? (
+                        <form onSubmit={saveEditLink} className="flex-1 p-2 rounded-lg bg-surface-container-low/50 space-y-1.5">
+                          <input
+                            value={editLinkForm.label}
+                            onChange={(e) => setEditLinkForm({ ...editLinkForm, label: e.target.value })}
+                            placeholder="Label"
+                            className="w-full px-2.5 py-1.5 bg-white border border-outline-variant/20 rounded text-xs"
+                          />
+                          <input
+                            value={editLinkForm.url}
+                            onChange={(e) => setEditLinkForm({ ...editLinkForm, url: e.target.value })}
+                            placeholder="https://…"
+                            className="w-full px-2.5 py-1.5 bg-white border border-outline-variant/20 rounded text-xs"
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <button type="button" onClick={cancelEditLink} className="px-2 py-1 text-[10px] font-semibold text-on-surface-variant">
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={!editLinkForm.label.trim() || !editLinkForm.url.trim()}
+                              className="px-3 py-1 bg-feather text-white rounded text-[10px] font-semibold disabled:opacity-50"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <a
+                            href={l.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex-1 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-surface-container-low/60 text-xs font-semibold text-primary hover:bg-secondary/10 hover:text-secondary transition-colors"
+                          >
+                            <span className="truncate">{l.label}</span>
+                            <Icon name="open_in_new" className="!text-[14px] shrink-0 opacity-50" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => startEditLink(l)}
+                            aria-label={`Edit ${l.label}`}
+                            title="Edit"
+                            className="p-1.5 mt-0.5 text-on-surface-variant/30 hover:text-secondary opacity-0 group-hover:opacity-100"
+                          >
+                            <Icon name="edit" className="!text-[14px]" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeLink(l.id)}
+                            className="p-1.5 mt-0.5 text-on-surface-variant/30 hover:text-error opacity-0 group-hover:opacity-100"
+                          >
+                            <Icon name="close" className="!text-[14px]" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

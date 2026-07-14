@@ -176,6 +176,8 @@ function migrateTeamHubTables(db) {
 
     CREATE INDEX IF NOT EXISTS idx_team_messages_created ON team_messages(created_at);
   `);
+  addColumnIfMissing(db, 'team_messages', 'pinned', 'INTEGER NOT NULL DEFAULT 0');
+  addColumnIfMissing(db, 'team_messages', 'pinned_at', 'DATETIME');
 }
 
 function migrateTaskCategory(db) {
