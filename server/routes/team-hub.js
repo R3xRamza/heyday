@@ -126,23 +126,61 @@ router.get('/messages', (_req, res) => {
     SELECT m.*, u.name as user_name, u.email as user_email
     FROM team_messages m
     LEFT JOIN users u ON u.id = m.user_id
-    ORDER BY m.created_at DESC, m.id DESC
+    ORDER BY m.pinned DESC, m.pinned_at DESC, m.created_at DESC, m.id DESC
     LIMIT 50
   `).all();
   res.json({ messages });
 });
+
+function getMessageOr404(id) {
+  return db.prepare(`
+    SELECT m.*, u.name as user_name, u.email as user_email
+    FROM team_messages m LEFT JOIN users u ON u.id = m.user_id
+    WHERE m.id = ?
+  `).get(id);
+}
+
+function asFlag(value, fallback = 0) {
+  if (value === true || value === 1 || value === '1') return 1;
+  if (value === false || value === 0 || value === '0') return 0;
+  return fallback ? 1 : 0;
+}
 
 router.post('/messages', (req, res) => {
   const body = req.body.body?.trim();
   if (!body) return res.status(400).json({ error: 'body is required' });
 
   const r = db.prepare('INSERT INTO team_messages (user_id, body) VALUES (?, ?)').run(req.user.id, body);
-  const message = db.prepare(`
-    SELECT m.*, u.name as user_name, u.email as user_email
-    FROM team_messages m LEFT JOIN users u ON u.id = m.user_id
-    WHERE m.id = ?
-  `).get(r.lastInsertRowid);
-  res.status(201).json({ message });
+  res.status(201).json({ message: getMessageOr404(r.lastInsertRowid) });
+});
+
+router.patch('/messages/:id', (req, res) => {
+  const message = getMessageOr404(req.params.id);
+  if (!message) return res.status(404).json({ error: 'Not found' });
+
+  const body = req.body.body != null ? String(req.body.body).trim() : message.body;
+  if (!body) return res.status(400).json({ error: 'body is required' });
+
+  const pinned = req.body.pinned !== undefined
+    ? asFlag(req.body.pinned)
+    : asFlag(message.pinned);
+
+  let pinnedAt = message.pinned_at;
+  if (req.body.pinned !== undefined) {
+    if (pinned && !asFlag(message.pinned)) {
+      pinnedAt = new Date().toISOString();
+    } else if (!pinned) {
+      pinnedAt = null;
+    }
+  }
+
+  db.prepare(`
+    UPDATE team_messages
+    SET body = ?, pinned = ?, pinned_at = ?
+    WHERE id = ?
+  `).run(body, pinned, pinnedAt, message.id);
+
+  res.json({ message: getMessageOr404(message.id) });
 });
 
 router.delete('/messages/:id', (req, res) => {
@@ -192,6 +230,20 @@ router.put('/links/reorder', (req, res) => {
 
   const links = db.prepare('SELECT * FROM team_links ORDER BY sort_order ASC, id ASC').all();
   res.json({ links });
+});
+
+router.patch('/links/:id', (req, res) => {
+  const link = db.prepare('SELECT * FROM team_links WHERE id = ?').get(req.params.id);
+  if (!link) return res.status(404).json({ error: 'Not found' });
+
+  const label = req.body.label != null ? String(req.body.label).trim() : link.label;
+  let url = req.body.url != null ? String(req.body.url).trim() : link.url;
+  if (!label || !url) return res.status(400).json({ error: 'label and url are required' });
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+
+  db.prepare('UPDATE team_links SET label = ?, url = ? WHERE id = ?').run(label, url, link.id);
+  const updated = db.prepare('SELECT * FROM team_links WHERE id = ?').get(link.id);
+  res.json({ link: updated });
 });
 
 router.delete('/links/:id', (req, res) => {
