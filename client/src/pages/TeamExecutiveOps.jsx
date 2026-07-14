@@ -220,7 +220,7 @@ function TxRow({ tx, dateField, dateLabel, onClick }) {
 }
 
 const TX_PANEL_HEIGHT = 'h-[21rem]';
-const HUB_SIDE_PANEL_HEIGHT = 'h-[22rem]';
+const HUB_SIDE_PANEL_HEIGHT = 'h-[35.2rem]';
 
 function isPinnedMessage(m) {
   return m?.pinned === 1 || m?.pinned === true;
