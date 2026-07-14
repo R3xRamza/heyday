@@ -21,7 +21,7 @@ import {
 } from '../lib/transactionValidation.js';
 import { closePastDueTransactions, deriveStageFromCloseDate } from '../lib/transactionAutoClose.js';
 import { CURRENT_LISTINGS_VIEW_SCOPE, ON_MARKET_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE } from '../lib/transactionScopes.js';
-import { parseAgentScope, transactionAgentScopeClause, assertTransactionInScope, agentScopeUserId } from '../lib/agentScope.js';
+import { parseAgentScope, transactionAgentScopeClause, assertTransactionInScope } from '../lib/agentScope.js';
 import { runBrokermintImport, fixBrokermintAgentIds } from '../lib/brokermintImport.js';
 import { parsePagination } from '../lib/pagination.js';
 
@@ -331,21 +331,10 @@ router.post('/', (req, res) => {
 
   const name = (req.body.client_name || req.body.owner_name)?.trim() || null;
   const normalized = normalizeAddressFields(req.body);
-  const scope = parseAgentScope({ agent_scope: req.query.agent_scope ?? req.body.agent_scope });
-  let agentId;
-  if (req.body.agent_id != null && req.body.agent_id !== '') {
-    agentId = Number(req.body.agent_id);
-    const agent = db.prepare('SELECT id FROM users WHERE id = ?').get(agentId);
-    if (!agent) return res.status(400).json({ error: 'Invalid agent_id' });
-  } else {
-    const scopeUserId = agentScopeUserId(scope);
-    if (scopeUserId) {
-      agentId = scopeUserId;
-    } else {
-      const meredith = db.prepare("SELECT id FROM users WHERE email = 'meredith@theheydaygroup.com'").get();
-      agentId = meredith?.id ?? req.user.id;
-    }
-  }
+  const agentId = Number(req.body.agent_id);
+  const agent = db.prepare('SELECT id FROM users WHERE id = ?').get(agentId);
+  if (!agent) return res.status(400).json({ error: 'Invalid agent_id' });
+
   const result = db.prepare(`
     INSERT INTO transactions (address, city, state, zip, value, owner_name, client_name, agent_id, workflow_status, stage)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'details', 'active')

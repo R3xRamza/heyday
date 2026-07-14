@@ -154,7 +154,7 @@ function StatCard({ label, value, sub }) {
 
 export default function TransactionsList() {
   const navigate = useNavigate();
-  const { scope, scopeAgentId } = useAgentScope();
+  const { scope } = useAgentScope();
   const [searchParams, setSearchParams] = useSearchParams();
   const restoredRef = useRef(false);
   const prevFilterRef = useRef(null);
@@ -179,7 +179,8 @@ export default function TransactionsList() {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(() => listView.page);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ address: '', city: '', state: '', zip: '', value: '', client_name: '' });
+  const [form, setForm] = useState({ address: '', city: '', state: '', zip: '', value: '', agent_id: '' });
+  const [teamMembers, setTeamMembers] = useState([]);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
   const [sortKey, setSortKey] = useState(() => listView.sortKey);
@@ -189,6 +190,14 @@ export default function TransactionsList() {
   useEffect(() => {
     writeTransactionsListView({ filter, page, search, sortKey, sortDir });
   }, [filter, page, search, sortKey, sortDir]);
+
+  useEffect(() => {
+    if (!showCreate) return;
+    fetch('/api/team', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((d) => setTeamMembers(d.members || []))
+      .catch(() => setTeamMembers([]));
+  }, [showCreate]);
 
   const columns = tableColumns(filter);
   const statsFilter = refreshing ? loadedFilter : filter;
@@ -294,12 +303,13 @@ export default function TransactionsList() {
     setCreateError('');
     setCreating(true);
     const createBody = {
-      ...form,
+      address: form.address,
+      city: form.city,
+      state: form.state,
+      zip: form.zip,
       value: form.value != null && form.value !== '' ? Number(form.value) : null,
+      agent_id: Number(form.agent_id),
     };
-    if (scope !== 'all' && scopeAgentId) {
-      createBody.agent_id = scopeAgentId;
-    }
     const res = await fetch(appendAgentScope('/api/transactions', scope), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -311,6 +321,7 @@ export default function TransactionsList() {
     if (res.ok) {
       blurActiveElement();
       setShowCreate(false);
+      setForm({ address: '', city: '', state: '', zip: '', value: '', agent_id: '' });
       setCreateError('');
       navigate(`/transactions/${json.transaction.id}`, {
         state: {
@@ -578,10 +589,24 @@ export default function TransactionsList() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-on-surface-variant mb-1">Client Name</label>
-                <input value={form.client_name} onChange={(e) => setForm({ ...form, client_name: e.target.value })}
-                  autoComplete={CHROME_AUTOCOMPLETE}
-                  className="w-full px-3 py-2 border border-outline-variant/40 rounded text-sm" />
+                <label className="block text-xs font-semibold text-on-surface-variant mb-1">Agent *</label>
+                <select
+                  required
+                  value={form.agent_id === '' || form.agent_id == null ? '' : String(form.agent_id)}
+                  onChange={(e) => {
+                    setCreateError('');
+                    setForm({
+                      ...form,
+                      agent_id: e.target.value ? Number(e.target.value) : '',
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-outline-variant/40 rounded text-sm bg-white"
+                >
+                  <option value="">Select agent…</option>
+                  {teamMembers.map((u) => (
+                    <option key={u.id} value={String(u.id)}>{u.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
