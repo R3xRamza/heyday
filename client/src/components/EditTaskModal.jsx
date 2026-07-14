@@ -66,7 +66,8 @@ export default function EditTaskModal({ task, users, transaction = null, adminOn
     };
 
     if (isTemplateTask) {
-      if (deadlineMode === 'fixed') {
+      // Without a loaded transaction, the UI is a fixed date picker even if mode is "relative".
+      if (!showLinkedDeadline || deadlineMode === 'fixed') {
         payload.due_date = form.due_date || null;
         payload.due_date_override = true;
       } else {

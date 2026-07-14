@@ -566,6 +566,17 @@ router.patch('/:id', (req, res) => {
         if (resolvedDueDate !== task.due_date) {
           changes.push(formatFieldChange('Deadline', task.due_date, resolvedDueDate));
         }
+      } else if (due_date !== undefined) {
+        // Bare due_date on a template task = fixed override (e.g. task dashboard edit)
+        if (due_date !== task.due_date || !task.due_date_override) {
+          changes.push(formatFieldChange('Deadline', task.due_date, due_date || null));
+        }
+        db.prepare(`
+          UPDATE tasks
+          SET due_date = ?, due_date_override = 1,
+              timing_value = NULL, timing_direction = NULL, timing_anchor = NULL
+          WHERE id = ?
+        `).run(due_date || null, req.params.id);
       }
     } else {
       const resolvedDueDate = resolveTaskDueDate(transaction, {

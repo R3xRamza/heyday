@@ -74,6 +74,7 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
   const [data, setData] = useState({ tasks: [], stats: {} });
   const [loading, setLoading] = useState(true);
   const [editTask, setEditTask] = useState(null);
+  const [editTransaction, setEditTransaction] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [viewMode, setViewMode] = useState('list');
@@ -138,6 +139,25 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
     setPage(1);
   }, [userId, filter, showUndated, includeCompleted, viewMode]);
 
+  useEffect(() => {
+    if (!editTask?.transaction_id) {
+      setEditTransaction(null);
+      return undefined;
+    }
+    let cancelled = false;
+    fetch(`/api/transactions/${editTask.transaction_id}`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (!cancelled) setEditTransaction(json?.transaction || null);
+      })
+      .catch(() => {
+        if (!cancelled) setEditTransaction(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editTask]);
+
   async function patchTask(taskId, body, { refresh = true } = {}) {
     const res = await fetch(`/api/tasks/${taskId}`, {
       method: 'PATCH',
@@ -181,8 +201,13 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
 
   async function saveTaskEdit(formData) {
     if (!editTask) return;
-    await patchTask(editTask.id, formData);
+    const updated = await patchTask(editTask.id, formData);
+    if (!updated) {
+      window.alert('Could not save task. Check the due date and try again.');
+      return;
+    }
     setEditTask(null);
+    setEditTransaction(null);
   }
 
   async function createTask(formData) {
@@ -575,8 +600,12 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
         <EditTaskModal
           task={editTask}
           users={users}
+          transaction={editTransaction}
           adminOnly={category === 'admin'}
-          onClose={() => setEditTask(null)}
+          onClose={() => {
+            setEditTask(null);
+            setEditTransaction(null);
+          }}
           onSave={saveTaskEdit}
         />
       )}
