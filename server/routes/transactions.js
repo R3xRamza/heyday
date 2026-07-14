@@ -401,7 +401,9 @@ router.put('/:id', (req, res) => {
     }
   }
 
-  if (nextCloseDate && derivedStage === 'pending') {
+  const closeDateChanging = 'close_date' in req.body
+    && String(req.body.close_date || '') !== String(before.close_date || '');
+  if (closeDateChanging && nextCloseDate && derivedStage === 'pending') {
     const intent = isTraditionalSale(nextSaleType, nextRepresenting) ? 'pending' : 'active';
     const partyCheck = assertPartiesForIntent(db, before.id, intent);
     if (!partyCheck.ok) {
