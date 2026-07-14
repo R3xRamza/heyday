@@ -189,7 +189,7 @@ export default function HubDocList({ section, emptyHint }) {
       <p className="text-[11px] text-on-surface-variant/70 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
         {item.created_at && (
           <span>
-            Posted <DateText value={item.created_at} />
+            Posted <DateText value={String(item.created_at).slice(0, 10)} />
           </span>
         )}
         {item.updated_by_name && <span>{item.updated_by_name}</span>}
