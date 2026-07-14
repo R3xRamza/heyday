@@ -592,40 +592,41 @@ export default function TransactionWorkspace({
                   <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-5">
                     Critical Dates Timeline
                   </h3>
-                  <div className="relative pl-1">
-                    <div
-                      className="absolute left-[19px] top-5 bottom-5 w-0.5 bg-outline-variant/25 rounded-full"
-                      aria-hidden
-                    />
-                    <ul className="space-y-5 relative z-10">
-                      {timelineDates.map((item) => {
-                        const hasDate = Boolean(form[item.key]);
-                        return (
-                          <li key={item.key} className="flex gap-4 items-start">
+                  <ul className="space-y-5">
+                    {timelineDates.map((item, index) => {
+                      const hasDate = Boolean(form[item.key]);
+                      const hasConnector = index < timelineDates.length - 1;
+                      return (
+                        <li key={item.key} className="relative flex gap-4 items-start">
+                          {hasConnector && (
                             <div
-                              className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center border-2 shadow-sm ${
-                                hasDate
-                                  ? 'bg-secondary border-secondary text-white'
-                                  : 'bg-surface border-outline-variant/40 text-outline-variant'
-                              }`}
-                            >
-                              <Icon name={item.icon} filled={hasDate} className="!text-[18px]" />
-                            </div>
-                            <div className="flex-1 min-w-0 pt-0.5">
-                              <p className="text-xs font-bold text-primary leading-snug">{item.label}</p>
-                              <input
-                                type="date"
-                                value={form[item.key] || ''}
-                                onChange={(e) => handleFieldChange(item.key, e.target.value)}
-                                onBlur={(e) => handleFieldBlur(item.key, e.target.value || null)}
-                                className="mt-1.5 w-full text-sm text-primary bg-surface-container-low border border-outline-variant/20 rounded-lg px-3 py-2 focus:ring-2 focus:ring-secondary/30 outline-none"
-                              />
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
+                              className="absolute left-5 top-10 -bottom-5 w-0.5 -translate-x-1/2 bg-outline-variant/25 rounded-full z-0"
+                              aria-hidden
+                            />
+                          )}
+                          <div
+                            className={`relative z-10 w-10 h-10 shrink-0 rounded-full flex items-center justify-center border-2 shadow-sm ${
+                              hasDate
+                                ? 'bg-secondary border-secondary text-white'
+                                : 'bg-surface border-outline-variant/40 text-outline-variant'
+                            }`}
+                          >
+                            <Icon name={item.icon} filled={hasDate} className="!text-[18px]" />
+                          </div>
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <p className="text-xs font-bold text-primary leading-snug">{item.label}</p>
+                            <input
+                              type="date"
+                              value={form[item.key] || ''}
+                              onChange={(e) => handleFieldChange(item.key, e.target.value)}
+                              onBlur={(e) => handleFieldBlur(item.key, e.target.value || null)}
+                              className="mt-1.5 w-full text-sm text-primary bg-surface-container-low border border-outline-variant/20 rounded-lg px-3 py-2 focus:ring-2 focus:ring-secondary/30 outline-none"
+                            />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               </div>
 
