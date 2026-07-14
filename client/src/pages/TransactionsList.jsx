@@ -296,7 +296,7 @@ export default function TransactionsList() {
       ...form,
       value: form.value != null && form.value !== '' ? Number(form.value) : null,
     };
-    if (scope === 'tessa' && scopeAgentId) {
+    if (scope !== 'all' && scopeAgentId) {
       createBody.agent_id = scopeAgentId;
     }
     const res = await fetch(appendAgentScope('/api/transactions', scope), {
