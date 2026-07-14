@@ -169,6 +169,31 @@ router.post('/links', (req, res) => {
   res.status(201).json({ link });
 });
 
+router.put('/links/reorder', (req, res) => {
+  const orderedIds = Array.isArray(req.body.ordered_ids)
+    ? req.body.ordered_ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
+    : null;
+  if (!orderedIds || orderedIds.length === 0) {
+    return res.status(400).json({ error: 'ordered_ids array is required' });
+  }
+
+  const existingIds = new Set(
+    db.prepare('SELECT id FROM team_links').all().map((row) => row.id),
+  );
+  if (orderedIds.length !== existingIds.size || orderedIds.some((id) => !existingIds.has(id))) {
+    return res.status(400).json({ error: 'ordered_ids must include every link id exactly once' });
+  }
+
+  const update = db.prepare('UPDATE team_links SET sort_order = ? WHERE id = ?');
+  const reorder = db.transaction((ids) => {
+    ids.forEach((id, index) => update.run(index, id));
+  });
+  reorder(orderedIds);
+
+  const links = db.prepare('SELECT * FROM team_links ORDER BY sort_order ASC, id ASC').all();
+  res.json({ links });
+});
+
 router.delete('/links/:id', (req, res) => {
   const link = db.prepare('SELECT id FROM team_links WHERE id = ?').get(req.params.id);
   if (!link) return res.status(404).json({ error: 'Not found' });

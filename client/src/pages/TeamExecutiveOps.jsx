@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import Icon from '../components/shared/Icon';
@@ -220,6 +220,7 @@ function TxRow({ tx, dateField, dateLabel, onClick }) {
 }
 
 const TX_PANEL_HEIGHT = 'h-[21rem]';
+const HUB_SIDE_PANEL_HEIGHT = 'h-[22rem]';
 
 function TxPanel({ panel, rows, onRowClick, onViewAll }) {
   return (
@@ -297,6 +298,15 @@ export default function TeamExecutiveOps() {
   const [posting, setPosting] = useState(false);
   const [showAddLink, setShowAddLink] = useState(false);
   const [linkForm, setLinkForm] = useState({ label: '', url: '' });
+  const [dragLinkId, setDragLinkId] = useState(null);
+  const [linkOrderError, setLinkOrderError] = useState('');
+  const linksRef = useRef(links);
+  const linksBeforeDragRef = useRef(null);
+  const dragLinkIdRef = useRef(null);
+
+  useEffect(() => {
+    linksRef.current = links;
+  }, [links]);
 
   const celebrationLabel = useMemo(() => celebrationWindowLabel(), []);
 
@@ -391,6 +401,63 @@ export default function TeamExecutiveOps() {
   async function removeLink(id) {
     const res = await fetch(`/api/team-hub/links/${id}`, { method: 'DELETE', credentials: 'include' });
     if (res.ok) setLinks((prev) => prev.filter((l) => l.id !== id));
+  }
+
+  function moveLinkBefore(fromId, toId) {
+    setLinks((prev) => {
+      const from = prev.findIndex((l) => l.id === fromId);
+      const to = prev.findIndex((l) => l.id === toId);
+      if (from < 0 || to < 0 || from === to) return prev;
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  }
+
+  function handleLinkDragStart(e, id) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(id));
+    linksBeforeDragRef.current = linksRef.current;
+    dragLinkIdRef.current = id;
+    setDragLinkId(id);
+    setLinkOrderError('');
+  }
+
+  function handleLinkDragOver(e, overId) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const fromId = dragLinkIdRef.current;
+    if (fromId == null || fromId === overId) return;
+    moveLinkBefore(fromId, overId);
+  }
+
+  async function handleLinkDragEnd() {
+    const dragging = dragLinkIdRef.current;
+    dragLinkIdRef.current = null;
+    setDragLinkId(null);
+    if (dragging == null) return;
+
+    const orderedIds = linksRef.current.map((l) => l.id);
+    const previous = linksBeforeDragRef.current;
+    const unchanged = previous
+      && previous.length === orderedIds.length
+      && previous.every((l, i) => l.id === orderedIds[i]);
+    if (unchanged) return;
+
+    const res = await fetch('/api/team-hub/links/reorder', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ ordered_ids: orderedIds }),
+    });
+    if (!res.ok) {
+      if (previous) setLinks(previous);
+      setLinkOrderError('Could not save link order');
+      return;
+    }
+    const json = await res.json();
+    if (json.links) setLinks(json.links);
   }
 
   return (
@@ -493,12 +560,12 @@ export default function TeamExecutiveOps() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-4">
-          <section className="lg:col-span-8 bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden">
-            <div className="bg-feather px-4 py-2.5 flex items-center gap-2">
+          <section className={`lg:col-span-8 bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden flex flex-col ${HUB_SIDE_PANEL_HEIGHT}`}>
+            <div className="bg-feather px-4 py-2.5 flex items-center gap-2 shrink-0">
               <Icon name="campaign" className="text-lemon !text-[18px]" />
               <h3 className="text-sm font-bold text-white">Messages</h3>
             </div>
-            <form onSubmit={postMessage} className="px-3 py-2.5 bg-surface-container-low/50 border-b border-primary/5 flex gap-2">
+            <form onSubmit={postMessage} className="px-3 py-2.5 bg-surface-container-low/50 border-b border-primary/5 flex gap-2 shrink-0">
               <textarea
                 value={composer}
                 onChange={(e) => setComposer(e.target.value)}
@@ -514,7 +581,7 @@ export default function TeamExecutiveOps() {
                 {posting ? '…' : 'Post'}
               </button>
             </form>
-            <div className="max-h-48 overflow-y-auto custom-scrollbar p-2 space-y-1.5">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar p-2 space-y-1.5">
               {messages.length === 0 ? (
                 <p className="py-4 text-xs text-on-surface-variant text-center">No messages yet.</p>
               ) : (
@@ -526,7 +593,7 @@ export default function TeamExecutiveOps() {
                         <p className="font-bold text-xs text-primary">{m.user_name || 'Team'}</p>
                         <p className="text-[10px] text-on-surface-variant">{relativeTime(m.created_at)}</p>
                       </div>
-                      <p className="text-xs text-on-surface mt-0.5 whitespace-pre-wrap line-clamp-3">{m.body}</p>
+                      <p className="text-xs text-on-surface mt-0.5 whitespace-pre-wrap">{m.body}</p>
                     </div>
                     <button
                       type="button"
@@ -541,18 +608,37 @@ export default function TeamExecutiveOps() {
             </div>
           </section>
 
-          <section className="lg:col-span-4 bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden">
-            <div className="bg-secondary px-4 py-2.5 flex items-center gap-2">
+          <section className={`lg:col-span-4 bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden flex flex-col ${HUB_SIDE_PANEL_HEIGHT}`}>
+            <div className="bg-secondary px-4 py-2.5 flex items-center gap-2 shrink-0">
               <Icon name="link" className="text-lemon !text-[18px]" />
               <h3 className="text-sm font-bold text-white">Quick Links</h3>
             </div>
-            <div className="p-3">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar p-3">
               {links.length === 0 && (
                 <p className="text-xs text-on-surface-variant py-2 text-center">No links yet.</p>
               )}
+              {linkOrderError && (
+                <p className="text-[11px] text-error mb-2">{linkOrderError}</p>
+              )}
               <div className="space-y-1.5">
                 {links.map((l) => (
-                  <div key={l.id} className="group flex items-center gap-0.5">
+                  <div
+                    key={l.id}
+                    onDragOver={(e) => handleLinkDragOver(e, l.id)}
+                    onDrop={(e) => e.preventDefault()}
+                    className={`group flex items-center gap-0.5 ${dragLinkId === l.id ? 'opacity-60' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={(e) => handleLinkDragStart(e, l.id)}
+                      onDragEnd={handleLinkDragEnd}
+                      aria-label={`Reorder ${l.label}`}
+                      title="Drag to reorder"
+                      className="p-1.5 text-on-surface-variant/40 hover:text-on-surface-variant cursor-grab active:cursor-grabbing shrink-0"
+                    >
+                      <Icon name="drag_indicator" className="!text-[16px]" />
+                    </button>
                     <a
                       href={l.url}
                       target="_blank"
@@ -572,39 +658,40 @@ export default function TeamExecutiveOps() {
                   </div>
                 ))}
               </div>
+            </div>
+            <div className="shrink-0 px-3 pb-3 pt-1 border-t border-primary/5">
               {showAddLink ? (
-                  <form onSubmit={addLink} className="mt-2 p-2.5 rounded-lg bg-surface-container-low/50 space-y-2">
-                    <input
-                      value={linkForm.label}
-                      onChange={(e) => setLinkForm({ ...linkForm, label: e.target.value })}
-                      placeholder="Label"
-                      className="w-full px-2.5 py-1.5 bg-white border border-outline-variant/20 rounded text-xs"
-                    />
-                    <input
-                      value={linkForm.url}
-                      onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })}
-                      placeholder="https://…"
-                      className="w-full px-2.5 py-1.5 bg-white border border-outline-variant/20 rounded text-xs"
-                    />
-                    <div className="flex gap-2 justify-end">
-                      <button type="button" onClick={() => setShowAddLink(false)} className="px-2 py-1 text-[10px] font-semibold text-on-surface-variant">
-                        Cancel
-                      </button>
-                      <button type="submit" className="px-3 py-1 bg-feather text-white rounded text-[10px] font-semibold">
-                        Add
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddLink(true)}
-                    className="mt-2 w-full py-2 rounded-lg border border-dashed border-secondary/40 text-xs font-semibold text-secondary hover:bg-secondary/5"
-                  >
-                    + Add link
-                  </button>
-                )
-              }
+                <form onSubmit={addLink} className="p-2.5 rounded-lg bg-surface-container-low/50 space-y-2">
+                  <input
+                    value={linkForm.label}
+                    onChange={(e) => setLinkForm({ ...linkForm, label: e.target.value })}
+                    placeholder="Label"
+                    className="w-full px-2.5 py-1.5 bg-white border border-outline-variant/20 rounded text-xs"
+                  />
+                  <input
+                    value={linkForm.url}
+                    onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })}
+                    placeholder="https://…"
+                    className="w-full px-2.5 py-1.5 bg-white border border-outline-variant/20 rounded text-xs"
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button type="button" onClick={() => setShowAddLink(false)} className="px-2 py-1 text-[10px] font-semibold text-on-surface-variant">
+                      Cancel
+                    </button>
+                    <button type="submit" className="px-3 py-1 bg-feather text-white rounded text-[10px] font-semibold">
+                      Add
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowAddLink(true)}
+                  className="w-full py-2 rounded-lg border border-dashed border-secondary/40 text-xs font-semibold text-secondary hover:bg-secondary/5"
+                >
+                  + Add link
+                </button>
+              )}
             </div>
           </section>
         </div>
