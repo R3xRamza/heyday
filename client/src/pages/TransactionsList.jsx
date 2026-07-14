@@ -44,7 +44,7 @@ const KPI_CARDS = [
 const VOLUME_BOX_BY_FILTER = {
   active_transactions: { label: 'Active Volume', sub: (n) => `${n} active` },
   all: { label: 'Total Volume', sub: (n) => `${n} propert${n === 1 ? 'y' : 'ies'}` },
-  current_listings: { label: 'Listing Volume', sub: (n) => `${n} on market` },
+  current_listings: { label: 'Listing Volume', sub: (n) => `${n} active listings` },
   coming_soon: { label: 'Coming Soon Volume', sub: (n) => `${n} future listing${n === 1 ? '' : 's'}` },
   pending: { label: 'Total Pending Volume', sub: (n) => `${n} under contract` },
   closed: { label: 'Closed YTD', sub: (n) => `${n} closing${n === 1 ? '' : 's'}` },
@@ -125,7 +125,7 @@ function portfolioTypeBadgeClass(tx) {
   const type = transactionPortfolioType(tx);
   if (type === 'Coming Soon') return 'bg-lemon text-feather';
   if (type === 'Closed') return 'bg-secondary/20 text-secondary';
-  if (type === 'Pending' || type === 'Pending listing') return 'bg-tertiary-container/50 text-feather';
+  if (type === 'Pending buyer' || type === 'Pending listing') return 'bg-tertiary-container/50 text-feather';
   if (type === 'Active listing') return 'bg-sky text-feather';
   return 'bg-secondary-container/50 text-secondary';
 }

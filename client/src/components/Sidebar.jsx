@@ -25,10 +25,10 @@ import { APP_HEADER_BORDER_CLASS, APP_HEADER_HEIGHT_CLASS } from '../constants/a
 const NAV_ITEMS = [
   { to: '/team-ops', label: 'Team Hub', icon: Users },
   { to: '/tasks', label: 'Task Hub', icon: CheckSquare, taskHub: true },
-  { to: '/crm', label: 'CRM Hub', icon: BookUser },
-  { to: '/revenue', label: 'Revenue', icon: BarChart2 },
   { to: '/transactions', label: 'Transactions', icon: Building2 },
   { to: '/marketing', label: 'Marketing', icon: Megaphone },
+  { to: '/crm', label: 'CRM Hub', icon: BookUser },
+  { to: '/revenue', label: 'Revenue', icon: BarChart2 },
   { to: '/feedback', label: 'Feedback', icon: MessageSquare },
 ];
 

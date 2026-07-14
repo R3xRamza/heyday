@@ -110,7 +110,7 @@ export function transactionPortfolioType(tx) {
     if (isListingSideRepresenting(normalizeRepresenting(tx.representing))) {
       return 'Pending listing';
     }
-    return 'Pending';
+    return 'Pending buyer';
   }
 
   const today = portfolioTodayStr();
