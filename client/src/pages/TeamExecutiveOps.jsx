@@ -231,15 +231,10 @@ function sortMessages(list) {
     const ap = isPinnedMessage(a) ? 1 : 0;
     const bp = isPinnedMessage(b) ? 1 : 0;
     if (ap !== bp) return bp - ap;
-    if (ap && bp) {
-      const at = a.pinned_at || '';
-      const bt = b.pinned_at || '';
-      if (at !== bt) return bt.localeCompare(at);
-    }
-    const ac = a.created_at || '';
-    const bc = b.created_at || '';
-    if (ac !== bc) return bc.localeCompare(ac);
-    return (b.id || 0) - (a.id || 0);
+    const ao = a.sort_order ?? 0;
+    const bo = b.sort_order ?? 0;
+    if (ao !== bo) return ao - bo;
+    return (a.id || 0) - (b.id || 0);
   });
 }
 
@@ -336,14 +331,25 @@ export default function TeamExecutiveOps() {
   const [editLinkForm, setEditLinkForm] = useState({ label: '', url: '' });
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editMessageBody, setEditMessageBody] = useState('');
+  const [dragMessageId, setDragMessageId] = useState(null);
+  const [dragMessageInsertIndex, setDragMessageInsertIndex] = useState(null);
+  const [messageOrderError, setMessageOrderError] = useState('');
   const linksRef = useRef(links);
   const linksBeforeDragRef = useRef(null);
   const dragLinkIdRef = useRef(null);
   const dragInsertIndexRef = useRef(null);
+  const messagesRef = useRef(messages);
+  const messagesBeforeDragRef = useRef(null);
+  const dragMessageIdRef = useRef(null);
+  const dragMessageInsertIndexRef = useRef(null);
 
   useEffect(() => {
     linksRef.current = links;
   }, [links]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const celebrationLabel = useMemo(() => celebrationWindowLabel(), []);
 
@@ -456,6 +462,91 @@ export default function TeamExecutiveOps() {
     if (!body) return;
     const updated = await patchMessage(id, { body });
     if (updated) cancelEditMessage();
+  }
+
+  function handleMessageDragStart(e, id) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(id));
+    messagesBeforeDragRef.current = messagesRef.current;
+    const fromIndex = messagesRef.current.findIndex((m) => m.id === id);
+    dragMessageIdRef.current = id;
+    dragMessageInsertIndexRef.current = fromIndex;
+    setDragMessageId(id);
+    setDragMessageInsertIndex(fromIndex);
+    setMessageOrderError('');
+  }
+
+  function handleMessageDragOver(e, overId) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const fromId = dragMessageIdRef.current;
+    if (fromId == null) return;
+
+    const list = messagesRef.current;
+    const fromIndex = list.findIndex((m) => m.id === fromId);
+    const overIndex = list.findIndex((m) => m.id === overId);
+    if (fromIndex < 0 || overIndex < 0) return;
+
+    const fromItem = list[fromIndex];
+    const overItem = list[overIndex];
+    if (isPinnedMessage(fromItem) !== isPinnedMessage(overItem)) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    let insertIndex = after ? overIndex + 1 : overIndex;
+    if (fromIndex < insertIndex) insertIndex -= 1;
+    insertIndex = Math.max(0, Math.min(list.length - 1, insertIndex));
+
+    // Keep insert within the same pin group bounds
+    const samePin = list
+      .map((m, i) => ({ m, i }))
+      .filter(({ m }) => isPinnedMessage(m) === isPinnedMessage(fromItem))
+      .map(({ i }) => i);
+    const minI = samePin[0];
+    const maxI = samePin[samePin.length - 1];
+    insertIndex = Math.max(minI, Math.min(maxI, insertIndex));
+
+    if (dragMessageInsertIndexRef.current === insertIndex) return;
+    dragMessageInsertIndexRef.current = insertIndex;
+    setDragMessageInsertIndex(insertIndex);
+  }
+
+  async function handleMessageDragEnd() {
+    const fromId = dragMessageIdRef.current;
+    const insertIndex = dragMessageInsertIndexRef.current;
+    dragMessageIdRef.current = null;
+    dragMessageInsertIndexRef.current = null;
+    setDragMessageId(null);
+    setDragMessageInsertIndex(null);
+    if (fromId == null || insertIndex == null) return;
+
+    const previous = messagesBeforeDragRef.current || messagesRef.current;
+    const next = moveItemToIndex(previous, fromId, insertIndex);
+    const unchanged = previous.length === next.length
+      && previous.every((m, i) => m.id === next[i].id);
+    if (unchanged) return;
+
+    setMessages(next);
+    messagesRef.current = next;
+
+    const res = await fetch('/api/team-hub/messages/reorder', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ ordered_ids: next.map((m) => m.id) }),
+    });
+    if (!res.ok) {
+      setMessages(previous);
+      messagesRef.current = previous;
+      setMessageOrderError('Could not save message order');
+      return;
+    }
+    const json = await res.json();
+    if (json.messages) {
+      const sorted = sortMessages(json.messages);
+      setMessages(sorted);
+      messagesRef.current = sorted;
+    }
   }
 
   async function addLink(e) {
@@ -710,88 +801,112 @@ export default function TeamExecutiveOps() {
               {messages.length === 0 ? (
                 <p className="py-4 text-xs text-on-surface-variant text-center">No messages yet.</p>
               ) : (
-                messages.map((m) => {
-                  const pinned = isPinnedMessage(m);
-                  const editing = editingMessageId === m.id;
-                  return (
-                    <div
-                      key={m.id}
-                      className={`group flex gap-2 rounded-lg px-2.5 py-2 transition-colors ${
-                        pinned ? 'bg-lemon/15 border border-lemon/30' : 'bg-surface-container-low/40 hover:bg-surface-container-low'
-                      }`}
-                    >
-                      <TeamAvatar email={m.user_email} name={m.user_name} size="xs" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-1.5 flex-wrap">
-                          <p className="font-bold text-xs text-primary">{m.user_name || 'Team'}</p>
-                          <p className="text-[10px] text-on-surface-variant">{relativeTime(m.created_at)}</p>
-                          {pinned && (
-                            <span className="text-[10px] font-semibold uppercase tracking-wide text-feather/70">Pinned</span>
-                          )}
-                        </div>
-                        {editing ? (
-                          <div className="mt-1 space-y-1.5">
-                            <textarea
-                              value={editMessageBody}
-                              onChange={(e) => setEditMessageBody(e.target.value)}
-                              rows={3}
-                              className="w-full bg-white border border-outline-variant/20 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-secondary/25 outline-none resize-y"
-                            />
-                            <div className="flex gap-2 justify-end">
-                              <button
-                                type="button"
-                                onClick={cancelEditMessage}
-                                className="px-2 py-1 text-[10px] font-semibold text-on-surface-variant"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => saveEditMessage(m.id)}
-                                disabled={!editMessageBody.trim()}
-                                className="px-3 py-1 bg-feather text-white rounded text-[10px] font-semibold disabled:opacity-50"
-                              >
-                                Save
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-xs text-on-surface mt-0.5 whitespace-pre-wrap">{m.body}</p>
+                <>
+                  {messageOrderError && (
+                    <p className="text-[11px] text-error px-1">{messageOrderError}</p>
+                  )}
+                  {messages.map((m, index) => {
+                    const pinned = isPinnedMessage(m);
+                    const editing = editingMessageId === m.id;
+                    return (
+                      <div key={m.id}>
+                        {dragMessageId != null && dragMessageInsertIndex === index && (
+                          <div className="h-0.5 mb-1 rounded bg-lemon" aria-hidden />
                         )}
-                      </div>
-                      <div className="flex flex-col items-center gap-0.5 shrink-0 self-start">
-                        <button
-                          type="button"
-                          onClick={() => togglePinMessage(m)}
-                          aria-label={pinned ? 'Unpin message' : 'Pin message'}
-                          title={pinned ? 'Unpin' : 'Pin'}
-                          className={`p-0.5 rounded ${pinned ? 'text-feather opacity-100' : 'text-on-surface-variant/40 opacity-0 group-hover:opacity-100 hover:text-feather'}`}
+                        <div
+                          onDragOver={(e) => handleMessageDragOver(e, m.id)}
+                          onDrop={(e) => e.preventDefault()}
+                          className={`group flex gap-2 rounded-lg px-2.5 py-2 transition-colors ${
+                            dragMessageId === m.id ? 'opacity-50' : ''
+                          } ${
+                            pinned ? 'bg-lemon/15 border border-lemon/30' : 'bg-surface-container-low/40 hover:bg-surface-container-low'
+                          }`}
                         >
-                          <Icon name="push_pin" className="!text-[15px]" filled={pinned} />
-                        </button>
-                        {!editing && (
                           <button
                             type="button"
-                            onClick={() => startEditMessage(m)}
-                            aria-label="Edit message"
-                            title="Edit"
-                            className="p-0.5 text-on-surface-variant/40 hover:text-secondary opacity-0 group-hover:opacity-100"
+                            draggable
+                            onDragStart={(e) => handleMessageDragStart(e, m.id)}
+                            onDragEnd={handleMessageDragEnd}
+                            aria-label="Reorder message"
+                            title="Drag to reorder"
+                            className="p-0.5 mt-0.5 text-on-surface-variant/40 hover:text-on-surface-variant cursor-grab active:cursor-grabbing shrink-0 self-start"
                           >
-                            <Icon name="edit" className="!text-[15px]" />
+                            <Icon name="drag_indicator" className="!text-[16px]" />
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => deleteMessage(m.id)}
-                          aria-label="Delete message"
-                          className="p-0.5 text-on-surface-variant/30 hover:text-error opacity-0 group-hover:opacity-100"
-                        >
-                          <Icon name="close" className="!text-[16px]" />
-                        </button>
+                          <TeamAvatar email={m.user_email} name={m.user_name} size="xs" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              <p className="font-bold text-xs text-primary">{m.user_name || 'Team'}</p>
+                              <p className="text-[10px] text-on-surface-variant">{relativeTime(m.created_at)}</p>
+                              {pinned && (
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-feather/70">Pinned</span>
+                              )}
+                            </div>
+                            {editing ? (
+                              <div className="mt-1 space-y-1.5">
+                                <textarea
+                                  value={editMessageBody}
+                                  onChange={(e) => setEditMessageBody(e.target.value)}
+                                  rows={3}
+                                  className="w-full bg-white border border-outline-variant/20 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-secondary/25 outline-none resize-y"
+                                />
+                                <div className="flex gap-2 justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={cancelEditMessage}
+                                    className="px-2 py-1 text-[10px] font-semibold text-on-surface-variant"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => saveEditMessage(m.id)}
+                                    disabled={!editMessageBody.trim()}
+                                    className="px-3 py-1 bg-feather text-white rounded text-[10px] font-semibold disabled:opacity-50"
+                                  >
+                                    Save
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-on-surface mt-0.5 whitespace-pre-wrap">{m.body}</p>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-center gap-0.5 shrink-0 self-start">
+                            <button
+                              type="button"
+                              onClick={() => togglePinMessage(m)}
+                              aria-label={pinned ? 'Unpin message' : 'Pin message'}
+                              title={pinned ? 'Unpin' : 'Pin'}
+                              className={`p-0.5 rounded ${pinned ? 'text-feather opacity-100' : 'text-on-surface-variant/40 opacity-0 group-hover:opacity-100 hover:text-feather'}`}
+                            >
+                              <Icon name="push_pin" className="!text-[15px]" filled={pinned} />
+                            </button>
+                            {!editing && (
+                              <button
+                                type="button"
+                                onClick={() => startEditMessage(m)}
+                                aria-label="Edit message"
+                                title="Edit"
+                                className="p-0.5 text-on-surface-variant/40 hover:text-secondary opacity-0 group-hover:opacity-100"
+                              >
+                                <Icon name="edit" className="!text-[15px]" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => deleteMessage(m.id)}
+                              aria-label="Delete message"
+                              className="p-0.5 text-on-surface-variant/30 hover:text-error opacity-0 group-hover:opacity-100"
+                            >
+                              <Icon name="close" className="!text-[16px]" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                </>
               )}
             </div>
           </section>
