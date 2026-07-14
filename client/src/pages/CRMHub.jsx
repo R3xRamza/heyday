@@ -114,7 +114,7 @@ export default function CRMHub() {
 
         <div className="bg-white rounded-xl border border-outline-variant/10 p-4 shadow-executive space-y-4">
           <div className="flex flex-col lg:flex-row gap-3">
-            <div className="flex-1 relative">
+            <div className="flex-[2] min-w-[20rem] relative">
               <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-[20px]" />
               <input
                 type="search"
