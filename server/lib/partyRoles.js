@@ -6,7 +6,7 @@ export const SALE_TYPE_RENT_LEASE = 'Rent/lease';
 export const FIXED_PARTY_ROLES = {
   traditional: [
     { role: 'agent', label: 'Agent', isTeam: true },
-    { role: 'escrow_officer', label: 'Escrow', isTeam: false },
+    { role: 'escrow_officer', label: 'Title', isTeam: false },
     { role: 'cooperating_agent', label: 'Cooperating Agent', isTeam: false },
     { role: 'client', label: 'Client', isTeam: false },
     { role: 'lender', label: 'Lender', isTeam: false },
@@ -23,7 +23,7 @@ const LEGACY_LABELS = {
   listing_agent: 'Agent',
   office_administrator: 'office administrator',
   transaction_coordinator: 'transaction coordinator',
-  escrow_officer: 'Escrow',
+  escrow_officer: 'Title',
   cooperating_agent: 'Cooperating Agent',
   lender: 'Lender',
   client: 'Client',

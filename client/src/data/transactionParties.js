@@ -7,7 +7,7 @@ import {
 export const FIXED_PARTY_ROLES = {
   traditional: [
     { role: 'agent', label: 'Agent', is_team: true },
-    { role: 'escrow_officer', label: 'Escrow', is_team: false },
+    { role: 'escrow_officer', label: 'Title', is_team: false },
     { role: 'cooperating_agent', label: 'Cooperating Agent', is_team: false },
     { role: 'client', label: 'Client', is_team: false },
     { role: 'lender', label: 'Lender', is_team: false },
@@ -24,7 +24,7 @@ const LEGACY_LABELS = {
   listing_agent: 'Agent',
   office_administrator: 'office administrator',
   transaction_coordinator: 'transaction coordinator',
-  escrow_officer: 'Escrow',
+  escrow_officer: 'Title',
   cooperating_agent: 'Cooperating Agent',
   lender: 'Lender',
   client: 'Client',
