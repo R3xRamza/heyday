@@ -18,7 +18,7 @@ export default function AgentScopeToggle({ className = '' }) {
             type="button"
             aria-label={opt.label}
             aria-pressed={active}
-            onClick={() => setScope(active ? 'meredith' : opt.value)}
+            onClick={() => setScope(opt.value)}
             className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
               active
                 ? 'bg-feather text-lemon shadow-sm'

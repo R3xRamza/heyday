@@ -916,23 +916,23 @@ export default function TeamExecutiveOps() {
               <Icon name="link" className="text-lemon !text-[18px]" />
               <h3 className="text-sm font-bold text-white">Quick Links</h3>
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar p-3">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain custom-scrollbar p-3">
               {links.length === 0 && (
                 <p className="text-xs text-on-surface-variant py-2 text-center">No links yet.</p>
               )}
               {linkOrderError && (
                 <p className="text-[11px] text-error mb-2">{linkOrderError}</p>
               )}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 {links.map((l, index) => (
-                  <div key={l.id}>
+                  <div key={l.id} className="min-w-0">
                     {dragLinkId != null && dragInsertIndex === index && (
                       <div className="h-0.5 mb-1 rounded bg-secondary" aria-hidden />
                     )}
                     <div
                       onDragOver={(e) => handleLinkDragOver(e, l.id)}
                       onDrop={(e) => e.preventDefault()}
-                      className={`group flex items-start gap-0.5 ${dragLinkId === l.id ? 'opacity-50' : ''}`}
+                      className={`group flex items-start gap-0.5 min-w-0 ${dragLinkId === l.id ? 'opacity-50' : ''}`}
                     >
                       <button
                         type="button"
@@ -978,7 +978,7 @@ export default function TeamExecutiveOps() {
                             href={l.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="flex-1 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-surface-container-low/60 text-xs font-semibold text-primary hover:bg-secondary/10 hover:text-secondary transition-colors"
+                            className="flex-1 min-w-0 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-surface-container-low/60 text-xs font-semibold text-primary hover:bg-secondary/10 hover:text-secondary transition-colors"
                           >
                             <span className="truncate">{l.label}</span>
                             <Icon name="open_in_new" className="!text-[14px] shrink-0 opacity-50" />

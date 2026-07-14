@@ -132,6 +132,7 @@ function normalizeEvents({
         subtitle: shortAddress(t.transaction_address),
         taskId: t.id,
         transactionId: t.transaction_id,
+        platform: t.marketing_post_type || null,
         raw: t,
       });
     }
@@ -491,6 +492,23 @@ export default function MarketingCalendar() {
     await patchTaskStatus(id, 'pending');
   }
 
+  async function saveTaskDetails(id, payload) {
+    const res = await fetch(`/api/tasks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Could not save task');
+    if (json.task) {
+      setTasks((prev) => prev.map((t) => (t.id === id ? json.task : t)));
+      setTaskModalTask((prev) => (prev?.id === id ? json.task : prev));
+    } else {
+      await fetchCalendarData();
+    }
+  }
+
   async function savePost(form, id) {
     const url = id ? `/api/marketing/posts/${id}` : '/api/marketing/posts';
     const res = await fetch(url, {
@@ -575,7 +593,7 @@ export default function MarketingCalendar() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ due_date: newDate }),
+      body: JSON.stringify({ due_date: newDate, due_date_override: true }),
     });
     const json = await res.json();
     if (!res.ok) {
@@ -738,7 +756,9 @@ export default function MarketingCalendar() {
       <MarketingTaskModal
         open={!!taskModalTask}
         task={taskModalTask}
+        platforms={filterPlatforms}
         onClose={() => setTaskModalTask(null)}
+        onSave={saveTaskDetails}
         onComplete={completeTask}
         onMarkPending={markTaskPending}
       />
