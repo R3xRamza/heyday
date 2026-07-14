@@ -169,7 +169,7 @@ export default function PartiesToTransaction({
                   <select
                     value={agentValue}
                     onChange={(e) => handleAgentChange(i, e.target.value)}
-                    className="flex-1 min-w-0 text-sm font-medium text-primary bg-transparent border-0 outline-none focus:ring-0 p-0 pr-6 cursor-pointer appearance-auto"
+                    className="flex-1 min-w-0 text-sm font-medium text-primary bg-transparent border-0 outline-none focus:ring-0 p-0 cursor-pointer appearance-none bg-none"
                     aria-label="Agent"
                   >
                     <option value="">Select agent…</option>
