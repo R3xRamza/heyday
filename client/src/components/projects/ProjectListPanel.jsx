@@ -4,6 +4,7 @@ import ProjectListItem from './ProjectListItem';
 function ProjectEditForm({ project, onSave, onCancel, onDelete, readOnly }) {
   const [title, setTitle] = useState(project.title);
   const [description, setDescription] = useState(project.description || '');
+  const [deadline, setDeadline] = useState(project.deadline || '');
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e) {
@@ -14,6 +15,7 @@ function ProjectEditForm({ project, onSave, onCancel, onDelete, readOnly }) {
       await onSave(project.id, {
         title: title.trim(),
         description: description.trim() || null,
+        deadline: deadline || null,
       });
       onCancel();
     } finally {
@@ -22,7 +24,10 @@ function ProjectEditForm({ project, onSave, onCancel, onDelete, readOnly }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-xl ring-2 ring-secondary/50 border border-secondary bg-secondary/5 shadow-executive p-4 mb-2 space-y-2">
+    <form
+      onSubmit={handleSubmit}
+      className="h-full bg-white rounded-xl ring-2 ring-secondary/50 border border-secondary bg-secondary/5 shadow-executive p-5 space-y-3"
+    >
       <input
         type="text"
         value={title}
@@ -41,8 +46,30 @@ function ProjectEditForm({ project, onSave, onCancel, onDelete, readOnly }) {
         className="w-full px-3 py-2 text-sm rounded-lg border border-outline-variant/30 focus:outline-none focus:ring-2 focus:ring-secondary/30 resize-none disabled:opacity-70"
         onKeyDown={(e) => e.key === 'Escape' && onCancel()}
       />
+      <div className="flex items-center gap-2">
+        <label className="text-xs font-semibold text-on-surface-variant shrink-0" htmlFor={`deadline-${project.id}`}>
+          Deadline
+        </label>
+        <input
+          id={`deadline-${project.id}`}
+          type="date"
+          value={deadline}
+          onChange={(e) => setDeadline(e.target.value)}
+          disabled={readOnly}
+          className="flex-1 min-w-0 px-3 py-2 text-sm rounded-lg border border-outline-variant/30 focus:outline-none focus:ring-2 focus:ring-secondary/30 disabled:opacity-70"
+        />
+        {!readOnly && deadline && (
+          <button
+            type="button"
+            onClick={() => setDeadline('')}
+            className="text-xs font-semibold text-on-surface-variant shrink-0 px-1"
+          >
+            Clear
+          </button>
+        )}
+      </div>
       {!readOnly && (
-        <div className="flex gap-2 justify-between">
+        <div className="flex gap-2 justify-between pt-1">
           <button
             type="button"
             onClick={() => {
@@ -77,11 +104,9 @@ function ProjectEditForm({ project, onSave, onCancel, onDelete, readOnly }) {
 
 export default function ProjectListPanel({
   projects,
-  onCreate,
   onUpdate,
   onDelete,
   readOnly,
-  embedded = false,
 }) {
   const [expandedId, setExpandedId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -102,15 +127,6 @@ export default function ProjectListPanel({
     if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
   }, []);
 
-  async function handleCreate(data) {
-    const project = await onCreate(data);
-    if (project?.id) {
-      setExpandedId(project.id);
-      setEditingId(null);
-    }
-    return project;
-  }
-
   function handleExpand(projectId) {
     if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
     clickTimerRef.current = setTimeout(() => {
@@ -121,6 +137,7 @@ export default function ProjectListPanel({
   }
 
   function handleEdit(projectId) {
+    if (readOnly) return;
     if (clickTimerRef.current) {
       clearTimeout(clickTimerRef.current);
       clickTimerRef.current = null;
@@ -139,8 +156,8 @@ export default function ProjectListPanel({
     if (editingId === projectId) setEditingId(null);
   }
 
-  const list = (
-    <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {projects.map((project) => {
         if (editingId === project.id) {
           return (
@@ -162,19 +179,10 @@ export default function ProjectListPanel({
             expanded={expandedId === project.id}
             onExpand={() => handleExpand(project.id)}
             onEdit={() => handleEdit(project.id)}
+            canEdit={!readOnly}
           />
         );
       })}
     </div>
-  );
-
-  if (embedded) {
-    return list;
-  }
-
-  return (
-    <aside className="flex flex-col min-h-0 h-full border-r border-outline-variant/15 pr-4 lg:pr-6">
-      {list}
-    </aside>
   );
 }

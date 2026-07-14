@@ -129,6 +129,7 @@ export function runMigrations(db) {
   migrateMarketingTables(db);
   migrateBirthdayPinsTable(db);
   migrateProjectsTables(db);
+  addColumnIfMissing(db, 'projects', 'deadline', 'DATE');
   migrateUserTodosTable(db);
   addColumnIfMissing(db, 'user_todos', 'due_date', 'DATE');
   migratePendingStageFromCloseDate(db);

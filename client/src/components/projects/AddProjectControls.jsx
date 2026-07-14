@@ -4,6 +4,7 @@ import { ADD_BUTTON_CLASS, ADD_ROW_CLASS } from './dashboardShared';
 export function AddProjectForm({ onSave, onCancel }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [deadline, setDeadline] = useState('');
   const [saving, setSaving] = useState(false);
   const titleRef = useRef(null);
 
@@ -16,14 +17,21 @@ export function AddProjectForm({ onSave, onCancel }) {
     if (!title.trim() || saving) return;
     setSaving(true);
     try {
-      await onSave({ title: title.trim(), description: description.trim() || null });
+      await onSave({
+        title: title.trim(),
+        description: description.trim() || null,
+        deadline: deadline || null,
+      });
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className={`bg-white rounded-xl border border-secondary/40 shadow-executive p-4 space-y-2 ${ADD_ROW_CLASS}`}>
+    <form
+      onSubmit={handleSubmit}
+      className={`bg-white rounded-xl border border-secondary/40 shadow-executive p-4 space-y-2 ${ADD_ROW_CLASS}`}
+    >
       <input
         ref={titleRef}
         type="text"
@@ -40,6 +48,27 @@ export function AddProjectForm({ onSave, onCancel }) {
         rows={3}
         className="w-full px-3 py-2 text-sm rounded-lg border border-outline-variant/30 focus:outline-none focus:ring-2 focus:ring-secondary/30 resize-none"
       />
+      <div className="flex items-center gap-2">
+        <label className="text-xs font-semibold text-on-surface-variant shrink-0" htmlFor="add-project-deadline">
+          Deadline
+        </label>
+        <input
+          id="add-project-deadline"
+          type="date"
+          value={deadline}
+          onChange={(e) => setDeadline(e.target.value)}
+          className="flex-1 min-w-0 px-3 py-2 text-sm rounded-lg border border-outline-variant/30 focus:outline-none focus:ring-2 focus:ring-secondary/30"
+        />
+        {deadline && (
+          <button
+            type="button"
+            onClick={() => setDeadline('')}
+            className="text-xs font-semibold text-on-surface-variant shrink-0 px-1"
+          >
+            Clear
+          </button>
+        )}
+      </div>
       <div className="flex gap-2 justify-end">
         <button type="button" onClick={onCancel} className="text-xs font-semibold text-on-surface-variant px-2 py-1">
           Cancel
@@ -57,7 +86,7 @@ export function AddProjectForm({ onSave, onCancel }) {
 }
 
 export function AddProjectButton({ onClick, readOnly }) {
-  if (readOnly) return <div className={ADD_ROW_CLASS} aria-hidden />;
+  if (readOnly) return null;
   return (
     <button type="button" onClick={onClick} className={`${ADD_BUTTON_CLASS} ${ADD_ROW_CLASS}`}>
       + Add a project

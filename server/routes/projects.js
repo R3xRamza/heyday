@@ -11,6 +11,14 @@ function getProjectOr404(id) {
   return db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
 }
 
+/** Accept YYYY-MM-DD, empty/null → null. */
+function normalizeDeadline(value) {
+  if (value == null || value === '') return null;
+  const s = String(value).trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  return s;
+}
+
 router.get('/', (req, res) => {
   const userId = Number(req.query.user_id);
   if (!userId) return res.status(400).json({ error: 'user_id is required' });
@@ -21,7 +29,7 @@ router.get('/', (req, res) => {
   const projects = db.prepare(`
     SELECT * FROM projects
     WHERE user_id = ? AND status != 'archived'
-    ORDER BY sort_order, updated_at DESC, id DESC
+    ORDER BY (deadline IS NULL), deadline ASC, sort_order ASC, updated_at DESC, id DESC
   `).all(userId);
 
   res.json({ projects });
@@ -41,10 +49,12 @@ router.post('/', (req, res) => {
     'SELECT COALESCE(MAX(sort_order), -1) as m FROM projects WHERE user_id = ?',
   ).get(userId);
 
+  const deadline = normalizeDeadline(req.body.deadline);
+
   const result = db.prepare(`
-    INSERT INTO projects (user_id, title, description, sort_order)
-    VALUES (?, ?, ?, ?)
-  `).run(userId, title, req.body.description?.trim() || null, maxOrder.m + 1);
+    INSERT INTO projects (user_id, title, description, deadline, sort_order)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(userId, title, req.body.description?.trim() || null, deadline, maxOrder.m + 1);
 
   res.status(201).json({ project: getProjectOr404(result.lastInsertRowid) });
 });
@@ -63,9 +73,15 @@ router.patch('/:id', (req, res) => {
     ? (req.body.description.trim() || null)
     : project.description;
 
+  const deadline = Object.prototype.hasOwnProperty.call(req.body, 'deadline')
+    ? normalizeDeadline(req.body.deadline)
+    : project.deadline;
+
   db.prepare(`
-    UPDATE projects SET title = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-  `).run(title, description, project.id);
+    UPDATE projects
+    SET title = ?, description = ?, deadline = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(title, description, deadline, project.id);
 
   res.json({ project: getProjectOr404(project.id) });
 });
