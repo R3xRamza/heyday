@@ -109,7 +109,7 @@ Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · CR
 
 ## DOMAIN — Project Dashboard
 
-- `/tasks/:userId/projects` — projects-only card grid (optional `deadline`); no personal todo columns
+- `/tasks/:userId/projects` — projects-only card grid (optional target date / `deadline`); no personal todo columns
 - Write: owner or admin. Components: `client/src/components/projects/*`
 - Day-to-day tasks live under Admin Tasks; projects track longer initiatives
 
