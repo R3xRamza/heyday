@@ -59,6 +59,7 @@ export function runMigrations(db) {
   addColumnIfMissing(db, 'tasks', 'transaction_id', 'INTEGER REFERENCES transactions(id)');
   addColumnIfMissing(db, 'tasks', 'template_task_id', 'INTEGER REFERENCES template_tasks(id)');
   addColumnIfMissing(db, 'tasks', 'completed_at', 'DATETIME');
+  addColumnIfMissing(db, 'tasks', 'marketing_post_type', 'TEXT');
   addColumnIfMissing(db, 'template_tasks', 'default_role', 'TEXT');
   addColumnIfMissing(db, 'template_tasks', 'calendar_nickname', 'TEXT');
   backfillTemplateTaskNicknames(db);

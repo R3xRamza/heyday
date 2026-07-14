@@ -490,6 +490,7 @@ router.patch('/:id', (req, res) => {
     timing_direction,
     timing_anchor,
     priority,
+    marketing_post_type,
   } = req.body;
   const changes = [];
 
@@ -503,6 +504,17 @@ router.patch('/:id', (req, res) => {
   }
   if (description !== undefined && description !== task.description) {
     db.prepare('UPDATE tasks SET description = ? WHERE id = ?').run(description || null, req.params.id);
+  }
+
+  if (marketing_post_type !== undefined) {
+    const nextType = marketing_post_type != null && String(marketing_post_type).trim()
+      ? String(marketing_post_type).trim()
+      : null;
+    const prevType = task.marketing_post_type || null;
+    if (nextType !== prevType) {
+      changes.push(formatFieldChange('Post type', prevType || 'None', nextType || 'None'));
+      db.prepare('UPDATE tasks SET marketing_post_type = ? WHERE id = ?').run(nextType, req.params.id);
+    }
   }
 
   const timingTouched = timing_anchor !== undefined

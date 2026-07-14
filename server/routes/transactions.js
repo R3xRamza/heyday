@@ -20,7 +20,7 @@ import {
   mergeTransactionForValidation,
 } from '../lib/transactionValidation.js';
 import { closePastDueTransactions, deriveStageFromCloseDate } from '../lib/transactionAutoClose.js';
-import { closedYtdStats, CURRENT_LISTINGS_VIEW_SCOPE, ON_MARKET_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE } from '../lib/transactionScopes.js';
+import { CURRENT_LISTINGS_VIEW_SCOPE, ON_MARKET_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE } from '../lib/transactionScopes.js';
 import { parseAgentScope, transactionAgentScopeClause, assertTransactionInScope, agentScopeUserId } from '../lib/agentScope.js';
 import { runBrokermintImport, fixBrokermintAgentIds } from '../lib/brokermintImport.js';
 import { parsePagination } from '../lib/pagination.js';
@@ -39,6 +39,33 @@ const VIEW_MAP = {
   pending: PENDING_COUNT,
   closed: "stage = 'closed'",
 };
+
+/** Case-insensitive address / zip / client search predicate. `alias` e.g. 't' or '' for bare table. */
+function transactionSearchClause(alias = 't') {
+  const p = alias ? `${alias}.` : '';
+  return `(LOWER(${p}address) LIKE ? OR LOWER(${p}city) LIKE ? OR LOWER(COALESCE(${p}state, '')) LIKE ? OR LOWER(COALESCE(${p}zip, '')) LIKE ? OR LOWER(COALESCE(${p}client_name, ${p}owner_name)) LIKE ?)`;
+}
+
+function transactionSearchParams(search) {
+  const q = `%${search}%`;
+  return [q, q, q, q, q];
+}
+
+function closedYtdStatsForSearch(db, agentScope, search) {
+  const jan1 = `${new Date().getFullYear()}-01-01`;
+  const { sql, params } = transactionAgentScopeClause(agentScope, '');
+  let query = `
+    SELECT COUNT(*) as count, COALESCE(SUM(value), 0) as volume
+    FROM transactions
+    WHERE stage = 'closed' AND close_date >= ?${sql}
+  `;
+  const bind = [jan1, ...params];
+  if (search) {
+    query += ` AND ${transactionSearchClause('')}`;
+    bind.push(...transactionSearchParams(search));
+  }
+  return db.prepare(query).get(...bind);
+}
 
 const TX_FIELDS = [
   'address', 'city', 'state', 'zip', 'value', 'owner_name', 'representing', 'listing_visibility', 'stage',
@@ -129,9 +156,8 @@ router.get('/', (req, res) => {
   let countSql = `SELECT COUNT(*) as c FROM transactions t WHERE ${where}${scopeSql}`;
   const params = [...scopeParams];
   if (search) {
-    countSql += ` AND (LOWER(t.address) LIKE ? OR LOWER(t.city) LIKE ? OR LOWER(COALESCE(t.state, '')) LIKE ? OR LOWER(COALESCE(t.zip, '')) LIKE ? OR LOWER(COALESCE(t.client_name, t.owner_name)) LIKE ?)`;
-    const q = `%${search}%`;
-    params.push(q, q, q, q, q);
+    countSql += ` AND ${transactionSearchClause('t')}`;
+    params.push(...transactionSearchParams(search));
   }
   const total = db.prepare(countSql).get(...params).c;
 
@@ -144,22 +170,28 @@ router.get('/', (req, res) => {
     WHERE ${where}${scopeSql}
   `;
   if (search) {
-    sql += ` AND (LOWER(t.address) LIKE ? OR LOWER(t.city) LIKE ? OR LOWER(COALESCE(t.state, '')) LIKE ? OR LOWER(COALESCE(t.zip, '')) LIKE ? OR LOWER(COALESCE(t.client_name, t.owner_name)) LIKE ?)`;
+    sql += ` AND ${transactionSearchClause('t')}`;
   }
   sql += ` ORDER BY ${transactionOrderClause(sortKey, sortDir, dateField)} LIMIT ? OFFSET ?`;
   const transactions = db.prepare(sql).all(...params, limit, offset);
 
-  const portfolioStats = db.prepare(`
+  let portfolioSql = `
     SELECT COUNT(*) as count, COALESCE(SUM(value), 0) as volume,
       SUM(CASE WHEN ${ON_MARKET_LISTINGS_SCOPE} THEN 1 ELSE 0 END) as listings_count,
       SUM(CASE WHEN ${PRE_LISTINGS_SCOPE} THEN 1 ELSE 0 END) as pre_listings_count,
       SUM(CASE WHEN ${PENDING_COUNT} THEN 1 ELSE 0 END) as pending_count
     FROM transactions WHERE ${PORTFOLIO_SCOPE}${scopeSqlBare}
-  `).get(...scopeParamsBare);
+  `;
+  const portfolioParams = [...scopeParamsBare];
+  if (search) {
+    portfolioSql += ` AND ${transactionSearchClause('')}`;
+    portfolioParams.push(...transactionSearchParams(search));
+  }
+  const portfolioStats = db.prepare(portfolioSql).get(...portfolioParams);
 
   let filteredSql = `SELECT COUNT(*) as count, COALESCE(SUM(t.value), 0) as volume FROM transactions t WHERE ${where}${scopeSql}`;
   if (search) {
-    filteredSql += ` AND (LOWER(t.address) LIKE ? OR LOWER(t.city) LIKE ? OR LOWER(COALESCE(t.state, '')) LIKE ? OR LOWER(COALESCE(t.zip, '')) LIKE ? OR LOWER(COALESCE(t.client_name, t.owner_name)) LIKE ?)`;
+    filteredSql += ` AND ${transactionSearchClause('t')}`;
   }
   const filtered = db.prepare(filteredSql).get(...params);
 
@@ -171,7 +203,7 @@ router.get('/', (req, res) => {
     stats: {
       ...portfolioStats,
       filtered,
-      closedYtd: closedYtdStats(db, agentScope),
+      closedYtd: closedYtdStatsForSearch(db, agentScope, search),
     },
   });
 });

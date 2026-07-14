@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowRight, ListChecks, Plus } from 'lucide-react';
+import { ArrowRight, ListChecks, Plus, Search, X } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import DateText from '../components/shared/DateText';
 import { formatCurrency, parseTransactionAddress } from '../utils/format';
@@ -222,6 +222,24 @@ export default function TransactionsList() {
     setPage(1);
   }, [search]);
 
+  useEffect(() => {
+    setSearchParams(buildTransactionsListSearchParams({
+      filter,
+      page,
+      search,
+      sortKey,
+      sortDir,
+    }), { replace: true });
+  }, [filter, page, search, sortKey, sortDir, setSearchParams]);
+
+  function handleSearchChange(value) {
+    setSearch(value);
+  }
+
+  function clearSearch() {
+    setSearch('');
+  }
+
   function handleSort(key) {
     setPage(1);
     if (sortKey === key) {
@@ -312,7 +330,32 @@ export default function TransactionsList() {
   return (
     <DashboardLayout title="Transactions" className="bg-surface">
       <div className="max-w-[1440px] mx-auto px-8 py-6">
-        <header className="flex justify-end mb-6 gap-4">
+        <header className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div className="relative flex-1 min-w-[12rem] max-w-md">
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none"
+            />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search street or zip…"
+              aria-label="Search transactions by street or zip"
+              className="w-full pl-9 pr-9 py-2.5 bg-white border border-outline-variant/30 rounded-lg text-sm text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-secondary/25"
+            />
+            {search.trim() && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-on-surface-variant hover:text-primary"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-4 shrink-0 ml-auto">
             <Link
               to="/checklists"
               className="flex items-center gap-2 px-6 py-3 bg-surface-container-highest border border-outline-variant/30 text-primary text-xs font-semibold uppercase tracking-wider hover:bg-surface-container-high"
@@ -325,6 +368,7 @@ export default function TransactionsList() {
             >
               <Plus size={18} /> New Transaction
             </button>
+          </div>
         </header>
 
         <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-10 transition-opacity ${refreshing ? 'opacity-70' : ''}`}>

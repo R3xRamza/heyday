@@ -112,6 +112,15 @@ function TaskChip({ event, onTaskClick }) {
               {event.subtitle}
             </span>
           )}
+          {event.platform && (
+            <span
+              className={`text-[9px] font-semibold uppercase tracking-wide line-clamp-1 block mt-0.5 ${
+                isComplete ? 'text-stone-400' : 'text-stone-500'
+              }`}
+            >
+              {event.platform}
+            </span>
+          )}
         </span>
       </span>
     </button>

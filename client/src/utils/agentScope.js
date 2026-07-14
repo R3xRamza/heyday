@@ -1,7 +1,8 @@
 export const AGENT_SCOPE_STORAGE_KEY = 'heyday-agent-scope-v1';
 
-/** Meredith is the implicit default — not shown in the toggle. */
+/** Default scope is Meredith; all three options are shown in the Team Hub toggle. */
 export const VISIBLE_SCOPE_OPTIONS = [
+  { value: 'meredith', code: 'M', label: 'Meredith' },
   { value: 'all', code: 'A', label: 'All' },
   { value: 'tessa', code: 'T', label: 'Tessa' },
 ];
@@ -25,6 +26,7 @@ export function scopeQueryParam(scope) {
 
 export function scopeBadgeLabel(scope) {
   const normalized = normalizeScope(scope);
+  // Meredith is the default — no TopNav badge when selected.
   if (normalized === 'meredith') return null;
   return VISIBLE_SCOPE_OPTIONS.find((o) => o.value === normalized)?.label ?? null;
 }
