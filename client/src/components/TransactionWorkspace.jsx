@@ -628,12 +628,20 @@ export default function TransactionWorkspace({
                       parties={partiesProp}
                       transaction={{ ...transaction, ...form }}
                       agentName={agentName}
+                      users={users}
                       error={partiesError}
                       onSave={async (payload) => {
                         setPartiesError('');
                         const result = await onSaveParties(payload);
                         if (result?.ok === false) {
                           setPartiesError(result.error || 'Could not save parties.');
+                        } else if (result?.transaction) {
+                          setForm((prev) => ({
+                            ...prev,
+                            agent_id: result.transaction.agent_id ?? prev.agent_id,
+                            client_name: result.transaction.client_name ?? prev.client_name,
+                            owner_name: result.transaction.owner_name ?? prev.owner_name,
+                          }));
                         }
                         return result;
                       }}

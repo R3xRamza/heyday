@@ -9,6 +9,7 @@ export default function PartiesToTransaction({
   parties = [],
   transaction = null,
   agentName = '',
+  users = [],
   onSave,
   error = '',
 }) {
@@ -52,9 +53,26 @@ export default function PartiesToTransaction({
     const changed = rows.some((r, i) => {
       const prev = composed[i];
       if (!prev) return true;
-      return r.role !== prev.role || (r.name || '') !== (prev.name || '');
+      return r.role !== prev.role
+        || (r.name || '') !== (prev.name || '')
+        || String(r.user_id ?? '') !== String(prev.user_id ?? '');
     }) || rows.length !== composed.length;
     if (changed) commit(rows);
+  }
+
+  async function handleAgentChange(index, userIdStr) {
+    const user = users.find((u) => String(u.id) === String(userIdStr));
+    const next = rows.map((p, i) => (
+      i === index
+        ? {
+          ...p,
+          user_id: userIdStr ? Number(userIdStr) : null,
+          name: user?.name || '',
+        }
+        : p
+    ));
+    setRows(next);
+    await commit(next);
   }
 
   function startAdd() {
@@ -78,7 +96,6 @@ export default function PartiesToTransaction({
       return;
     }
     let role = customRoleKey(label);
-    // Ensure unique role key
     const existing = new Set(rows.map((r) => r.role));
     if (existing.has(role)) {
       let n = 2;
@@ -112,6 +129,9 @@ export default function PartiesToTransaction({
   }
 
   const displayError = error || localError;
+  const agentOptions = users.length
+    ? users
+    : [];
 
   return (
     <div>
@@ -138,20 +158,34 @@ export default function PartiesToTransaction({
       <ul className="divide-y divide-outline-variant/15">
         {rows.map((party, i) => {
           const isAgent = party.role === 'agent' || party.role === 'listing_agent';
+          const agentValue = party.user_id != null && party.user_id !== ''
+            ? String(party.user_id)
+            : (transaction?.agent_id != null ? String(transaction.agent_id) : '');
+
           return (
             <li key={`${party.role}-${i}`} className="flex items-center gap-2 py-2.5 first:pt-0 last:pb-0">
               <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                <input
-                  value={party.name || ''}
-                  onChange={(e) => updateName(i, e.target.value)}
-                  onBlur={handleBlur}
-                  readOnly={isAgent}
-                  placeholder={party.label}
-                  title={isAgent ? 'Change agent in Transaction Details' : undefined}
-                  className={`flex-1 min-w-0 text-sm font-medium text-primary bg-transparent border-0 outline-none placeholder:text-on-surface-variant/50 focus:ring-0 p-0 ${
-                    isAgent ? 'cursor-default opacity-90' : ''
-                  }`}
-                />
+                {isAgent ? (
+                  <select
+                    value={agentValue}
+                    onChange={(e) => handleAgentChange(i, e.target.value)}
+                    className="flex-1 min-w-0 text-sm font-medium text-primary bg-transparent border-0 outline-none focus:ring-0 p-0 pr-6 cursor-pointer appearance-auto"
+                    aria-label="Agent"
+                  >
+                    <option value="">Select agent…</option>
+                    {agentOptions.map((u) => (
+                      <option key={u.id} value={String(u.id)}>{u.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={party.name || ''}
+                    onChange={(e) => updateName(i, e.target.value)}
+                    onBlur={handleBlur}
+                    placeholder={party.label}
+                    className="flex-1 min-w-0 text-sm font-medium text-primary bg-transparent border-0 outline-none placeholder:text-on-surface-variant/50 focus:ring-0 p-0"
+                  />
+                )}
                 {(party.is_team || isAgent) && (
                   <Icon name="person" className="!text-[16px] text-on-surface-variant shrink-0" />
                 )}

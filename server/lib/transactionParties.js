@@ -329,6 +329,7 @@ export function saveParties(db, transactionId, parties, opts = {}) {
   if (!tx) return null;
 
   // Normalize roles on write
+  let nextAgentId = tx.agent_id;
   const normalized = (parties || []).map((p, i) => {
     let role = p.role;
     if (role === 'listing_agent') role = 'agent';
@@ -336,8 +337,17 @@ export function saveParties(db, transactionId, parties, opts = {}) {
     let name = p.name?.trim() || '';
     let user_id = p.user_id || null;
     if (normalizePartyRole(role) === 'agent') {
-      name = agentDisplayName(db, tx) || name;
-      user_id = tx.agent_id ?? user_id;
+      if (p.user_id != null && p.user_id !== '') {
+        user_id = Number(p.user_id);
+        const user = db.prepare('SELECT id, email, name FROM users WHERE id = ?').get(user_id);
+        if (user) {
+          name = TEAM_DISPLAY_NAMES[user.email] || user.name || name;
+          nextAgentId = user.id;
+        }
+      } else {
+        name = agentDisplayName(db, tx) || name;
+        user_id = tx.agent_id ?? null;
+      }
     }
     return { role, name, user_id, sort_order: i };
   });
@@ -375,6 +385,9 @@ export function saveParties(db, transactionId, parties, opts = {}) {
     deduped.forEach((p, i) => {
       insert.run(transactionId, p.role, p.name, p.user_id, i);
     });
+    if (nextAgentId != null && Number(nextAgentId) !== Number(tx.agent_id)) {
+      db.prepare('UPDATE transactions SET agent_id = ? WHERE id = ?').run(nextAgentId, transactionId);
+    }
   })();
 
   syncTransactionClientName(db, transactionId, deduped);
