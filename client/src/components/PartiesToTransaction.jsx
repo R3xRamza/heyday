@@ -42,7 +42,7 @@ export default function PartiesToTransaction({
       const result = await onSave(payload);
       if (result?.ok === false || result?.error) {
         setLocalError(result.error || result.message || 'Could not save parties.');
-        setRows(composed);
+        // Keep local edits so a failed gate/validation does not wipe typed names.
       }
     } finally {
       setSaving(false);
