@@ -121,9 +121,9 @@ export default function TransactionManager() {
       if (json.parties?.length) setParties(json.parties);
       if (json.tasksRecalculated) fetchTasks();
       fetchActivities();
-      return json;
+      return { ok: true, ...json };
     }
-    return null;
+    return { ok: false, error: json.error || 'Could not save transaction.', missing: json.missing };
   }
 
   async function saveParties(partiesPayload) {
@@ -136,10 +136,10 @@ export default function TransactionManager() {
     const json = await res.json();
     if (res.ok) {
       setTransaction(json.transaction);
-      setParties(json.parties?.length ? json.parties : await fetchPartiesForTransaction(id, json.transaction));
-      return json;
+      setParties(json.parties?.length ? json.parties : await fetchPartiesForTransaction(id, json.transaction, scope));
+      return { ok: true, ...json };
     }
-    return null;
+    return { ok: false, error: json.error || 'Could not save parties.', missing: json.missing };
   }
 
   async function updateTask(taskId, body) {

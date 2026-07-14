@@ -169,23 +169,22 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
     if (res.ok) {
       const tx = json.transaction;
       onUpdate(tx);
-      let parties = buildFallbackParties({
-        ...tx,
-        representing: form.representing,
-        client_name: form.client_name,
-        owner_name: form.owner_name,
-      });
-      if (isDualCounterpartyRepresenting(form.representing)) {
-        parties = parties.map((p) => {
-          if (p.role === 'seller') {
-            return { ...p, name: form.seller_party_name ?? form.client_name ?? '' };
-          }
-          if (p.role === 'buyer') {
-            return { ...p, name: form.buyer_party_name ?? '' };
-          }
-          return p;
-        });
-      }
+      const agentUser = users.find((u) => Number(u.id) === Number(form.agent_id));
+      const parties = buildFallbackParties(
+        {
+          ...tx,
+          sale_type: form.sale_type,
+          representing: form.representing,
+          client_name: form.client_name,
+          owner_name: form.owner_name,
+          agent_id: form.agent_id,
+        },
+        agentUser?.name || '',
+      ).map((p) => (
+        p.role === 'client'
+          ? { ...p, name: form.client_name || form.owner_name || p.name || '' }
+          : p
+      ));
       await fetch(appendAgentScope(`/api/transactions/${transaction.id}/parties`, scope), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -267,7 +266,11 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
     const res = await fetch(appendAgentScope(`/api/transactions/${transaction.id}/complete-setup`, scope), { method: 'POST', credentials: 'include' });
     const json = await res.json();
     setSaving(false);
-    if (res.ok) onComplete(json.transaction);
+    if (res.ok) {
+      onComplete(json.transaction);
+    } else {
+      setValidationError(json.error || 'Could not complete setup. Fill Agent and Client under parties.');
+    }
   }
 
   const isDual = isDualCounterpartyRepresenting(form.representing);

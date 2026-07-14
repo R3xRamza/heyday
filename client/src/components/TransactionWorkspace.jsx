@@ -158,6 +158,7 @@ export default function TransactionWorkspace({
   const [comment, setComment] = useState('');
   const [savingTx, setSavingTx] = useState(false);
   const [savedMsg, setSavedMsg] = useState('');
+  const [partiesError, setPartiesError] = useState('');
   const [completingOverdue, setCompletingOverdue] = useState(false);
 
   useEffect(() => {
@@ -283,9 +284,23 @@ export default function TransactionWorkspace({
   async function saveTransaction(updates) {
     setSavingTx(true);
     setSavedMsg('');
+    setPartiesError('');
     const payload = { ...form, ...updates };
     const result = await onSaveTransaction(payload);
     setSavingTx(false);
+    if (result?.ok === false) {
+      setSavedMsg('');
+      setPartiesError(result.error || 'Could not save.');
+      // Revert form field if close_date / party gate failed
+      setForm((prev) => ({
+        ...prev,
+        ...Object.fromEntries(Object.keys(updates).map((k) => [k, transaction[k]])),
+        representing: normalizeRepresenting(transaction.representing),
+        sale_type: normalizeSaleType(transaction.sale_type, transaction.representing),
+        listing_visibility: normalizeListingVisibility(transaction.listing_visibility),
+      }));
+      return;
+    }
     if (result?.tasksRecalculated) {
       setSavedMsg(`Saved · ${result.tasksRecalculated} task due dates updated`);
     } else {
@@ -293,6 +308,13 @@ export default function TransactionWorkspace({
     }
     setTimeout(() => setSavedMsg(''), 4000);
   }
+
+  const agentName = (() => {
+    const agentId = form.agent_id ?? transaction.agent_id;
+    if (!agentId) return '';
+    const u = (users || []).find((m) => Number(m.id) === Number(agentId));
+    return u?.name || '';
+  })();
 
   function handleFieldChange(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -604,8 +626,17 @@ export default function TransactionWorkspace({
                   <div className="mt-8 pt-8 border-t border-outline-variant/15">
                     <PartiesToTransaction
                       parties={partiesProp}
-                      transaction={transaction}
-                      onSave={onSaveParties}
+                      transaction={{ ...transaction, ...form }}
+                      agentName={agentName}
+                      error={partiesError}
+                      onSave={async (payload) => {
+                        setPartiesError('');
+                        const result = await onSaveParties(payload);
+                        if (result?.ok === false) {
+                          setPartiesError(result.error || 'Could not save parties.');
+                        }
+                        return result;
+                      }}
                     />
                   </div>
                 </div>
