@@ -188,6 +188,13 @@ export default function TransactionWorkspace({
     });
   }, [checklists, transaction.checklist_template_id, transaction.template_name]);
 
+  const appliedChecklistIdSet = new Set(sidebarChecklists.map((c) => Number(c.id)));
+
+  /** All checklist-linked tasks across every applied template (for overview totals). */
+  const allChecklistTasks = tasks.filter(
+    (t) => t.template_id != null && appliedChecklistIdSet.has(Number(t.template_id)),
+  );
+
   const checklistTasks = tasks.filter((t) => {
     if (!activeChecklistId) return true;
     if (t.template_task_id != null) {
@@ -366,7 +373,10 @@ export default function TransactionWorkspace({
   }
 
   const doneCount = checklistTasks.filter((t) => t.status === 'complete').length;
-  const progressPct = checklistTasks.length ? Math.round((doneCount / checklistTasks.length) * 100) : 0;
+  const overviewDoneCount = allChecklistTasks.filter((t) => t.status === 'complete').length;
+  const progressPct = allChecklistTasks.length
+    ? Math.round((overviewDoneCount / allChecklistTasks.length) * 100)
+    : 0;
   const { street, cityLine } = parseTransactionAddress({
     address: form.address,
     city: form.city,
@@ -609,7 +619,7 @@ export default function TransactionWorkspace({
                     </div>
                     <div>
                       <p className="text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold">Checklist Tasks</p>
-                      <p className="text-xl font-semibold text-primary">{checklistTasks.length} Total</p>
+                      <p className="text-xl font-semibold text-primary">{allChecklistTasks.length} Total</p>
                     </div>
                   </div>
                 </div>
