@@ -2,6 +2,8 @@ import db from '../db.js';
 
 const SCOPE_EMAILS = {
   meredith: 'meredith@theheydaygroup.com',
+  margaret: 'margaret@theheydaygroup.com',
+  adam: 'adam@theheydaygroup.com',
   tessa: 'tessa@theheydaygroup.com',
 };
 
@@ -15,27 +17,38 @@ function userIdForEmail(email) {
   return id;
 }
 
-/** @returns {'meredith' | 'all' | 'tessa'} */
+/** @returns {'meredith' | 'margaret' | 'adam' | 'all' | 'tessa'} */
 export function parseAgentScope(query = {}) {
   const raw = String(query.agent_scope ?? query.scope ?? 'M').trim().toLowerCase();
   if (raw === 'a' || raw === 'all') return 'all';
   if (raw === 't' || raw === 'tessa') return 'tessa';
+  if (raw === 'g' || raw === 'margaret') return 'margaret';
+  if (raw === 'd' || raw === 'adam') return 'adam';
   return 'meredith';
 }
 
 /** Accept parsed scope or query object — avoids double-parsing. */
 export function resolveAgentScope(input) {
-  if (input === 'meredith' || input === 'all' || input === 'tessa') return input;
+  if (
+    input === 'meredith'
+    || input === 'margaret'
+    || input === 'adam'
+    || input === 'all'
+    || input === 'tessa'
+  ) {
+    return input;
+  }
   return parseAgentScope(input);
 }
 
 export function agentScopeUserId(scope) {
-  if (scope === 'meredith') return userIdForEmail(SCOPE_EMAILS.meredith);
-  if (scope === 'tessa') return userIdForEmail(SCOPE_EMAILS.tessa);
-  return null;
+  if (scope === 'all') return null;
+  const email = SCOPE_EMAILS[scope];
+  if (!email) return null;
+  return userIdForEmail(email);
 }
 
-/** SQL fragment for transactions table alias (NULL agent_id excluded in M/T). */
+/** SQL fragment for transactions table alias (NULL agent_id excluded in agent scopes). */
 export function transactionAgentScopeClause(scope, tableAlias = 't') {
   const userId = agentScopeUserId(scope);
   if (!userId) return { sql: '', params: [] };

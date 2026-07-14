@@ -80,9 +80,13 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
     if (step !== 'details' || users.length === 0) return;
     setForm((prev) => {
       if (prev.agent_id) return prev;
-      const email = scope === 'tessa'
-        ? 'tessa@theheydaygroup.com'
-        : 'meredith@theheydaygroup.com';
+      const emailByScope = {
+        tessa: 'tessa@theheydaygroup.com',
+        adam: 'adam@theheydaygroup.com',
+        margaret: 'margaret@theheydaygroup.com',
+        meredith: 'meredith@theheydaygroup.com',
+      };
+      const email = emailByScope[scope] || 'meredith@theheydaygroup.com';
       const agent = users.find((u) => u.email === email);
       const defaultId = agent?.id ?? users[0]?.id;
       return defaultId ? { ...prev, agent_id: defaultId } : prev;

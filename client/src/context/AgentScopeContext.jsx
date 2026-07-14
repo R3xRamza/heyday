@@ -10,6 +10,8 @@ const AgentScopeContext = createContext(null);
 
 const EMAIL_BY_SCOPE = {
   meredith: 'meredith@theheydaygroup.com',
+  margaret: 'margaret@theheydaygroup.com',
+  adam: 'adam@theheydaygroup.com',
   tessa: 'tessa@theheydaygroup.com',
 };
 
@@ -21,7 +23,12 @@ export function AgentScopeProvider({ children }) {
       return 'meredith';
     }
   });
-  const [agentIds, setAgentIds] = useState({ meredith: null, tessa: null });
+  const [agentIds, setAgentIds] = useState({
+    meredith: null,
+    margaret: null,
+    adam: null,
+    tessa: null,
+  });
 
   useEffect(() => {
     try {
@@ -39,6 +46,8 @@ export function AgentScopeProvider({ children }) {
         const byEmail = Object.fromEntries(members.map((m) => [m.email, m.id]));
         setAgentIds({
           meredith: byEmail[EMAIL_BY_SCOPE.meredith] ?? null,
+          margaret: byEmail[EMAIL_BY_SCOPE.margaret] ?? null,
+          adam: byEmail[EMAIL_BY_SCOPE.adam] ?? null,
           tessa: byEmail[EMAIL_BY_SCOPE.tessa] ?? null,
         });
       })
