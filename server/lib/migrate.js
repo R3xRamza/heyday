@@ -154,6 +154,8 @@ function migrateHubDocItemsTable(db) {
 
     CREATE INDEX IF NOT EXISTS idx_hub_doc_items_section ON hub_doc_items(section, sort_order, id);
   `);
+  addColumnIfMissing(db, 'hub_doc_items', 'completed', 'INTEGER NOT NULL DEFAULT 0');
+  addColumnIfMissing(db, 'hub_doc_items', 'completed_at', 'DATETIME');
 }
 
 function migrateTeamHubTables(db) {
