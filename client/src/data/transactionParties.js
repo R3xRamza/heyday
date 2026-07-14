@@ -92,11 +92,17 @@ export function validateParties(parties, saleType, representing, intent) {
     }
   }
   if (missing.length === 0) return { ok: true, missing: [] };
-  const gate = intent === 'pending' ? 'pending' : 'active';
+  if (intent === 'pending') {
+    return {
+      ok: false,
+      missing,
+      message: `Can't move this transaction to pending until these party fields are filled: ${missing.join(', ')}.`,
+    };
+  }
   return {
     ok: false,
     missing,
-    message: `Required for ${gate}: ${missing.join(', ')}`,
+    message: `Can't activate this transaction until these party fields are filled: ${missing.join(', ')}.`,
   };
 }
 

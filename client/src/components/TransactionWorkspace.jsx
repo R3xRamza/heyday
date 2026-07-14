@@ -28,6 +28,7 @@ import {
 } from '../constants/transactionForm';
 import { useTransactionsListReturn } from '../hooks/useTransactionsListReturn';
 import { useTransactionWorkspaceView } from '../hooks/useTransactionWorkspaceView';
+import { validateParties, isTraditionalSale } from '../data/transactionParties';
 
 const ASSET_VIEWS = [
   { key: 'details', label: 'Transaction details', icon: 'info' },
@@ -285,6 +286,26 @@ export default function TransactionWorkspace({
     setSavingTx(true);
     setSavedMsg('');
     setPartiesError('');
+
+    const nextClose = 'close_date' in updates ? updates.close_date : form.close_date;
+    const closeDateChanging = 'close_date' in updates
+      && String(updates.close_date || '') !== String(transaction.close_date || '');
+    if (closeDateChanging && nextClose) {
+      const saleType = updates.sale_type ?? form.sale_type;
+      const representing = updates.representing ?? form.representing;
+      const intent = isTraditionalSale(saleType, representing) ? 'pending' : 'active';
+      const partyCheck = validateParties(partiesProp, saleType, representing, intent);
+      if (!partyCheck.ok) {
+        setSavingTx(false);
+        setPartiesError(partyCheck.message);
+        setForm((prev) => ({
+          ...prev,
+          close_date: transaction.close_date || '',
+        }));
+        return;
+      }
+    }
+
     const payload = { ...form, ...updates };
     const result = await onSaveTransaction(payload);
     setSavingTx(false);
@@ -427,6 +448,11 @@ export default function TransactionWorkspace({
           <span className="text-secondary font-bold">{street?.toUpperCase()}</span>
         </div>
         {savedMsg && <p className="text-xs text-secondary mt-1 font-semibold">{savedMsg}</p>}
+        {partiesError && (
+          <p className="text-xs text-error mt-1 font-semibold max-w-xl" role="alert">
+            {partiesError}
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap gap-2">
         <span className="px-3 py-1 bg-secondary-container/30 text-secondary border border-secondary/20 rounded-full text-xs font-semibold uppercase tracking-wide">
