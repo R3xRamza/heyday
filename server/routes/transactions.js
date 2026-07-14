@@ -8,6 +8,9 @@ import {
   saveParties,
   reshapePartiesForRepresenting,
   syncCounterpartyNamesFromTransaction,
+  assertPartiesForIntent,
+  isTraditionalSale,
+  normalizeSaleType,
 } from '../lib/transactionParties.js';
 import { normalizeRepresenting } from '../lib/transactionValidation.js';
 import { normalizeAddressFields } from '../lib/address.js';
@@ -320,9 +323,16 @@ router.put('/:id/parties', (req, res) => {
   if (!tx) return res.status(404).json({ error: 'Not found' });
   if (!Array.isArray(req.body.parties)) return res.status(400).json({ error: 'parties array required' });
 
-  const parties = saveParties(db, req.params.id, req.body.parties);
-  const transaction = pickTransaction(req.params.id);
-  res.json({ transaction, parties });
+  try {
+    const parties = saveParties(db, req.params.id, req.body.parties);
+    const transaction = pickTransaction(req.params.id);
+    res.json({ transaction, parties });
+  } catch (err) {
+    if (err.status === 400) {
+      return res.status(400).json({ error: err.message, missing: err.missing });
+    }
+    throw err;
+  }
 });
 
 router.post('/', (req, res) => {
@@ -370,6 +380,32 @@ router.put('/:id', (req, res) => {
     const validation = validateTransactionFields(merged);
     if (!validation.ok) {
       return res.status(400).json({ error: validation.message, missing: validation.missing });
+    }
+  }
+
+  const nextCloseDate = 'close_date' in req.body
+    ? (req.body.close_date === '' || req.body.close_date == null ? null : req.body.close_date)
+    : before.close_date;
+  const nextSaleType = 'sale_type' in req.body ? req.body.sale_type : before.sale_type;
+  const nextRepresenting = 'representing' in req.body ? req.body.representing : before.representing;
+  const nextWorkflow = 'workflow_status' in req.body ? req.body.workflow_status : before.workflow_status;
+  const derivedStage = deriveStageFromCloseDate({
+    stage: before.stage === 'closed' ? 'closed' : 'active',
+    close_date: nextCloseDate,
+  });
+
+  if (nextWorkflow === 'active' && before.workflow_status !== 'active') {
+    const partyCheck = assertPartiesForIntent(db, before.id, 'active');
+    if (!partyCheck.ok) {
+      return res.status(400).json({ error: partyCheck.message, missing: partyCheck.missing });
+    }
+  }
+
+  if (nextCloseDate && derivedStage === 'pending') {
+    const intent = isTraditionalSale(nextSaleType, nextRepresenting) ? 'pending' : 'active';
+    const partyCheck = assertPartiesForIntent(db, before.id, intent);
+    if (!partyCheck.ok) {
+      return res.status(400).json({ error: partyCheck.message, missing: partyCheck.missing });
     }
   }
 
@@ -451,8 +487,11 @@ router.put('/:id', (req, res) => {
 
   let updatedParties = null;
   if (
-    'representing' in req.body
-    && normalizeRepresenting(before.representing) !== normalizeRepresenting(after.representing)
+    ('representing' in req.body
+      && normalizeRepresenting(before.representing) !== normalizeRepresenting(after.representing))
+    || ('sale_type' in req.body
+      && normalizeSaleType(before.sale_type, before.representing)
+        !== normalizeSaleType(after.sale_type, after.representing))
   ) {
     updatedParties = reshapePartiesForRepresenting(db, after.id);
     after = db.prepare('SELECT * FROM transactions WHERE id = ?').get(req.params.id);
@@ -542,6 +581,10 @@ router.post('/:id/apply-checklists', (req, res) => {
 
 router.post('/:id/complete-setup', (req, res) => {
   if (!assertTransactionInScope(req, res, Number(req.params.id))) return;
+  const partyCheck = assertPartiesForIntent(db, req.params.id, 'active');
+  if (!partyCheck.ok) {
+    return res.status(400).json({ error: partyCheck.message, missing: partyCheck.missing });
+  }
   db.prepare("UPDATE transactions SET workflow_status = 'active' WHERE id = ?").run(req.params.id);
   const transaction = pickTransaction(req.params.id);
   res.json({ transaction });
