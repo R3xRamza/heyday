@@ -10,6 +10,7 @@ import { blurActiveElement, CHROME_AUTOCOMPLETE, ChromeAddressDecoy } from '../c
 import { validateCreateTransaction, transactionPortfolioType, isPrivateListing } from '../constants/transactionForm';
 import PrivateListingFlag from '../components/transactions/PrivateListingFlag';
 import ListPagination from '../components/shared/ListPagination';
+import AgentScopeToggle from '../components/AgentScopeToggle';
 import { useAgentScope } from '../context/AgentScopeContext';
 import { appendAgentScope } from '../utils/agentScope';
 import {
@@ -328,7 +329,11 @@ export default function TransactionsList() {
   const showInitialLoading = loading && data.transactions.length === 0;
 
   return (
-    <DashboardLayout title="Transactions" className="bg-surface">
+    <DashboardLayout
+      title="Transactions"
+      headerRight={<AgentScopeToggle />}
+      className="bg-surface"
+    >
       <div className="max-w-[1440px] mx-auto px-8 py-6">
         <header className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div className="relative flex-1 min-w-[12rem] max-w-md">

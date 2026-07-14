@@ -1,9 +1,9 @@
 export const AGENT_SCOPE_STORAGE_KEY = 'heyday-agent-scope-v1';
 
-/** Default scope is Meredith. */
+/** Default scope is Meredith. Toggle order starts with All. */
 export const VISIBLE_SCOPE_OPTIONS = [
-  { value: 'meredith', code: 'M', label: 'Meredith' },
   { value: 'all', code: 'A', label: 'All' },
+  { value: 'meredith', code: 'M', label: 'Meredith' },
   { value: 'margaret', code: 'G', label: 'Margaret' },
   { value: 'adam', code: 'D', label: 'Adam' },
   { value: 'tessa', code: 'T', label: 'Tessa' },
