@@ -43,7 +43,7 @@ export default function ProjectListItem({
         {project.deadline && (
           <div className="mt-4 pt-3 border-t border-outline-variant/15 flex items-center gap-2">
             <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-              Deadline
+              Target date
             </span>
             <DateText value={project.deadline} className="text-sm font-semibold text-feather" />
           </div>

@@ -48,7 +48,7 @@ function ProjectEditForm({ project, onSave, onCancel, onDelete, readOnly }) {
       />
       <div className="flex items-center gap-2">
         <label className="text-xs font-semibold text-on-surface-variant shrink-0" htmlFor={`deadline-${project.id}`}>
-          Deadline
+          Target date
         </label>
         <input
           id={`deadline-${project.id}`}
