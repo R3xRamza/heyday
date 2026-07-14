@@ -94,7 +94,7 @@ Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · CR
 - **List filters** (`TransactionsList.jsx`): Active Transactions, Coming Soon, Current Listings, Pending, Closed, All
 - **Current Listings columns:** Address, Type, Price, Listing Date, **Expiration** (`important_date`) — no Agent column
 - **Listings KPI card** subtitle: **Active**
-- **Create (step 1):** address/city/state/zip only — `validateCreateTransaction`; full fields in setup later
+- **Create (step 1):** address/city/state/zip + required Agent (no default) — `validateCreateTransaction`; client name in setup later
 - **Delete:** detach `transaction_activity.task_id` → delete tasks → delete transaction (FK-safe)
 - **Checklist view** (`TransactionWorkspace.jsx`): scrollable panel ~32rem min height; task rows `font-medium`; complete = strikethrough only (no COMPLETED label); click row → detail sidebar
 - List view state: `transactions-list-view-v1` sessionStorage; `TransactionsNavTracker`

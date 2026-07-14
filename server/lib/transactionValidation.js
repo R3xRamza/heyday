@@ -12,6 +12,7 @@ export const FIELD_LABELS = {
   city: 'City',
   state: 'State',
   zip: 'ZIP',
+  agent_id: 'Agent',
   listing_date: 'Listing date',
   important_date: 'Expiry date',
   close_date: 'Closing date',
@@ -47,7 +48,10 @@ function isEmpty(value) {
 }
 
 export function validateTransactionFields(record) {
-  const required = getRequiredTransactionFields(record.representing, record.listing_visibility);
+  const required = [
+    ...getRequiredTransactionFields(record.representing, record.listing_visibility),
+    'agent_id',
+  ];
   const missing = required.filter((key) => isEmpty(record[key]));
   if (missing.length === 0) {
     return { ok: true, missing: [] };
@@ -61,7 +65,8 @@ export function validateTransactionFields(record) {
 }
 
 export function validateCreateTransaction(body) {
-  const missing = BASE_REQUIRED.filter((key) => isEmpty(body[key]));
+  const required = [...BASE_REQUIRED, 'agent_id'];
+  const missing = required.filter((key) => isEmpty(body[key]));
   if (missing.length === 0) return null;
   const labels = missing.map((k) => FIELD_LABELS[k] || k);
   return `Required: ${labels.join(', ')}`;
@@ -76,6 +81,7 @@ export function mergeTransactionForValidation(before, body) {
   const keys = [
     'address', 'city', 'state', 'zip', 'representing', 'listing_visibility',
     'listing_date', 'important_date', 'close_date', 'acceptance_date', 'option_end_date',
+    'agent_id',
   ];
   for (const key of keys) {
     if (key in body) {

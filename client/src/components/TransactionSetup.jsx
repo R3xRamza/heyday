@@ -16,7 +16,6 @@ import {
   SALE_TYPE_OPTIONS,
   saleTypeForRepresenting,
   normalizeSaleType,
-  counterpartyNameLabel,
   isDualCounterpartyRepresenting,
 } from '../constants/transactionForm';
 import PriceInput from './shared/PriceInput';
@@ -76,23 +75,6 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
     fetch('/api/team', { credentials: 'include' }).then((r) => r.json()).then((d) => setUsers(d.members || []));
   }, []);
 
-  useEffect(() => {
-    if (step !== 'details' || users.length === 0) return;
-    setForm((prev) => {
-      if (prev.agent_id) return prev;
-      const emailByScope = {
-        tessa: 'tessa@theheydaygroup.com',
-        adam: 'adam@theheydaygroup.com',
-        margaret: 'margaret@theheydaygroup.com',
-        meredith: 'meredith@theheydaygroup.com',
-      };
-      const email = emailByScope[scope] || 'meredith@theheydaygroup.com';
-      const agent = users.find((u) => u.email === email);
-      const defaultId = agent?.id ?? users[0]?.id;
-      return defaultId ? { ...prev, agent_id: defaultId } : prev;
-    });
-  }, [users, step, scope]);
-
   async function handleCancelSetup() {
     if (!onCancelSetup) return;
     if (!window.confirm('Cancel setup? This transaction will be permanently deleted.')) return;
@@ -108,10 +90,14 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
   function agentSelect() {
     return (
       <div>
-        <label className="text-xs font-semibold text-on-surface-variant">Agent</label>
+        <label className="text-xs font-semibold text-on-surface-variant">Agent *</label>
         <select
+          required
           value={String(form.agent_id || '')}
-          onChange={(e) => setForm({ ...form, agent_id: e.target.value ? Number(e.target.value) : '' })}
+          onChange={(e) => {
+            setValidationError('');
+            setForm({ ...form, agent_id: e.target.value ? Number(e.target.value) : '' });
+          }}
           className="w-full mt-1 px-3 py-2 border rounded text-sm"
         >
           <option value="">Select agent…</option>
@@ -395,9 +381,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-on-surface-variant">
-                {isDual ? 'Seller name' : counterpartyNameLabel(form.representing)}
-              </label>
+              <label className="text-xs font-semibold text-on-surface-variant">Client name</label>
               <input
                 value={isDual
                   ? (form.seller_party_name ?? form.client_name ?? form.owner_name ?? '')
@@ -419,17 +403,18 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
               />
             </div>
             {agentSelect()}
-            <div className={`col-span-2 ${isDual ? '' : 'invisible pointer-events-none'}`} aria-hidden={!isDual}>
-              <label className="text-xs font-semibold text-on-surface-variant">Buyer name</label>
-              <input
-                tabIndex={isDual ? 0 : -1}
-                value={form.buyer_party_name ?? ''}
-                onChange={(e) => setForm({ ...form, buyer_party_name: e.target.value })}
-                autoComplete={CHROME_AUTOCOMPLETE}
-                className="w-full mt-1 px-3 py-2 border rounded text-sm"
-              />
-            </div>
-            <div className="col-span-2">
+            {isDual && (
+              <div className="col-span-2">
+                <label className="text-xs font-semibold text-on-surface-variant">Client name</label>
+                <input
+                  value={form.buyer_party_name ?? ''}
+                  onChange={(e) => setForm({ ...form, buyer_party_name: e.target.value })}
+                  autoComplete={CHROME_AUTOCOMPLETE}
+                  className="w-full mt-1 px-3 py-2 border rounded text-sm"
+                />
+              </div>
+            )}
+            <div className={isListingSide ? '' : 'col-span-2'}>
               <label className="text-xs font-semibold text-on-surface-variant">Representing</label>
               <select
                 value={form.representing || 'seller'}
@@ -453,19 +438,20 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
                 ))}
               </select>
             </div>
-            <div className={`col-span-2 ${isListingSide ? '' : 'invisible pointer-events-none'}`} aria-hidden={!isListingSide}>
-              <label className="text-xs font-semibold text-on-surface-variant">Listing status</label>
-              <select
-                tabIndex={isListingSide ? 0 : -1}
-                value={form.listing_visibility || 'public'}
-                onChange={(e) => setForm({ ...form, listing_visibility: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border rounded text-sm"
-              >
-                {LISTING_VISIBILITY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
+            {isListingSide && (
+              <div>
+                <label className="text-xs font-semibold text-on-surface-variant">Listing status</label>
+                <select
+                  value={form.listing_visibility || 'public'}
+                  onChange={(e) => setForm({ ...form, listing_visibility: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 border rounded text-sm"
+                >
+                  {LISTING_VISIBILITY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="text-xs font-semibold text-on-surface-variant">Type of sale</label>
               <select

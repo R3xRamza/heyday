@@ -52,8 +52,8 @@ function isUnderContract(tx) {
 }
 
 /** Label for counterparty name field(s) in setup / forms */
-export function counterpartyNameLabel(representing) {
-  return `${representingLabel(representing)} name`;
+export function counterpartyNameLabel() {
+  return 'Client name';
 }
 
 export function isDualCounterpartyRepresenting(representing) {
@@ -208,6 +208,7 @@ export const FIELD_LABELS = {
   city: 'City',
   state: 'State',
   zip: 'ZIP',
+  agent_id: 'Agent',
   listing_date: 'Listing date',
   important_date: 'Expiration date',
   close_date: 'Closing date',
@@ -230,7 +231,8 @@ function isEmpty(value) {
 }
 
 export function validateCreateTransaction(form) {
-  const missing = BASE_REQUIRED.filter((key) => isEmpty(form[key]));
+  const required = [...BASE_REQUIRED, 'agent_id'];
+  const missing = required.filter((key) => isEmpty(form[key]));
   if (missing.length === 0) {
     return { ok: true, missing: [] };
   }
@@ -243,7 +245,10 @@ export function validateCreateTransaction(form) {
 }
 
 export function validateTransactionFields(form) {
-  const required = getRequiredTransactionFields(form.representing, form.listing_visibility);
+  const required = [
+    ...getRequiredTransactionFields(form.representing, form.listing_visibility),
+    'agent_id',
+  ];
   const missing = required.filter((key) => isEmpty(form[key]));
   if (missing.length === 0) {
     return { ok: true, missing: [] };
