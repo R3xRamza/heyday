@@ -361,18 +361,9 @@ export function saveParties(db, transactionId, parties, opts = {}) {
     deduped.push(p);
   }
 
-  if (!opts.skipValidation) {
-    const intent = (tx.close_date || tx.stage === 'pending') ? 'pending' : (tx.workflow_status === 'active' ? 'active' : null);
-    if (intent) {
-      const v = validateParties(deduped, tx.sale_type, tx.representing, intent);
-      if (!v.ok) {
-        const err = new Error(v.message);
-        err.status = 400;
-        err.missing = v.missing;
-        throw err;
-      }
-    }
-  }
+  // Stage gates (active / pending required roles) are enforced on complete-setup
+  // and when setting close_date — not on every parties blur save, so users can
+  // fill Title / Cooperating Agent / Lender one field at a time.
 
   const del = db.prepare('DELETE FROM transaction_parties WHERE transaction_id = ?');
   const insert = db.prepare(`
