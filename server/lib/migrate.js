@@ -178,6 +178,27 @@ function migrateTeamHubTables(db) {
   `);
   addColumnIfMissing(db, 'team_messages', 'pinned', 'INTEGER NOT NULL DEFAULT 0');
   addColumnIfMissing(db, 'team_messages', 'pinned_at', 'DATETIME');
+  addColumnIfMissing(db, 'team_messages', 'sort_order', 'INTEGER NOT NULL DEFAULT 0');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )
+  `);
+  const sorted = db.prepare("SELECT 1 FROM app_meta WHERE key = 'team_messages_sort_order_v1'").get();
+  if (!sorted) {
+    const rows = db.prepare(`
+      SELECT id FROM team_messages
+      ORDER BY pinned DESC, COALESCE(pinned_at, '') DESC, created_at DESC, id DESC
+    `).all();
+    const update = db.prepare('UPDATE team_messages SET sort_order = ? WHERE id = ?');
+    const backfill = db.transaction((items) => {
+      items.forEach((row, index) => update.run(index, row.id));
+      db.prepare("INSERT INTO app_meta (key, value) VALUES ('team_messages_sort_order_v1', '1')").run();
+    });
+    backfill(rows);
+  }
 }
 
 function migrateTaskCategory(db) {

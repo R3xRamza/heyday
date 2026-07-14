@@ -126,7 +126,7 @@ router.get('/messages', (_req, res) => {
     SELECT m.*, u.name as user_name, u.email as user_email
     FROM team_messages m
     LEFT JOIN users u ON u.id = m.user_id
-    ORDER BY m.pinned DESC, m.pinned_at DESC, m.created_at DESC, m.id DESC
+    ORDER BY m.pinned DESC, m.sort_order ASC, m.id ASC
     LIMIT 50
   `).all();
   res.json({ messages });
@@ -150,8 +150,53 @@ router.post('/messages', (req, res) => {
   const body = req.body.body?.trim();
   if (!body) return res.status(400).json({ error: 'body is required' });
 
-  const r = db.prepare('INSERT INTO team_messages (user_id, body) VALUES (?, ?)').run(req.user.id, body);
+  const minOrder = db.prepare('SELECT COALESCE(MIN(sort_order), 0) as m FROM team_messages').get().m;
+  const r = db.prepare(`
+    INSERT INTO team_messages (user_id, body, sort_order)
+    VALUES (?, ?, ?)
+  `).run(req.user.id, body, minOrder - 1);
   res.status(201).json({ message: getMessageOr404(r.lastInsertRowid) });
+});
+
+router.put('/messages/reorder', (req, res) => {
+  const orderedIds = Array.isArray(req.body.ordered_ids)
+    ? req.body.ordered_ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
+    : null;
+  if (!orderedIds || orderedIds.length === 0) {
+    return res.status(400).json({ error: 'ordered_ids array is required' });
+  }
+
+  const unique = [...new Set(orderedIds)];
+  if (unique.length !== orderedIds.length) {
+    return res.status(400).json({ error: 'ordered_ids must be unique' });
+  }
+
+  const find = db.prepare('SELECT id FROM team_messages WHERE id = ?');
+  if (orderedIds.some((id) => !find.get(id))) {
+    return res.status(400).json({ error: 'ordered_ids contains unknown message id' });
+  }
+
+  const update = db.prepare('UPDATE team_messages SET sort_order = ? WHERE id = ?');
+  const placeholders = orderedIds.map(() => '?').join(',');
+  const reorder = db.transaction((ids) => {
+    ids.forEach((id, index) => update.run(index, id));
+    const others = db.prepare(`
+      SELECT id FROM team_messages
+      WHERE id NOT IN (${placeholders})
+      ORDER BY pinned DESC, sort_order ASC, id ASC
+    `).all(...ids);
+    others.forEach((row, index) => update.run(ids.length + index, row.id));
+  });
+  reorder(orderedIds);
+
+  const messages = db.prepare(`
+    SELECT m.*, u.name as user_name, u.email as user_email
+    FROM team_messages m
+    LEFT JOIN users u ON u.id = m.user_id
+    ORDER BY m.pinned DESC, m.sort_order ASC, m.id ASC
+    LIMIT 50
+  `).all();
+  res.json({ messages });
 });
 
 router.patch('/messages/:id', (req, res) => {
@@ -166,9 +211,12 @@ router.patch('/messages/:id', (req, res) => {
     : asFlag(message.pinned);
 
   let pinnedAt = message.pinned_at;
+  let sortOrder = message.sort_order ?? 0;
   if (req.body.pinned !== undefined) {
     if (pinned && !asFlag(message.pinned)) {
       pinnedAt = new Date().toISOString();
+      const minOrder = db.prepare('SELECT COALESCE(MIN(sort_order), 0) as m FROM team_messages').get().m;
+      sortOrder = minOrder - 1;
     } else if (!pinned) {
       pinnedAt = null;
     }
@@ -176,9 +224,9 @@ router.patch('/messages/:id', (req, res) => {
 
   db.prepare(`
     UPDATE team_messages
-    SET body = ?, pinned = ?, pinned_at = ?
+    SET body = ?, pinned = ?, pinned_at = ?, sort_order = ?
     WHERE id = ?
-  `).run(body, pinned, pinnedAt, message.id);
+  `).run(body, pinned, pinnedAt, sortOrder, message.id);
 
   res.json({ message: getMessageOr404(message.id) });
 });
