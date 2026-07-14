@@ -24,7 +24,7 @@ export {
 /** @deprecated — use fixedRolesForSaleType; kept for any leftover imports */
 export const PARTY_ROLES = [
   { key: 'agent', label: 'Agent', isTeam: true },
-  { key: 'escrow_officer', label: 'Escrow', isTeam: false },
+  { key: 'escrow_officer', label: 'Title', isTeam: false },
   { key: 'cooperating_agent', label: 'Cooperating Agent', isTeam: false },
   { key: 'client', label: 'Client', isTeam: false },
   { key: 'lender', label: 'Lender', isTeam: false },
