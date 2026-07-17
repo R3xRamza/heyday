@@ -3,6 +3,8 @@ import db from '../db.js';
 
 const router = Router();
 
+const PRIORITIES = new Set(['high', 'medium', 'low']);
+
 function canWriteForUser(reqUser, userId) {
   return reqUser.id === userId || reqUser.role === 'admin';
 }
@@ -19,6 +21,12 @@ function normalizeDeadline(value) {
   return s;
 }
 
+function normalizePriority(value, fallback = 'medium') {
+  if (value == null || value === '') return fallback;
+  const p = String(value).trim().toLowerCase();
+  return PRIORITIES.has(p) ? p : fallback;
+}
+
 router.get('/', (req, res) => {
   const userId = Number(req.query.user_id);
   if (!userId) return res.status(400).json({ error: 'user_id is required' });
@@ -29,7 +37,15 @@ router.get('/', (req, res) => {
   const projects = db.prepare(`
     SELECT * FROM projects
     WHERE user_id = ? AND status != 'archived'
-    ORDER BY (deadline IS NULL), deadline ASC, sort_order ASC, updated_at DESC, id DESC
+    ORDER BY
+      CASE lower(COALESCE(priority, 'medium'))
+        WHEN 'high' THEN 0
+        WHEN 'medium' THEN 1
+        WHEN 'low' THEN 2
+        ELSE 1
+      END ASC,
+      (deadline IS NULL), deadline ASC,
+      sort_order ASC, updated_at DESC, id DESC
   `).all(userId);
 
   res.json({ projects });
@@ -50,11 +66,12 @@ router.post('/', (req, res) => {
   ).get(userId);
 
   const deadline = normalizeDeadline(req.body.deadline);
+  const priority = normalizePriority(req.body.priority);
 
   const result = db.prepare(`
-    INSERT INTO projects (user_id, title, description, deadline, sort_order)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(userId, title, req.body.description?.trim() || null, deadline, maxOrder.m + 1);
+    INSERT INTO projects (user_id, title, description, deadline, priority, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(userId, title, req.body.description?.trim() || null, deadline, priority, maxOrder.m + 1);
 
   res.status(201).json({ project: getProjectOr404(result.lastInsertRowid) });
 });
@@ -77,11 +94,15 @@ router.patch('/:id', (req, res) => {
     ? normalizeDeadline(req.body.deadline)
     : project.deadline;
 
+  const priority = Object.prototype.hasOwnProperty.call(req.body, 'priority')
+    ? normalizePriority(req.body.priority, project.priority || 'medium')
+    : normalizePriority(project.priority);
+
   db.prepare(`
     UPDATE projects
-    SET title = ?, description = ?, deadline = ?, updated_at = CURRENT_TIMESTAMP
+    SET title = ?, description = ?, deadline = ?, priority = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(title, description, deadline, project.id);
+  `).run(title, description, deadline, priority, project.id);
 
   res.json({ project: getProjectOr404(project.id) });
 });

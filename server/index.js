@@ -24,6 +24,7 @@ import projectsRoutes from './routes/projects.js';
 import userTodosRoutes from './routes/user-todos.js';
 import addressRoutes from './routes/address.js';
 import hubDocsRoutes from './routes/hub-docs.js';
+import opportunitiesRoutes from './routes/opportunities.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const autoClosed = closePastDueTransactions(db);
@@ -59,6 +60,7 @@ app.use('/api/projects', authMiddleware, projectsRoutes);
 app.use('/api/user-todos', authMiddleware, userTodosRoutes);
 app.use('/api/address', authMiddleware, addressRoutes);
 app.use('/api/hub-docs', authMiddleware, hubDocsRoutes);
+app.use('/api/opportunities', authMiddleware, opportunitiesRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, '..', 'client', 'dist');
