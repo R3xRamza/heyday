@@ -8,8 +8,6 @@ import {
 import { syncAllTaskAssigneesFromTemplates } from './taskAssignment.js';
 import { resyncNamedChecklistTemplates } from '../seed-data.js';
 import { dedupeAllChecklistTemplates } from './checklistTaskCleanup.js';
-import { migrateOpportunitiesTables } from './seedOpportunities.js';
-import { normalizeBuyerOpportunityRows } from './buyerOpportunityNormalize.js';
 
 export function addColumnIfMissing(db, table, column, definition) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
@@ -136,7 +134,6 @@ export function runMigrations(db) {
   migrateBirthdayPinsTable(db);
   migrateProjectsTables(db);
   addColumnIfMissing(db, 'projects', 'deadline', 'DATE');
-  addColumnIfMissing(db, 'projects', 'priority', "TEXT NOT NULL DEFAULT 'medium'");
   migrateUserTodosTable(db);
   addColumnIfMissing(db, 'user_todos', 'due_date', 'DATE');
   migratePendingStageFromCloseDate(db);
@@ -146,8 +143,6 @@ export function runMigrations(db) {
   migrateTaskCategory(db);
   migrateTeamHubTables(db);
   migrateHubDocItemsTable(db);
-  migrateOpportunitiesTables(db);
-  normalizeBuyerOpportunityRows(db);
 }
 
 function migrateHubDocItemsTable(db) {
