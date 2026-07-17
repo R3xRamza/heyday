@@ -10,7 +10,7 @@ import { parseAgentScope, transactionAgentScopeClause } from '../lib/agentScope.
 const router = Router();
 
 const DEAL_SELECT = `
-  SELECT t.id, t.address, t.city, t.state, t.value, t.stage, t.representing,
+  SELECT t.id, t.address, t.city, t.state, t.value, t.stage, t.representing, t.sale_type,
     t.close_date, t.gross_commission, t.commission_custom_fees,
     t.client_name, u.name as agent_name
   FROM transactions t

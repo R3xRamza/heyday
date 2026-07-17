@@ -293,15 +293,20 @@ export function computeYearCommissions(deals, startingYtd = 0, settings = COMMIS
       results.push({ ...deal, hasGci: false, breakdown: null });
       continue;
     }
+    const saleType = String(deal.sale_type || '').toLowerCase();
+    const isReferral = saleType.includes('referral');
     const overrides = {
       customFees: deal.commission_custom_fees,
+      applyPlanFees: !isReferral,
     };
     const breakdown = computeDealCommission(gci, ytd, overrides, settings);
-    ytd = {
-      capPaid: breakdown.capPaidAfter,
-      riskPaid: breakdown.riskPaidAfter,
-      cappedFeesPaid: breakdown.cappedFeesPaidAfter,
-    };
+    if (!isReferral) {
+      ytd = {
+        capPaid: breakdown.capPaidAfter,
+        riskPaid: breakdown.riskPaidAfter,
+        cappedFeesPaid: breakdown.cappedFeesPaidAfter,
+      };
+    }
     results.push({ ...deal, hasGci: true, breakdown });
   }
 
