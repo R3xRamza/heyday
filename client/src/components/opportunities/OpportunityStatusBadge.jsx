@@ -7,6 +7,9 @@ import {
 
 function buyerStatusStyle(status) {
   const v = normalizeBuyerStatus(status);
+  if (v === 'active') {
+    return { wrap: 'bg-sky-50 text-sky-800 border-sky-200', flag: 'bg-sky-500' };
+  }
   if (v === 'under_contract') {
     return { wrap: 'bg-emerald-50 text-emerald-800 border-emerald-200', flag: 'bg-emerald-500' };
   }

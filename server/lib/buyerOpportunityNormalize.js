@@ -1,10 +1,10 @@
 /** Server-side canonical buyer status / preapproval mapping (mirrors client utils). */
 
-const CANONICAL_STATUS = new Set(['under_contract', 'option_period', 'closed', 'on_hold']);
+const CANONICAL_STATUS = new Set(['active', 'under_contract', 'option_period', 'closed', 'on_hold']);
 const CANONICAL_PRE = new Set(['y', 'n', 'cash']);
 
 export function normalizeBuyerStatus(raw) {
-  if (raw == null || raw === '') return 'on_hold';
+  if (raw == null || raw === '') return 'active';
   const s = String(raw).trim();
   const lower = s.toLowerCase();
   if (CANONICAL_STATUS.has(lower)) return lower;
@@ -17,7 +17,8 @@ export function normalizeBuyerStatus(raw) {
   }
   if (/(^|\s)hold(\s|$)/.test(lower)) return 'on_hold';
   if (lower.includes('tour')) return 'option_period';
-  return 'on_hold';
+  if (lower.includes('active')) return 'active';
+  return 'active';
 }
 
 export function normalizePreapproval(raw) {
