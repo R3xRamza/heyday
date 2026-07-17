@@ -1,6 +1,10 @@
 import OpportunityStatusBadge from './OpportunityStatusBadge';
 import BuyerRepDropboxIcons from './BuyerRepDropboxIcons';
-import { normalizePreapproval, preapprovalLabel } from '../../utils/buyerOpportunity';
+import {
+  formatBuyerPrice,
+  normalizePreapproval,
+  preapprovalLabel,
+} from '../../utils/buyerOpportunity';
 
 function metaJoin(...parts) {
   return parts.map((p) => String(p || '').trim()).filter(Boolean).join(' · ');
@@ -10,7 +14,8 @@ export default function OpportunityBuyerCards({ rows, onEdit }) {
   return (
     <ul className="md:hidden flex flex-col gap-3">
       {rows.map((row) => {
-        const meta = metaJoin(row.price, row.timing);
+        const priceLabel = formatBuyerPrice(row);
+        const meta = metaJoin(priceLabel !== '—' ? priceLabel : '', row.timing);
         const pre = normalizePreapproval(row.preapproval);
 
         return (

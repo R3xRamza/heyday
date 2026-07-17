@@ -8,6 +8,7 @@ import {
 import {
   normalizeBuyerStatus,
   normalizePreapproval,
+  resolveBuyerPriceFields,
 } from '../lib/buyerOpportunityNormalize.js';
 
 const router = Router();
@@ -121,17 +122,25 @@ router.post('/buyers', (req, res) => {
     'SELECT COALESCE(MAX(sort_order), -1) AS m FROM opportunity_buyers WHERE agent_id = ?',
   ).get(agentId);
 
+  const priceFields = resolveBuyerPriceFields({
+    price_min: req.body.price_min,
+    price_max: req.body.price_max,
+    price: req.body.price,
+  });
+
   const result = db.prepare(`
     INSERT INTO opportunity_buyers (
-      agent_id, status, buyer_name, price, location, timing,
+      agent_id, status, buyer_name, price, price_min, price_max, location, timing,
       buyer_rep_signed, buyer_rep_dropbox, notes, lender, preapproval,
       showings, search_setup, sort_order
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     agentId,
     normalizeBuyerStatus(req.body.status),
     buyerName,
-    trimOrNull(req.body.price),
+    priceFields.price,
+    priceFields.price_min,
+    priceFields.price_max,
     trimOrNull(req.body.location),
     trimOrNull(req.body.timing),
     trimOrNull(req.body.buyer_rep_signed),
@@ -171,9 +180,40 @@ router.patch('/buyers/:id', (req, res) => {
     preapproval = mapped != null ? mapped : trimOrNull(req.body.preapproval);
   }
 
+  const priceTouched = ['price', 'price_min', 'price_max'].some((k) => (
+    Object.prototype.hasOwnProperty.call(req.body, k)
+  ));
+  const priceFields = priceTouched
+    ? resolveBuyerPriceFields({
+      price_min: Object.prototype.hasOwnProperty.call(req.body, 'price_min')
+        ? req.body.price_min
+        : existing.price_min,
+      price_max: Object.prototype.hasOwnProperty.call(req.body, 'price_max')
+        ? req.body.price_max
+        : existing.price_max,
+      price: Object.prototype.hasOwnProperty.call(req.body, 'price')
+        ? req.body.price
+        : undefined,
+    })
+    : {
+      price: existing.price,
+      price_min: existing.price_min,
+      price_max: existing.price_max,
+    };
+
+  // If only legacy price string sent without min/max keys, resolve from price alone
+  const priceFieldsFinal = (
+    Object.prototype.hasOwnProperty.call(req.body, 'price')
+    && !Object.prototype.hasOwnProperty.call(req.body, 'price_min')
+    && !Object.prototype.hasOwnProperty.call(req.body, 'price_max')
+  )
+    ? resolveBuyerPriceFields({ price: req.body.price })
+    : priceFields;
+
   db.prepare(`
     UPDATE opportunity_buyers SET
-      status = ?, buyer_name = ?, price = ?, location = ?, timing = ?,
+      status = ?, buyer_name = ?, price = ?, price_min = ?, price_max = ?,
+      location = ?, timing = ?,
       buyer_rep_signed = ?, buyer_rep_dropbox = ?, notes = ?, lender = ?,
       preapproval = ?, showings = ?, search_setup = ?,
       updated_at = CURRENT_TIMESTAMP
@@ -181,7 +221,9 @@ router.patch('/buyers/:id', (req, res) => {
   `).run(
     status,
     buyerName,
-    pick('price'),
+    priceFieldsFinal.price,
+    priceFieldsFinal.price_min,
+    priceFieldsFinal.price_max,
     pick('location'),
     pick('timing'),
     pick('buyer_rep_signed'),
