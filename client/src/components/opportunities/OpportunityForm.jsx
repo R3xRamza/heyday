@@ -26,7 +26,6 @@ const emptyBuyer = {
   lender: '',
   preapproval: '',
   showings: '',
-  search_setup: '',
 };
 
 const emptySeller = {
@@ -131,7 +130,6 @@ export default function OpportunityForm({
           lender: form.lender,
           preapproval: form.preapproval || null,
           showings: form.showings,
-          search_setup: form.search_setup,
         };
       } else {
         payload = {
@@ -344,13 +342,6 @@ export default function OpportunityForm({
                       className={INPUT}
                       value={form.showings || ''}
                       onChange={(e) => set('showings', e.target.value)}
-                    />
-                  </Field>
-                  <Field label="Search setup">
-                    <input
-                      className={INPUT}
-                      value={form.search_setup || ''}
-                      onChange={(e) => set('search_setup', e.target.value)}
                     />
                   </Field>
                 </div>
