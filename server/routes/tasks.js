@@ -6,6 +6,7 @@ import { resolveAssigneeId, resolveTaskRole } from '../lib/taskAssignment.js';
 import { logActivity, formatFieldChange, actorLabel } from '../lib/activity.js';
 import { parsePagination, wantsPagination, buildCountSql } from '../lib/pagination.js';
 import { parseAgentScope, transactionAgentScopeClause, taskTransactionScopeClause } from '../lib/agentScope.js';
+import { advanceDueDate, parseRecurrence } from '../lib/taskRecurrence.js';
 
 const router = Router();
 
@@ -350,6 +351,7 @@ router.post('/', (req, res) => {
     transaction_id,
     category,
     priority,
+    recurrence,
     timing_value,
     timing_direction,
     timing_anchor,
@@ -385,13 +387,17 @@ router.post('/', (req, res) => {
     ? parseTaskPriority(priority, 'normal')
     : 'normal';
 
+  const resolvedRecurrence = resolvedCategory === 'admin'
+    ? parseRecurrence(recurrence)
+    : null;
+
   const r = db.prepare(`
     INSERT INTO tasks (
       title, description, due_date, assigned_to, transaction_id, category,
       timing_value, timing_direction, timing_anchor,
-      priority, status
+      priority, recurrence, status
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
   `).run(
     String(title).trim(),
     description?.trim() || null,
@@ -403,6 +409,7 @@ router.post('/', (req, res) => {
     timing.timing_direction,
     timing.timing_anchor,
     resolvedPriority,
+    resolvedRecurrence,
   );
 
   const actor = actorLabel(req.user);
@@ -490,6 +497,7 @@ router.patch('/:id', (req, res) => {
     timing_direction,
     timing_anchor,
     priority,
+    recurrence,
     marketing_post_type,
   } = req.body;
   const changes = [];
@@ -630,6 +638,13 @@ router.patch('/:id', (req, res) => {
       db.prepare('UPDATE tasks SET priority = ? WHERE id = ?').run(nextPriority, req.params.id);
     }
   }
+  if (recurrence !== undefined && taskCategory(task) === 'admin') {
+    const nextRecurrence = parseRecurrence(recurrence);
+    if (nextRecurrence !== (task.recurrence || null)) {
+      changes.push(formatFieldChange('Recurrence', task.recurrence || 'none', nextRecurrence || 'none'));
+      db.prepare('UPDATE tasks SET recurrence = ? WHERE id = ?').run(nextRecurrence, req.params.id);
+    }
+  }
   const actor = actorLabel(req.user);
 
   if (status && status !== task.status) {
@@ -645,6 +660,26 @@ router.patch('/:id', (req, res) => {
         summary: `${actor} marked "${task.title}" complete`,
         taskId: task.id,
       });
+
+      // Spawn next occurrence for recurring admin tasks
+      const live = db.prepare('SELECT * FROM tasks WHERE id = ?').get(task.id);
+      const rec = parseRecurrence(live?.recurrence);
+      if (rec && taskCategory(live) === 'admin') {
+        const nextDue = advanceDueDate(live.due_date, rec);
+        db.prepare(`
+          INSERT INTO tasks (
+            title, description, due_date, assigned_to, transaction_id, category,
+            priority, recurrence, status
+          ) VALUES (?, ?, ?, ?, NULL, 'admin', ?, ?, 'pending')
+        `).run(
+          live.title,
+          live.description || null,
+          nextDue,
+          live.assigned_to || null,
+          live.priority || 'normal',
+          rec,
+        );
+      }
     }
   } else if (changes.length > 0) {
     logActivity({

@@ -144,6 +144,7 @@ export function runMigrations(db) {
   migrateChecklistTemplateAssigneesOnce(db);
   migrateUserEmailsToHeydayGroup(db);
   migrateTaskCategory(db);
+  addColumnIfMissing(db, 'tasks', 'recurrence', 'TEXT');
   migrateTeamHubTables(db);
   migrateHubDocItemsTable(db);
   migrateOpportunitiesTables(db);

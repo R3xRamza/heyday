@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import TaskDeadlineFields from './TaskDeadlineFields';
 import { computeTaskDueDate } from '../utils/taskTiming';
+import { RECURRENCE_OPTIONS } from '../utils/taskRecurrence';
 
 const PRIORITY_OPTIONS = [
   { value: 'normal', label: 'Normal' },
@@ -29,6 +30,7 @@ export default function EditTaskModal({ task, users, transaction = null, adminOn
     due_date: task.due_date || '',
     assigned_to: task.assigned_to || '',
     priority: task.priority || 'normal',
+    recurrence: task.recurrence || '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -43,6 +45,7 @@ export default function EditTaskModal({ task, users, transaction = null, adminOn
       due_date: task.due_date || '',
       assigned_to: task.assigned_to || '',
       priority: task.priority || 'normal',
+      recurrence: task.recurrence || '',
     });
   }, [task]);
 
@@ -66,7 +69,6 @@ export default function EditTaskModal({ task, users, transaction = null, adminOn
     };
 
     if (isTemplateTask) {
-      // Without a loaded transaction, the UI is a fixed date picker even if mode is "relative".
       if (!showLinkedDeadline || deadlineMode === 'fixed') {
         payload.due_date = form.due_date || null;
         payload.due_date_override = true;
@@ -94,6 +96,7 @@ export default function EditTaskModal({ task, users, transaction = null, adminOn
 
     if (adminOnly) {
       payload.priority = form.priority;
+      payload.recurrence = form.recurrence || null;
     }
 
     await onSave(payload);
@@ -171,18 +174,37 @@ export default function EditTaskModal({ task, users, transaction = null, adminOn
             </select>
           </div>
           {adminOnly && (
-            <div>
-              <label className="text-xs font-semibold text-on-surface-variant uppercase">Priority</label>
-              <select
-                value={form.priority}
-                onChange={(e) => setForm({ ...form, priority: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
-              >
-                {PRIORITY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
+            <>
+              <div>
+                <label className="text-xs font-semibold text-on-surface-variant uppercase">Priority</label>
+                <select
+                  value={form.priority}
+                  onChange={(e) => setForm({ ...form, priority: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
+                >
+                  {PRIORITY_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-on-surface-variant uppercase">Recurring</label>
+                <select
+                  value={form.recurrence || ''}
+                  onChange={(e) => setForm({ ...form, recurrence: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
+                >
+                  {RECURRENCE_OPTIONS.map((opt) => (
+                    <option key={opt.value || 'none'} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                {form.recurrence && (
+                  <p className="mt-1 text-[11px] text-on-surface-variant">
+                    When marked complete, a new copy is created for the next due date.
+                  </p>
+                )}
+              </div>
+            </>
           )}
         </div>
         <div className="px-6 py-4 border-t border-outline-variant/20 flex gap-3 justify-end">
