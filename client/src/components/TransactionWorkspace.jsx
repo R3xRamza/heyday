@@ -6,6 +6,7 @@ import EditTaskModal from './EditTaskModal';
 import CreateTaskModal from './CreateTaskModal';
 import PartiesToTransaction from './PartiesToTransaction';
 import PrivateListingFlag from './transactions/PrivateListingFlag';
+import TransactionCommission from './transactions/TransactionCommission';
 import DateText from './shared/DateText';
 import { formatCurrency, parseTransactionAddress } from '../utils/format';
 import {
@@ -33,6 +34,7 @@ import { validateParties, isTraditionalSale } from '../data/transactionParties';
 const ASSET_VIEWS = [
   { key: 'details', label: 'Transaction details', icon: 'info' },
   { key: 'checklist', label: 'Checklist', icon: 'checklist' },
+  { key: 'commission', label: 'Commission', icon: 'payments' },
   { key: 'activity', label: 'Activity', icon: 'history' },
 ];
 
@@ -143,6 +145,7 @@ export default function TransactionWorkspace({
   onRemoveChecklist,
   onApplyChecklists,
   onCompleteOverdueTasks,
+  onTransactionPatch,
 }) {
   const { returnTo } = useTransactionsListReturn();
   const { view, setView } = useTransactionWorkspaceView();
@@ -948,6 +951,17 @@ export default function TransactionWorkspace({
                 </div>
               </aside>
             </div>
+          </div>
+        )}
+
+        {view === 'commission' && (
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-6">
+            {dashboardHeader}
+            <TransactionCommission
+              transactionId={transaction.id}
+              salesPrice={transaction.value}
+              onTransactionPatch={onTransactionPatch}
+            />
           </div>
         )}
       </div>

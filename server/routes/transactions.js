@@ -27,6 +27,17 @@ import { CURRENT_LISTINGS_VIEW_SCOPE, ON_MARKET_LISTINGS_SCOPE, PRE_LISTINGS_SCO
 import { parseAgentScope, transactionAgentScopeClause, assertTransactionInScope } from '../lib/agentScope.js';
 import { runBrokermintImport, fixBrokermintAgentIds } from '../lib/brokermintImport.js';
 import { parsePagination } from '../lib/pagination.js';
+import {
+  COMMISSION_SETTINGS,
+  computeDealCommission,
+  computeYearCommissions,
+  anniversaryWindowForDate,
+  parseCustomFees,
+  serializeCustomFees,
+  dealSortsBefore,
+  resolveGrossCommission,
+  normalizeGciMode,
+} from '../lib/commissionPlans.js';
 
 const router = Router();
 
@@ -74,9 +85,111 @@ const TX_FIELDS = [
   'address', 'city', 'state', 'zip', 'value', 'owner_name', 'representing', 'listing_visibility', 'stage',
   'important_date', 'important_date_label', 'close_date', 'listing_date',
   'acceptance_date', 'option_end_date', 'workflow_status', 'transaction_name',
-  'sale_type', 'gross_commission', 'buyer_agreement_date', 'buyer_expiration_date',
+  'sale_type', 'gross_commission', 'commission_custom_fees',
+  'commission_gci_mode', 'commission_gci_percent',
+  'buyer_agreement_date', 'buyer_expiration_date',
   'client_name', 'owner_name', 'agent_id',
 ];
+
+function todayYmd() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const mo = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${d}`;
+}
+
+function buildCommissionSummary(tx) {
+  const dealDate = tx.close_date || todayYmd();
+  const window = anniversaryWindowForDate(dealDate);
+  const agentId = tx.agent_id != null ? Number(tx.agent_id) : null;
+
+  let peers = [];
+  if (agentId) {
+    peers = db.prepare(`
+      SELECT id, close_date, gross_commission, commission_custom_fees,
+        stage, address, value
+      FROM transactions
+      WHERE agent_id = ?
+        AND close_date IS NOT NULL
+        AND close_date >= ? AND close_date <= ?
+      ORDER BY close_date ASC, id ASC
+    `).all(agentId, window.start, window.end);
+  }
+
+  const prior = peers.filter((p) => {
+    if (Number(p.id) === Number(tx.id)) return false;
+    return dealSortsBefore(p, tx, dealDate);
+  });
+
+  const priorRun = computeYearCommissions(prior);
+  const gciMode = normalizeGciMode(tx.commission_gci_mode);
+  const gciPercent = tx.commission_gci_percent != null && tx.commission_gci_percent !== ''
+    ? Number(tx.commission_gci_percent)
+    : null;
+  const gci = resolveGrossCommission({
+    mode: gciMode,
+    grossCommission: tx.gross_commission,
+    gciPercent,
+    salesPrice: tx.value,
+  });
+  const hasGci = gci != null && !Number.isNaN(gci) && gci >= 0;
+
+  const overrides = {
+    customFees: tx.commission_custom_fees,
+  };
+
+  const ytdBefore = {
+    capPaid: priorRun.capPaid,
+    riskPaid: priorRun.riskPaid,
+    cappedFeesPaid: priorRun.cappedFeesPaid,
+  };
+
+  const breakdown = hasGci
+    ? computeDealCommission(gci, ytdBefore, overrides)
+    : null;
+
+  const capPaid = breakdown ? breakdown.capPaidAfter : priorRun.capPaid;
+  const riskPaid = breakdown ? breakdown.riskPaidAfter : priorRun.riskPaid;
+  const cappedFeesPaid = breakdown ? breakdown.cappedFeesPaidAfter : priorRun.cappedFeesPaid;
+  const afterCap = capPaid >= COMMISSION_SETTINGS.capAmount
+    || (breakdown ? breakdown.plan === 'after_cap' : priorRun.capPaid >= COMMISSION_SETTINGS.capAmount);
+
+  // For rate display when after cap but this deal has no GCI yet:
+  const displayCappedFeeRate = afterCap
+    ? (priorRun.cappedFeesPaid >= COMMISSION_SETTINGS.cappedFeesStepDownAt
+      ? COMMISSION_SETTINGS.cappedTransactionFeeReduced
+      : COMMISSION_SETTINGS.cappedTransactionFee)
+    : (breakdown?.cappedFee || 0);
+
+  return {
+    settings: COMMISSION_SETTINGS,
+    anniversary: {
+      start: window.start,
+      end: window.end,
+      startYear: window.startYear,
+    },
+    dealDate,
+    hasGci,
+    gci_mode: gciMode,
+    gci_percent: gciMode === 'percent' && gciPercent != null && !Number.isNaN(gciPercent) ? gciPercent : null,
+    gross_commission: hasGci ? gci : null,
+    sales_price: tx.value != null ? Number(tx.value) : null,
+    custom_fees: parseCustomFees(tx.commission_custom_fees),
+    breakdown,
+    progress: {
+      capPaid,
+      capAmount: COMMISSION_SETTINGS.capAmount,
+      riskPaid,
+      riskCap: COMMISSION_SETTINGS.riskManagementAnnualCap,
+      cappedFeesPaid,
+      cappedFeesStepDownAt: COMMISSION_SETTINGS.cappedFeesStepDownAt,
+      cappedFeeRate: breakdown ? (breakdown.cappedFee || displayCappedFeeRate) : displayCappedFeeRate,
+      plan: breakdown?.plan || (priorRun.capPaid >= COMMISSION_SETTINGS.capAmount ? 'after_cap' : 'before_cap'),
+    },
+    ytdBefore,
+  };
+}
 
 function syncStageFromCloseDate(db, transactionId, beforeStage) {
   const row = db.prepare('SELECT stage, close_date FROM transactions WHERE id = ?').get(transactionId);
@@ -308,6 +421,128 @@ router.delete('/:id/checklists/:templateId', (req, res) => {
   res.json(result);
 });
 
+router.get('/:id/commission', (req, res) => {
+  if (!assertTransactionInScope(req, res, Number(req.params.id))) return;
+  const transaction = pickTransaction(req.params.id);
+  if (!transaction) return res.status(404).json({ error: 'Not found' });
+  res.json(buildCommissionSummary(transaction));
+});
+
+router.patch('/:id/commission', (req, res) => {
+  if (!assertTransactionInScope(req, res, Number(req.params.id))) return;
+  const before = db.prepare('SELECT * FROM transactions WHERE id = ?').get(req.params.id);
+  if (!before) return res.status(404).json({ error: 'Not found' });
+
+  const sets = [];
+  const values = [];
+  const changes = [];
+
+  let nextMode = normalizeGciMode(
+    'gci_mode' in req.body || 'commission_gci_mode' in req.body
+      ? (req.body.gci_mode ?? req.body.commission_gci_mode)
+      : before.commission_gci_mode,
+  );
+  let nextPercent = before.commission_gci_percent;
+  const salesPrice = before.value != null ? Number(before.value) : null;
+
+  if ('gci_mode' in req.body || 'commission_gci_mode' in req.body) {
+    const modeRaw = req.body.gci_mode ?? req.body.commission_gci_mode;
+    nextMode = normalizeGciMode(modeRaw);
+    if (normalizeGciMode(before.commission_gci_mode) !== nextMode) {
+      changes.push(formatFieldChange('gci mode', before.commission_gci_mode || 'amount', nextMode));
+    }
+    sets.push('commission_gci_mode = ?');
+    values.push(nextMode);
+  }
+
+  if ('gci_percent' in req.body || 'commission_gci_percent' in req.body) {
+    const raw = 'gci_percent' in req.body ? req.body.gci_percent : req.body.commission_gci_percent;
+    const value = raw === null || raw === '' || raw === undefined ? null : Number(raw);
+    if (value !== null && (Number.isNaN(value) || value < 0)) {
+      return res.status(400).json({ error: 'gci_percent must be a non-negative number' });
+    }
+    nextPercent = value;
+    if (Number(before.commission_gci_percent) !== value) {
+      changes.push(formatFieldChange('gci percent', before.commission_gci_percent, value));
+    }
+    sets.push('commission_gci_percent = ?');
+    values.push(value);
+  }
+
+  if ('gross_commission' in req.body && nextMode === 'amount') {
+    const raw = req.body.gross_commission;
+    const value = raw === null || raw === '' || raw === undefined ? null : Number(raw);
+    if (value !== null && (Number.isNaN(value) || value < 0)) {
+      return res.status(400).json({ error: 'gross_commission must be a non-negative number' });
+    }
+    if (before.gross_commission !== value) {
+      changes.push(formatFieldChange('gross commission', before.gross_commission, value));
+    }
+    sets.push('gross_commission = ?');
+    values.push(value);
+  }
+
+  // Keep dollar GCI in sync when percent mode is active.
+  const gciTouched = 'gross_commission' in req.body
+    || 'gci_percent' in req.body
+    || 'commission_gci_percent' in req.body
+    || 'gci_mode' in req.body
+    || 'commission_gci_mode' in req.body;
+  if (gciTouched && nextMode === 'percent') {
+    const resolved = resolveGrossCommission({
+      mode: 'percent',
+      gciPercent: nextPercent,
+      salesPrice,
+    });
+    if (resolved !== null) {
+      const gciSetIdx = sets.indexOf('gross_commission = ?');
+      if (gciSetIdx >= 0) {
+        values[gciSetIdx] = resolved;
+      } else if (Number(before.gross_commission) !== resolved) {
+        changes.push(formatFieldChange('gross commission', before.gross_commission, resolved));
+        sets.push('gross_commission = ?');
+        values.push(resolved);
+      }
+    }
+  }
+
+  if ('commission_custom_fees' in req.body || 'custom_fees' in req.body) {
+    const raw = 'commission_custom_fees' in req.body ? req.body.commission_custom_fees : req.body.custom_fees;
+    if (raw != null && !Array.isArray(raw) && typeof raw !== 'string') {
+      return res.status(400).json({ error: 'custom_fees must be an array' });
+    }
+    const fees = parseCustomFees(raw);
+    for (const fee of fees) {
+      if (Number.isNaN(Number(fee.amount)) || Number(fee.amount) < 0) {
+        return res.status(400).json({ error: 'custom fee amounts must be non-negative numbers' });
+      }
+    }
+    const serialized = serializeCustomFees(fees);
+    if (String(before.commission_custom_fees || '[]') !== serialized) {
+      changes.push(formatFieldChange('custom fees', before.commission_custom_fees, serialized));
+    }
+    sets.push('commission_custom_fees = ?');
+    values.push(serialized);
+  }
+
+  if (sets.length > 0) {
+    values.push(req.params.id);
+    db.prepare(`UPDATE transactions SET ${sets.join(', ')} WHERE id = ?`).run(...values);
+    if (changes.length) {
+      logActivity({
+        transactionId: Number(req.params.id),
+        userId: req.user?.id,
+        eventType: 'transaction_updated',
+        summary: `Commission updated by ${actorLabel(req.user)}`,
+        detail: changes.join('; '),
+      });
+    }
+  }
+
+  const transaction = pickTransaction(req.params.id);
+  res.json(buildCommissionSummary(transaction));
+});
+
 router.get('/:id', (req, res) => {
   closePastDueTransactions(db);
   const transaction = pickTransaction(req.params.id);
@@ -418,8 +653,12 @@ router.put('/:id', (req, res) => {
   for (const field of TX_FIELDS) {
     if (!(field in req.body)) continue;
     let val = req.body[field];
-    if (field === 'value' || field === 'gross_commission') {
+    if (field === 'value' || field === 'gross_commission' || field === 'commission_gci_percent') {
       val = val != null && val !== '' ? Number(val) : null;
+    } else if (field === 'commission_gci_mode') {
+      val = normalizeGciMode(val);
+    } else if (field === 'commission_custom_fees') {
+      val = serializeCustomFees(val);
     } else if (field === 'agent_id') {
       val = val != null && val !== '' ? Number(val) : null;
       if (val) {
@@ -449,6 +688,23 @@ router.put('/:id', (req, res) => {
   db.prepare(`UPDATE transactions SET ${sets.join(', ')} WHERE id = ?`).run(...values);
 
   let after = db.prepare('SELECT * FROM transactions WHERE id = ?').get(req.params.id);
+
+  if (
+    'value' in req.body
+    && normalizeGciMode(after.commission_gci_mode) === 'percent'
+    && after.commission_gci_percent != null
+  ) {
+    const resolved = resolveGrossCommission({
+      mode: 'percent',
+      gciPercent: after.commission_gci_percent,
+      salesPrice: after.value,
+    });
+    if (resolved != null && Number(after.gross_commission) !== resolved) {
+      db.prepare('UPDATE transactions SET gross_commission = ? WHERE id = ?').run(resolved, after.id);
+      changes.push(formatFieldChange('gross commission', after.gross_commission, resolved));
+      after = db.prepare('SELECT * FROM transactions WHERE id = ?').get(req.params.id);
+    }
+  }
 
   const stageSync = syncStageFromCloseDate(db, after.id, before.stage);
   if (stageSync.changed) {
