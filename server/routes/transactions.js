@@ -27,6 +27,7 @@ import { CURRENT_LISTINGS_VIEW_SCOPE, ON_MARKET_LISTINGS_SCOPE, PRE_LISTINGS_SCO
 import { parseAgentScope, transactionAgentScopeClause, assertTransactionInScope } from '../lib/agentScope.js';
 import { runBrokermintImport, fixBrokermintAgentIds } from '../lib/brokermintImport.js';
 import { parsePagination } from '../lib/pagination.js';
+import { SALE_TYPE_REFERRAL } from '../lib/partyRoles.js';
 import {
   COMMISSION_SETTINGS,
   computeDealCommission,
@@ -107,23 +108,29 @@ function isMeredithAgent(agentId) {
   return String(row?.email || '').toLowerCase() === MEREDITH_EMAIL;
 }
 
+function isReferralSale(tx) {
+  return normalizeSaleType(tx?.sale_type, tx?.representing) === SALE_TYPE_REFERRAL;
+}
+
 function buildCommissionSummary(tx) {
   const dealDate = tx.close_date || todayYmd();
   const window = anniversaryWindowForDate(dealDate);
   const agentId = tx.agent_id != null ? Number(tx.agent_id) : null;
-  const appliesMeredithPlan = isMeredithAgent(agentId);
+  // eXp / team fees only for Meredith non-referral deals
+  const appliesMeredithPlan = isMeredithAgent(agentId) && !isReferralSale(tx);
 
   let peers = [];
   if (appliesMeredithPlan && agentId) {
     peers = db.prepare(`
       SELECT id, close_date, gross_commission, commission_custom_fees,
-        stage, address, value
+        stage, address, value, sale_type, representing
       FROM transactions
       WHERE agent_id = ?
         AND close_date IS NOT NULL
         AND close_date >= ? AND close_date <= ?
       ORDER BY close_date ASC, id ASC
-    `).all(agentId, window.start, window.end);
+    `).all(agentId, window.start, window.end)
+      .filter((p) => !isReferralSale(p));
   }
 
   const prior = peers.filter((p) => {
