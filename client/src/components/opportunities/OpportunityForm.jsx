@@ -4,6 +4,7 @@ import {
   BUYER_STATUSES,
   normalizeBuyerStatus,
   normalizePreapproval,
+  parsePriceAmount,
 } from '../../utils/buyerOpportunity';
 
 const INPUT =
@@ -15,7 +16,6 @@ const SELLER_STATUS_SUGGESTIONS = ['Upcoming', 'Pre-listing', 'LIVE', 'PRIVATE']
 const emptyBuyer = {
   status: 'active',
   buyer_name: '',
-  price: '',
   location: '',
   timing: '',
   buyer_rep_signed: '',
@@ -46,12 +46,26 @@ function Field({ label, children }) {
   );
 }
 
+function dollarsToInput(n) {
+  if (n == null || n === '' || Number.isNaN(Number(n))) return '';
+  return String(Math.round(Number(n)));
+}
+
 function initBuyerForm(initial) {
   const base = { ...emptyBuyer, ...(initial || {}) };
+  const min = base.price_min;
+  const max = base.price_max;
+  const isRange = min != null && max != null && Number(min) !== Number(max);
   return {
     ...base,
     status: normalizeBuyerStatus(base.status),
     preapproval: normalizePreapproval(base.preapproval),
+    priceMode: isRange ? 'range' : 'single',
+    priceSingle: isRange
+      ? ''
+      : dollarsToInput(min ?? max),
+    priceMinInput: isRange ? dollarsToInput(min) : '',
+    priceMaxInput: isRange ? dollarsToInput(max) : '',
   };
 }
 
@@ -89,30 +103,44 @@ export default function OpportunityForm({
     setError('');
     setSaving(true);
     try {
-      const payload = isBuyer
-        ? {
-            status: form.status,
-            buyer_name: form.buyer_name,
-            price: form.price,
-            location: form.location,
-            timing: form.timing,
-            buyer_rep_signed: form.buyer_rep_signed,
-            buyer_rep_dropbox: form.buyer_rep_dropbox,
-            notes: form.notes,
-            lender: form.lender,
-            preapproval: form.preapproval || null,
-            showings: form.showings,
-            search_setup: form.search_setup,
-          }
-        : {
-            status: form.status,
-            property_address: form.property_address,
-            seller_name: form.seller_name,
-            timing: form.timing,
-            price_range: form.price_range,
-            neighborhood: form.neighborhood,
-            notes: form.notes,
-          };
+      let payload;
+      if (isBuyer) {
+        let price_min = null;
+        let price_max = null;
+        if (form.priceMode === 'range') {
+          price_min = parsePriceAmount(form.priceMinInput);
+          price_max = parsePriceAmount(form.priceMaxInput);
+        } else {
+          const v = parsePriceAmount(form.priceSingle);
+          price_min = v;
+          price_max = v;
+        }
+        payload = {
+          status: form.status,
+          buyer_name: form.buyer_name,
+          price_min,
+          price_max,
+          location: form.location,
+          timing: form.timing,
+          buyer_rep_signed: form.buyer_rep_signed,
+          buyer_rep_dropbox: form.buyer_rep_dropbox,
+          notes: form.notes,
+          lender: form.lender,
+          preapproval: form.preapproval || null,
+          showings: form.showings,
+          search_setup: form.search_setup,
+        };
+      } else {
+        payload = {
+          status: form.status,
+          property_address: form.property_address,
+          seller_name: form.seller_name,
+          timing: form.timing,
+          price_range: form.price_range,
+          neighborhood: form.neighborhood,
+          notes: form.notes,
+        };
+      }
       await onSave(payload);
     } catch (err) {
       setError(err?.message || 'Save failed');
@@ -126,6 +154,11 @@ export default function OpportunityForm({
     if (!onDelete || !initial?.id) return;
     await onDelete(initial);
   }
+
+  const modeBtn = (active) =>
+    `flex-1 px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors ${
+      active ? 'bg-primary text-white' : 'text-on-surface-variant hover:bg-surface-container-low'
+    }`;
 
   return (
     <div
@@ -191,14 +224,65 @@ export default function OpportunityForm({
                   </select>
                 </Field>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Price">
-                  <input className={INPUT} value={form.price || ''} onChange={(e) => set('price', e.target.value)} />
-                </Field>
-                <Field label="Timing">
-                  <input className={INPUT} value={form.timing || ''} onChange={(e) => set('timing', e.target.value)} />
-                </Field>
+
+              <div>
+                <span className={LABEL}>Price</span>
+                <div className="mt-1 flex rounded-lg border border-outline-variant/30 overflow-hidden bg-white">
+                  <button
+                    type="button"
+                    className={modeBtn(form.priceMode === 'single')}
+                    onClick={() => set('priceMode', 'single')}
+                  >
+                    Single
+                  </button>
+                  <button
+                    type="button"
+                    className={modeBtn(form.priceMode === 'range')}
+                    onClick={() => set('priceMode', 'range')}
+                  >
+                    Range
+                  </button>
+                </div>
+                {form.priceMode === 'range' ? (
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    <div>
+                      <label className="text-[10px] font-semibold text-on-surface-variant uppercase">Min</label>
+                      <input
+                        className={INPUT}
+                        inputMode="decimal"
+                        placeholder="900k or 900000"
+                        value={form.priceMinInput || ''}
+                        onChange={(e) => set('priceMinInput', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-on-surface-variant uppercase">Max</label>
+                      <input
+                        className={INPUT}
+                        inputMode="decimal"
+                        placeholder="1.4M or 1400000"
+                        value={form.priceMaxInput || ''}
+                        onChange={(e) => set('priceMaxInput', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <input
+                    className={`${INPUT} mt-2`}
+                    inputMode="decimal"
+                    placeholder="1.2M, 900k, or 1200000"
+                    value={form.priceSingle || ''}
+                    onChange={(e) => set('priceSingle', e.target.value)}
+                  />
+                )}
+                <p className="mt-1 text-[11px] text-on-surface-variant">
+                  Use full dollars or suffixes (k / m). Example: 1.2m → $1.2M
+                </p>
               </div>
+
+              <Field label="Timing">
+                <input className={INPUT} value={form.timing || ''} onChange={(e) => set('timing', e.target.value)} />
+              </Field>
               <Field label="Location">
                 <input className={INPUT} value={form.location || ''} onChange={(e) => set('location', e.target.value)} />
               </Field>

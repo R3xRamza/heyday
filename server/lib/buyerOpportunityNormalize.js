@@ -1,4 +1,4 @@
-/** Server-side canonical buyer status / preapproval mapping (mirrors client utils). */
+/** Server-side buyer status / preapproval / price normalization. */
 
 const CANONICAL_STATUS = new Set(['active', 'under_contract', 'option_period', 'closed', 'on_hold']);
 const CANONICAL_PRE = new Set(['y', 'n', 'cash']);
@@ -34,12 +34,133 @@ export function normalizePreapproval(raw) {
   return null;
 }
 
-/** One-time-ish: rewrite freeform status/preapproval to canonical values. */
+function scalePriceNumber(n, suffix) {
+  if (n == null || Number.isNaN(n)) return null;
+  const suf = (suffix || '').toLowerCase();
+  if (suf === 'm') return Math.round(n * 1_000_000);
+  if (suf === 'k') return Math.round(n * 1_000);
+  if (n > 0 && n < 20) return Math.round(n * 1_000_000);
+  if (n >= 20 && n < 10000) return Math.round(n * 1_000);
+  return Math.round(n);
+}
+
+export function parsePriceAmount(token) {
+  if (token == null) return null;
+  let s = String(token).trim().toLowerCase().replace(/[$,]/g, '');
+  if (!s || s === '?' || s === 'x') return null;
+  s = s.replace(/or less|max|upto|up to|under|about|approx|~|each/g, '').trim();
+  s = s.replace(/million/g, 'm').replace(/thousand/g, 'k');
+  const m = s.match(/^([<>]=?)?\s*(\d+(?:\.\d+)?)\s*([km])?$/i);
+  if (!m) {
+    const loose = s.match(/(\d+(?:\.\d+)?)\s*([km])?/i);
+    if (!loose) return null;
+    return scalePriceNumber(Number(loose[1]), loose[2]);
+  }
+  return scalePriceNumber(Number(m[2]), m[3]);
+}
+
+export function parseBuyerPriceText(raw) {
+  if (raw == null || String(raw).trim() === '') return { min: null, max: null };
+  const original = String(raw).trim();
+  const lower = original.toLowerCase();
+  if (lower === '?' || lower === 'x') return { min: null, max: null };
+
+  const upTo = /^(up to|under|max|or less)/i.test(lower)
+    || /\b(or less|max)\b/i.test(lower)
+    || lower.startsWith('<');
+  const atLeast = lower.startsWith('>') || lower.startsWith('≥') || /\bmin\b/i.test(lower);
+
+  const rangeParts = original.split(/\s*(?:–|—|to)\s*|\s+-\s*|(?<=\d)\s*-\s*(?=\d)/i);
+  if (rangeParts.length >= 2) {
+    const a = parsePriceAmount(rangeParts[0].replace(/^[<>]=?\s*/, ''));
+    const b = parsePriceAmount(rangeParts[1]);
+    if (a != null && b != null) return { min: Math.min(a, b), max: Math.max(a, b) };
+    if (a != null && b == null) return { min: a, max: null };
+    if (a == null && b != null) return { min: null, max: b };
+  }
+
+  if (/[-\u2013\u2014]\s*$/.test(original)) {
+    const min = parsePriceAmount(original.replace(/[-\u2013\u2014]\s*$/, '').replace(/^[<>]=?\s*/, ''));
+    return { min, max: null };
+  }
+
+  const amount = parsePriceAmount(original.replace(/^[<>]=?\s*/, ''));
+  if (amount == null) return { min: null, max: null };
+  if (upTo) return { min: null, max: amount };
+  if (atLeast) return { min: amount, max: null };
+  return { min: amount, max: amount };
+}
+
+function formatCompactDollars(n) {
+  if (n == null || Number.isNaN(Number(n))) return '';
+  const v = Number(n);
+  if (v >= 1_000_000) {
+    const m = v / 1_000_000;
+    const s = m % 1 === 0 ? String(m) : m.toFixed(1).replace(/\.0$/, '');
+    return `$${s}M`;
+  }
+  if (v >= 1_000) {
+    const k = v / 1_000;
+    const s = k % 1 === 0 ? String(k) : k.toFixed(1).replace(/\.0$/, '');
+    return `$${s}K`;
+  }
+  return `$${Math.round(v).toLocaleString()}`;
+}
+
+export function priceDisplayFromBounds(min, max) {
+  const hasMin = min != null && !Number.isNaN(Number(min));
+  const hasMax = max != null && !Number.isNaN(Number(max));
+  if (hasMin && hasMax) {
+    const a = Number(min);
+    const b = Number(max);
+    if (a === b) return formatCompactDollars(a);
+    return `${formatCompactDollars(Math.min(a, b))}–${formatCompactDollars(Math.max(a, b))}`;
+  }
+  if (hasMin && !hasMax) return `${formatCompactDollars(Number(min))}+`;
+  if (!hasMin && hasMax) return `Up to ${formatCompactDollars(Number(max))}`;
+  return null;
+}
+
+export function resolveBuyerPriceFields({ price_min, price_max, price } = {}) {
+  const hasMin = price_min !== undefined && price_min !== null && price_min !== '';
+  const hasMax = price_max !== undefined && price_max !== null && price_max !== '';
+  if (hasMin || hasMax) {
+    let min = hasMin ? Number(price_min) : null;
+    let max = hasMax ? Number(price_max) : null;
+    if (min != null && Number.isNaN(min)) min = null;
+    if (max != null && Number.isNaN(max)) max = null;
+    if (min != null && max != null && min > max) {
+      const t = min;
+      min = max;
+      max = t;
+    }
+    return {
+      price_min: min,
+      price_max: max,
+      price: priceDisplayFromBounds(min, max),
+    };
+  }
+  if (price != null && String(price).trim() !== '') {
+    const parsed = parseBuyerPriceText(price);
+    return {
+      price_min: parsed.min,
+      price_max: parsed.max,
+      price: priceDisplayFromBounds(parsed.min, parsed.max) || String(price).trim(),
+    };
+  }
+  return { price_min: null, price_max: null, price: null };
+}
+
+/** Normalize status/preapproval and backfill price_min/max from legacy price text. */
 export function normalizeBuyerOpportunityRows(db) {
-  const rows = db.prepare('SELECT id, status, preapproval FROM opportunity_buyers').all();
-  const update = db.prepare(
-    'UPDATE opportunity_buyers SET status = ?, preapproval = ? WHERE id = ?',
-  );
+  const rows = db.prepare(
+    'SELECT id, status, preapproval, price, price_min, price_max FROM opportunity_buyers',
+  ).all();
+  const update = db.prepare(`
+    UPDATE opportunity_buyers
+    SET status = ?, preapproval = ?, price = ?, price_min = ?, price_max = ?
+    WHERE id = ?
+  `);
   let n = 0;
   const tx = db.transaction(() => {
     for (const row of rows) {
@@ -48,21 +169,34 @@ export function normalizeBuyerOpportunityRows(db) {
       const preapproval = mappedPre != null
         ? mappedPre
         : (row.preapproval == null || String(row.preapproval).trim() === '' ? null : row.preapproval);
-      // Only write when status changes, or preapproval maps to canonical
-      const statusChanged = status !== row.status;
-      const preChanged = mappedPre != null && mappedPre !== row.preapproval;
-      if (statusChanged || preChanged) {
-        update.run(
-          status,
-          preChanged ? mappedPre : row.preapproval,
-          row.id,
-        );
+
+      let priceMin = row.price_min;
+      let priceMax = row.price_max;
+      let price = row.price;
+      if ((priceMin == null && priceMax == null) && price) {
+        const parsed = parseBuyerPriceText(price);
+        priceMin = parsed.min;
+        priceMax = parsed.max;
+        const display = priceDisplayFromBounds(priceMin, priceMax);
+        if (display) price = display;
+      } else if (priceMin != null || priceMax != null) {
+        const display = priceDisplayFromBounds(priceMin, priceMax);
+        if (display) price = display;
+      }
+
+      const changed = status !== row.status
+        || (mappedPre != null && mappedPre !== row.preapproval)
+        || priceMin !== row.price_min
+        || priceMax !== row.price_max
+        || price !== row.price;
+      if (changed) {
+        update.run(status, preapproval, price, priceMin, priceMax, row.id);
         n += 1;
       }
     }
   });
   tx();
   if (n > 0) {
-    console.log(`[opportunities] Normalized ${n} buyer status/preapproval row(s)`);
+    console.log(`[opportunities] Normalized ${n} buyer row(s)`);
   }
 }

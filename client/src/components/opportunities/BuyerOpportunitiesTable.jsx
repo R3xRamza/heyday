@@ -1,6 +1,7 @@
 import {
   BUYER_PREAPPROVALS,
   BUYER_STATUSES,
+  formatBuyerPrice,
   normalizeBuyerStatus,
   normalizePreapproval,
 } from '../../utils/buyerOpportunity';
@@ -51,6 +52,7 @@ export default function BuyerOpportunitiesTable({ rows, onEdit, onPatch }) {
           {rows.map((row) => {
             const status = normalizeBuyerStatus(row.status);
             const pre = normalizePreapproval(row.preapproval);
+            const priceLabel = formatBuyerPrice(row);
 
             return (
               <tr
@@ -79,7 +81,7 @@ export default function BuyerOpportunitiesTable({ rows, onEdit, onPatch }) {
                     ))}
                   </select>
                 </td>
-                <TextCell title={row.price}>{row.price}</TextCell>
+                <TextCell title={priceLabel}>{priceLabel}</TextCell>
                 <TextCell title={row.location}>{row.location}</TextCell>
                 <TextCell title={row.timing}>{row.timing}</TextCell>
                 <td className={`${TD} text-on-surface`} title={row.notes || undefined}>

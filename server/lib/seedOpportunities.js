@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parse } from 'csv-parse/sync';
-import { normalizeBuyerOpportunityRows } from './buyerOpportunityNormalize.js';
+import { normalizeBuyerOpportunityRows, resolveBuyerPriceFields } from './buyerOpportunityNormalize.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SEED_DIR = path.join(__dirname, '..', 'seed', 'opportunities');
@@ -33,6 +33,13 @@ function emptyToNull(s) {
   return s ? s : null;
 }
 
+function addColumnIfMissingLocal(db, table, column, definition) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
 export function migrateOpportunitiesTables(db) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS opportunity_buyers (
@@ -41,6 +48,8 @@ export function migrateOpportunitiesTables(db) {
       status TEXT,
       buyer_name TEXT NOT NULL,
       price TEXT,
+      price_min REAL,
+      price_max REAL,
       location TEXT,
       timing TEXT,
       buyer_rep_signed TEXT,
@@ -73,6 +82,9 @@ export function migrateOpportunitiesTables(db) {
     CREATE INDEX IF NOT EXISTS idx_opportunity_buyers_agent ON opportunity_buyers(agent_id);
     CREATE INDEX IF NOT EXISTS idx_opportunity_sellers_agent ON opportunity_sellers(agent_id);
   `);
+
+  addColumnIfMissingLocal(db, 'opportunity_buyers', 'price_min', 'REAL');
+  addColumnIfMissingLocal(db, 'opportunity_buyers', 'price_max', 'REAL');
 
   seedOpportunitiesIfEmpty(db);
   normalizeBuyerOpportunityRows(db);
@@ -121,10 +133,10 @@ function seedBuyers(db, agentId) {
 
   const insert = db.prepare(`
     INSERT INTO opportunity_buyers (
-      agent_id, status, buyer_name, price, location, timing,
+      agent_id, status, buyer_name, price, price_min, price_max, location, timing,
       buyer_rep_signed, buyer_rep_dropbox, notes, lender, preapproval,
       showings, search_setup, sort_order
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   let n = 0;
@@ -132,11 +144,15 @@ function seedBuyers(db, agentId) {
     for (const row of rows) {
       const buyerName = cell(row, 'Buyer', 'buyer', 'buyer_name');
       if (!buyerName) continue;
+      const rawPrice = emptyToNull(cell(row, 'Price', 'price'));
+      const priceFields = resolveBuyerPriceFields({ price: rawPrice });
       insert.run(
         agentId,
         emptyToNull(cell(row, 'Status', 'status')),
         buyerName,
-        emptyToNull(cell(row, 'Price', 'price')),
+        priceFields.price || rawPrice,
+        priceFields.price_min,
+        priceFields.price_max,
         emptyToNull(cell(row, 'Location', 'location')),
         emptyToNull(cell(row, 'Timing', 'timing')),
         emptyToNull(cell(row, 'Buyer Rep signed?', 'Buyer Rep signed', 'buyer_rep_signed')),
