@@ -1,22 +1,21 @@
 /** Canonical buyer opportunity helpers (client). */
 
 export const BUYER_STATUSES = [
-  { value: 'under_contract', label: 'Under contract' },
+  { value: 'pending', label: 'Pending' },
   { value: 'option_period', label: 'Option period' },
   { value: 'active', label: 'Active' },
   { value: 'on_hold', label: 'On hold' },
   { value: 'closed', label: 'Closed' },
 ];
 
+/** "Right fit" = waiting for the suitable/right property (not rushed). */
 export const BUYER_TIMINGS = [
   { value: 'asap', label: 'ASAP' },
   { value: 'near_term', label: '1–3 months' },
   { value: 'mid_term', label: '3–6 months' },
   { value: 'long_term', label: '6–12 months' },
-  { value: 'flexible', label: 'Flexible' },
+  { value: 'right_fit', label: 'Right fit' },
   { value: 'casual', label: 'Casual' },
-  { value: 'lease_driven', label: 'Lease / deadline' },
-  { value: 'on_hold', label: 'On hold' },
 ];
 
 export const BUYER_PREAPPROVALS = [
@@ -45,8 +44,11 @@ export function normalizeBuyerStatus(raw) {
   const s = String(raw).trim();
   const lower = s.toLowerCase();
   if (CANONICAL_STATUS.has(lower)) return lower;
-  if (lower.includes('under contract')) return 'under_contract';
-  if (lower.includes('leaseback')) return 'under_contract';
+  // Legacy
+  if (lower === 'under_contract' || lower.includes('under contract') || lower.includes('leaseback')) {
+    return 'pending';
+  }
+  if (lower.includes('pending')) return 'pending';
   if (lower.includes('option')) return 'option_period';
   if (/\bclosed\b/.test(lower) || lower === 'close') return 'closed';
   if (lower.includes('on hold') || lower.includes('paused') || lower.includes('unresponsive')) {
@@ -63,24 +65,31 @@ export function normalizeBuyerTiming(raw) {
   const s = String(raw).trim();
   const lower = s.toLowerCase();
   if (CANONICAL_TIMING.has(lower)) return lower;
-  if (lower === '?' || lower === 'x') return 'flexible';
+  // Legacy timing values
+  if (lower === 'flexible' || lower === 'lease_driven' || lower === 'on_hold') {
+    if (lower === 'lease_driven') return 'near_term';
+    if (lower === 'on_hold') return 'casual';
+    return 'right_fit';
+  }
+  if (lower === '?' || lower === 'x') return 'right_fit';
   if (lower.includes('asap')) return 'asap';
-  if (lower.includes('on hold') || lower === 'hold') return 'on_hold';
   if (lower.includes('lease') || lower.includes('deadline') || lower.includes('must have') || lower.includes('before')) {
-    return 'lease_driven';
+    return 'near_term';
   }
   if (lower.includes('casual')) return 'casual';
   if (
     lower.includes('flexible')
+    || lower.includes('suitable')
     || lower.includes('not in a hurry')
     || lower.includes('not in a rush')
     || lower.includes('whenever')
     || lower.includes('right thing')
+    || lower.includes('right fit')
     || lower.includes('send as we see')
     || lower.includes('hot & cold')
     || lower.includes('hot and cold')
   ) {
-    return 'flexible';
+    return 'right_fit';
   }
   if (lower.includes('summer') || lower.includes('this month') || /\b\d{1,2}\/\d{1,2}/.test(lower)) {
     return 'near_term';
@@ -89,7 +98,7 @@ export function normalizeBuyerTiming(raw) {
     return 'mid_term';
   }
   if (lower.includes('year') || lower.includes('12 month')) return 'long_term';
-  return 'flexible';
+  return 'right_fit';
 }
 
 export function normalizePreapproval(raw) {

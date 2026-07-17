@@ -14,7 +14,7 @@ const TH =
 const TD = 'px-3 py-2.5 text-sm text-on-surface align-top border-b border-outline-variant/10';
 
 const SELECT =
-  'w-full max-w-[10.5rem] px-2 py-1.5 text-xs font-semibold border border-outline-variant/30 rounded-md bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary/25 cursor-pointer';
+  'w-full max-w-[11rem] -ml-1 px-1 py-1 text-xs font-semibold bg-transparent border-0 shadow-none text-on-surface cursor-pointer focus:outline-none focus:ring-0 appearance-auto';
 
 function TextCell({ children, className = '', title }) {
   return (
