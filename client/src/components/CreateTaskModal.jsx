@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import TaskDeadlineFields, { getAnchorOptionsForTransaction } from './TaskDeadlineFields';
+import { RECURRENCE_OPTIONS } from '../utils/taskRecurrence';
 
 const PRIORITY_OPTIONS = [
   { value: 'normal', label: 'Normal' },
@@ -31,6 +32,7 @@ export default function CreateTaskModal({
     assigned_to: defaultAssignedTo ? String(defaultAssignedTo) : '',
     transaction_id: defaultTransactionId ? String(defaultTransactionId) : '',
     priority: 'normal',
+    recurrence: '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -59,6 +61,7 @@ export default function CreateTaskModal({
 
     if (adminOnly) {
       payload.priority = form.priority;
+      payload.recurrence = form.recurrence || null;
     }
 
     if (showLinkedDeadline && deadlineMode === 'relative') {
@@ -139,18 +142,37 @@ export default function CreateTaskModal({
             </select>
           </div>
           {adminOnly && (
-            <div>
-              <label className="text-xs font-semibold text-on-surface-variant uppercase">Priority</label>
-              <select
-                value={form.priority}
-                onChange={(e) => setForm({ ...form, priority: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
-              >
-                {PRIORITY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
+            <>
+              <div>
+                <label className="text-xs font-semibold text-on-surface-variant uppercase">Priority</label>
+                <select
+                  value={form.priority}
+                  onChange={(e) => setForm({ ...form, priority: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
+                >
+                  {PRIORITY_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-on-surface-variant uppercase">Recurring</label>
+                <select
+                  value={form.recurrence}
+                  onChange={(e) => setForm({ ...form, recurrence: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
+                >
+                  {RECURRENCE_OPTIONS.map((opt) => (
+                    <option key={opt.value || 'none'} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                {form.recurrence && (
+                  <p className="mt-1 text-[11px] text-on-surface-variant">
+                    When you mark this complete, a new copy is created for the next due date.
+                  </p>
+                )}
+              </div>
+            </>
           )}
           {!lockTransaction && !adminOnly && (
             <div>

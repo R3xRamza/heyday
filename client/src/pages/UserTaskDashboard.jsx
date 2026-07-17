@@ -11,6 +11,7 @@ import DateText from '../components/shared/DateText';
 import TwoLineFitText from '../components/shared/TwoLineFitText';
 import { useAgentScope } from '../context/AgentScopeContext';
 import { appendAgentScope } from '../utils/agentScope';
+import { recurrenceLabel } from '../utils/taskRecurrence';
 import TaskHubPersonHeader from '../components/TaskHubPersonHeader';
 import { APP_HEADER_BORDER_CLASS } from '../constants/appHeader';
 import { shortAddress } from '../utils/format';
@@ -184,7 +185,12 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
 
     setStatusOverrides((prev) => ({ ...prev, [task.id]: nextStatus }));
 
-    const updated = await patchTask(task.id, { status: nextStatus }, { refresh: showCompleted });
+    // Refresh on complete so a newly spawned recurring admin task appears in the list.
+    const updated = await patchTask(
+      task.id,
+      { status: nextStatus },
+      { refresh: showCompleted || nextStatus === 'complete' },
+    );
     if (!updated) {
       setStatusOverrides((prev) => {
         const next = { ...prev };
@@ -399,6 +405,11 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
                             <p className={`text-sm font-semibold ${isComplete ? 'text-on-surface-variant line-through' : 'text-on-surface'}`}>
                               {task.title}
                             </p>
+                            {isAdmin && recurrenceLabel(task.recurrence) && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wide bg-sky/15 text-sky border border-sky/25">
+                                {recurrenceLabel(task.recurrence)}
+                              </span>
+                            )}
                           </div>
                           {task.description && (
                             <button
