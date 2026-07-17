@@ -115,3 +115,10 @@ select {
   background-position: right 0.625rem center;
   background-size: 1rem;
 }
+
+/* Borderless table selects: still one chevron, tighter padding */
+select.buyer-flat-select {
+  padding-right: 1.15rem !important;
+  background-position: right 0 center;
+  background-size: 0.75rem;
+}
