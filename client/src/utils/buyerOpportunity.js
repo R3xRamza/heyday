@@ -4,8 +4,8 @@ export const BUYER_STATUSES = [
   { value: 'under_contract', label: 'Under contract' },
   { value: 'option_period', label: 'Option period' },
   { value: 'active', label: 'Active' },
-  { value: 'closed', label: 'Closed' },
   { value: 'on_hold', label: 'On hold' },
+  { value: 'closed', label: 'Closed' },
 ];
 
 export const BUYER_TIMINGS = [

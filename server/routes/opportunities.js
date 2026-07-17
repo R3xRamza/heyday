@@ -100,7 +100,10 @@ router.get('/buyers', (req, res) => {
   const q = String(req.query.q || '').trim();
   const { sql: searchSql, params: searchParams } = buyerSearchClause(q);
   const status = String(req.query.status || '').trim();
-  const statusSql = status ? ' AND status = ?' : '';
+  // "All" hides closed; pick Closed filter to see them
+  const statusSql = status
+    ? ' AND status = ?'
+    : " AND lower(COALESCE(status, '')) != 'closed'";
   const statusParams = status ? [status] : [];
 
   const rows = db.prepare(`
@@ -111,8 +114,8 @@ router.get('/buyers', (req, res) => {
         WHEN 'under_contract' THEN 0
         WHEN 'option_period' THEN 1
         WHEN 'active' THEN 2
-        WHEN 'closed' THEN 3
-        WHEN 'on_hold' THEN 4
+        WHEN 'on_hold' THEN 3
+        WHEN 'closed' THEN 4
         ELSE 5
       END ASC,
       buyer_name COLLATE NOCASE ASC,
