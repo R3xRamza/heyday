@@ -1,6 +1,7 @@
 /** Canonical buyer opportunity status + preapproval helpers (client). */
 
 export const BUYER_STATUSES = [
+  { value: 'active', label: 'Active' },
   { value: 'under_contract', label: 'Under contract' },
   { value: 'option_period', label: 'Option period' },
   { value: 'closed', label: 'Closed' },
@@ -18,11 +19,11 @@ const CANONICAL_PRE = new Set(BUYER_PREAPPROVALS.map((s) => s.value));
 
 export function buyerStatusLabel(value) {
   const v = normalizeBuyerStatus(value);
-  return BUYER_STATUSES.find((s) => s.value === v)?.label || 'On hold';
+  return BUYER_STATUSES.find((s) => s.value === v)?.label || 'Active';
 }
 
 export function normalizeBuyerStatus(raw) {
-  if (raw == null || raw === '') return 'on_hold';
+  if (raw == null || raw === '') return 'active';
   const s = String(raw).trim();
   const lower = s.toLowerCase();
   if (CANONICAL_STATUS.has(lower)) return lower;
@@ -34,9 +35,9 @@ export function normalizeBuyerStatus(raw) {
     return 'on_hold';
   }
   if (/(^|\s)hold(\s|$)/.test(lower)) return 'on_hold';
-  // Active pipeline freeform (tour, etc.) → option period as closest "in motion"
   if (lower.includes('tour')) return 'option_period';
-  return 'on_hold';
+  if (lower.includes('active')) return 'active';
+  return 'active';
 }
 
 export function normalizePreapproval(raw) {

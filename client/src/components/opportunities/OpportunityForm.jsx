@@ -13,7 +13,7 @@ const LABEL = 'text-xs font-semibold text-on-surface-variant uppercase';
 const SELLER_STATUS_SUGGESTIONS = ['Upcoming', 'Pre-listing', 'LIVE', 'PRIVATE'];
 
 const emptyBuyer = {
-  status: 'on_hold',
+  status: 'active',
   buyer_name: '',
   price: '',
   location: '',
@@ -170,7 +170,7 @@ export default function OpportunityForm({
                 <Field label="Status">
                   <select
                     className={INPUT}
-                    value={form.status || 'on_hold'}
+                    value={form.status || 'active'}
                     onChange={(e) => set('status', e.target.value)}
                   >
                     {BUYER_STATUSES.map((s) => (
