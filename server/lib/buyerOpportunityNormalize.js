@@ -1,8 +1,8 @@
 /** Server-side buyer status / preapproval / price normalization. */
 
-const CANONICAL_STATUS = new Set(['active', 'under_contract', 'option_period', 'closed', 'on_hold']);
+const CANONICAL_STATUS = new Set(['active', 'pending', 'option_period', 'closed', 'on_hold']);
 const CANONICAL_TIMING = new Set([
-  'asap', 'near_term', 'mid_term', 'long_term', 'flexible', 'casual', 'lease_driven', 'on_hold',
+  'asap', 'near_term', 'mid_term', 'long_term', 'right_fit', 'casual',
 ]);
 const CANONICAL_PRE = new Set(['y', 'n', 'cash']);
 
@@ -11,8 +11,10 @@ export function normalizeBuyerStatus(raw) {
   const s = String(raw).trim();
   const lower = s.toLowerCase();
   if (CANONICAL_STATUS.has(lower)) return lower;
-  if (lower.includes('under contract')) return 'under_contract';
-  if (lower.includes('leaseback')) return 'under_contract';
+  if (lower === 'under_contract' || lower.includes('under contract') || lower.includes('leaseback')) {
+    return 'pending';
+  }
+  if (lower.includes('pending')) return 'pending';
   if (lower.includes('option')) return 'option_period';
   if (/\bclosed\b/.test(lower) || lower === 'close') return 'closed';
   if (lower.includes('on hold') || lower.includes('paused') || lower.includes('unresponsive')) {
@@ -29,24 +31,28 @@ export function normalizeBuyerTiming(raw) {
   const s = String(raw).trim();
   const lower = s.toLowerCase();
   if (CANONICAL_TIMING.has(lower)) return lower;
-  if (lower === '?' || lower === 'x') return 'flexible';
+  if (lower === 'flexible') return 'right_fit';
+  if (lower === 'lease_driven') return 'near_term';
+  if (lower === 'on_hold') return 'casual';
+  if (lower === '?' || lower === 'x') return 'right_fit';
   if (lower.includes('asap')) return 'asap';
-  if (lower.includes('on hold') || lower === 'hold') return 'on_hold';
   if (lower.includes('lease') || lower.includes('deadline') || lower.includes('must have') || lower.includes('before')) {
-    return 'lease_driven';
+    return 'near_term';
   }
   if (lower.includes('casual')) return 'casual';
   if (
     lower.includes('flexible')
+    || lower.includes('suitable')
     || lower.includes('not in a hurry')
     || lower.includes('not in a rush')
     || lower.includes('whenever')
     || lower.includes('right thing')
+    || lower.includes('right fit')
     || lower.includes('send as we see')
     || lower.includes('hot & cold')
     || lower.includes('hot and cold')
   ) {
-    return 'flexible';
+    return 'right_fit';
   }
   if (lower.includes('summer') || lower.includes('this month') || /\b\d{1,2}\/\d{1,2}/.test(lower)) {
     return 'near_term';
@@ -55,7 +61,7 @@ export function normalizeBuyerTiming(raw) {
     return 'mid_term';
   }
   if (lower.includes('year') || lower.includes('12 month')) return 'long_term';
-  return 'flexible';
+  return 'right_fit';
 }
 
 export function normalizePreapproval(raw) {

@@ -111,6 +111,7 @@ router.get('/buyers', (req, res) => {
     WHERE 1=1 ${scopeSql} ${searchSql} ${statusSql}
     ORDER BY
       CASE lower(COALESCE(status, ''))
+        WHEN 'pending' THEN 0
         WHEN 'under_contract' THEN 0
         WHEN 'option_period' THEN 1
         WHEN 'active' THEN 2
