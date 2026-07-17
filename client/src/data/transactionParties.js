@@ -2,6 +2,7 @@ import {
   normalizeSaleType,
   SALE_TYPE_TRADITIONAL,
   SALE_TYPE_RENT_LEASE,
+  SALE_TYPE_REFERRAL,
 } from '../constants/transactionForm';
 
 export const FIXED_PARTY_ROLES = {
@@ -65,6 +66,11 @@ export function labelForPartyRole(role) {
 
 export function isTraditionalSale(saleType, representing) {
   return normalizeSaleType(saleType, representing) === SALE_TYPE_TRADITIONAL;
+}
+
+export function isSimplePartySale(saleType, representing) {
+  const normalized = normalizeSaleType(saleType, representing);
+  return normalized === SALE_TYPE_RENT_LEASE || normalized === SALE_TYPE_REFERRAL;
 }
 
 export function fixedRolesForSaleType(saleType, representing) {
@@ -150,8 +156,8 @@ export function composePartyRows(transaction, parties = [], agentName = '') {
     .filter((p) => {
       const n = normalizePartyRole(p.role);
       if (fixedKeys.has(n)) return false;
-      // Hide traditional-only slots on rent/lease UI (still stored)
-      if (saleType === SALE_TYPE_RENT_LEASE && ALL_FIXED.has(n) && !fixedKeys.has(n)) {
+      // Hide traditional-only slots on rent/lease and referral UI (still stored)
+      if (isSimplePartySale(saleType, transaction?.representing) && ALL_FIXED.has(n) && !fixedKeys.has(n)) {
         return false;
       }
       return true;
@@ -181,4 +187,4 @@ export function buildFallbackParties(transaction, agentName = '') {
   }));
 }
 
-export { SALE_TYPE_TRADITIONAL, SALE_TYPE_RENT_LEASE };
+export { SALE_TYPE_TRADITIONAL, SALE_TYPE_RENT_LEASE, SALE_TYPE_REFERRAL };

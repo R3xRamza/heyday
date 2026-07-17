@@ -1,3 +1,5 @@
+import { SALE_TYPE_REFERRAL, normalizeSaleType } from './partyRoles.js';
+
 const BASE_REQUIRED = ['address', 'city', 'state', 'zip'];
 
 const REQUIRED_BY_REPRESENTING = {
@@ -35,8 +37,11 @@ export function normalizeListingVisibility(value) {
   return 'public';
 }
 
-export function getRequiredTransactionFields(representing, listingVisibility) {
+export function getRequiredTransactionFields(representing, listingVisibility, saleType) {
   if (normalizeListingVisibility(listingVisibility) === 'coming_soon') {
+    return [...BASE_REQUIRED];
+  }
+  if (normalizeSaleType(saleType, representing) === SALE_TYPE_REFERRAL) {
     return [...BASE_REQUIRED];
   }
   const r = normalizeRepresenting(representing);
@@ -49,7 +54,7 @@ function isEmpty(value) {
 
 export function validateTransactionFields(record) {
   const required = [
-    ...getRequiredTransactionFields(record.representing, record.listing_visibility),
+    ...getRequiredTransactionFields(record.representing, record.listing_visibility, record.sale_type),
     'agent_id',
   ];
   const missing = required.filter((key) => isEmpty(record[key]));
@@ -79,7 +84,7 @@ export function shouldValidateSetupCompletion(body, before) {
 export function mergeTransactionForValidation(before, body) {
   const merged = { ...before };
   const keys = [
-    'address', 'city', 'state', 'zip', 'representing', 'listing_visibility',
+    'address', 'city', 'state', 'zip', 'representing', 'listing_visibility', 'sale_type',
     'listing_date', 'important_date', 'close_date', 'acceptance_date', 'option_end_date',
     'agent_id',
   ];

@@ -3,6 +3,7 @@ import { clearTransactionData } from './transactionSeed.js';
 
 const SALE_TYPE_TRADITIONAL = 'Traditional sale';
 const SALE_TYPE_RENT_LEASE = 'Rent/lease';
+const SALE_TYPE_REFERRAL = 'Referral';
 
 const DEAL_AGENT_FIRST_NAMES = ['meredith', 'tessa'];
 
@@ -46,7 +47,9 @@ export function mapBrokermintRepresenting(representing, transactionType) {
 }
 
 export function mapBrokermintSaleType(transactionType) {
-  return isRentLease(transactionType) ? SALE_TYPE_RENT_LEASE : SALE_TYPE_TRADITIONAL;
+  if (isRentLease(transactionType)) return SALE_TYPE_RENT_LEASE;
+  if (String(transactionType || '').toLowerCase().includes('referral')) return SALE_TYPE_REFERRAL;
+  return SALE_TYPE_TRADITIONAL;
 }
 
 export function mapBrokermintStage(status) {

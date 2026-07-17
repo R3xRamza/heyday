@@ -62,10 +62,12 @@ export function isDualCounterpartyRepresenting(representing) {
 
 export const SALE_TYPE_TRADITIONAL = 'Traditional sale';
 export const SALE_TYPE_RENT_LEASE = 'Rent/lease';
+export const SALE_TYPE_REFERRAL = 'Referral';
 
 export const SALE_TYPE_OPTIONS = [
   { value: SALE_TYPE_TRADITIONAL, label: 'Traditional sale' },
   { value: SALE_TYPE_RENT_LEASE, label: 'Rent/lease' },
+  { value: SALE_TYPE_REFERRAL, label: 'Referral' },
 ];
 
 /** Sale type from representing: buyer/seller → traditional; landlord/tenant → rent/lease */
@@ -81,6 +83,7 @@ export function normalizeSaleType(value, representing) {
   }
   const lower = String(value).toLowerCase();
   if (lower.includes('rent') || lower.includes('lease')) return SALE_TYPE_RENT_LEASE;
+  if (lower.includes('referral')) return SALE_TYPE_REFERRAL;
   return SALE_TYPE_TRADITIONAL;
 }
 
@@ -218,8 +221,11 @@ export const FIELD_LABELS = {
   listing_visibility: 'Listing status',
 };
 
-export function getRequiredTransactionFields(representing, listingVisibility) {
+export function getRequiredTransactionFields(representing, listingVisibility, saleType) {
   if (normalizeListingVisibility(listingVisibility) === 'coming_soon') {
+    return [...BASE_REQUIRED];
+  }
+  if (normalizeSaleType(saleType, representing) === SALE_TYPE_REFERRAL) {
     return [...BASE_REQUIRED];
   }
   const r = normalizeRepresenting(representing);
@@ -246,7 +252,7 @@ export function validateCreateTransaction(form) {
 
 export function validateTransactionFields(form) {
   const required = [
-    ...getRequiredTransactionFields(form.representing, form.listing_visibility),
+    ...getRequiredTransactionFields(form.representing, form.listing_visibility, form.sale_type),
     'agent_id',
   ];
   const missing = required.filter((key) => isEmpty(form[key]));

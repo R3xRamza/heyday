@@ -2,6 +2,7 @@
 
 export const SALE_TYPE_TRADITIONAL = 'Traditional sale';
 export const SALE_TYPE_RENT_LEASE = 'Rent/lease';
+export const SALE_TYPE_REFERRAL = 'Referral';
 
 export const FIXED_PARTY_ROLES = {
   traditional: [
@@ -37,6 +38,7 @@ export function normalizeSaleType(value, representing) {
   if (value && String(value).trim()) {
     const lower = String(value).toLowerCase();
     if (lower.includes('rent') || lower.includes('lease')) return SALE_TYPE_RENT_LEASE;
+    if (lower.includes('referral')) return SALE_TYPE_REFERRAL;
     return SALE_TYPE_TRADITIONAL;
   }
   const r = representing || 'seller';
@@ -48,6 +50,12 @@ export function normalizeSaleType(value, representing) {
 
 export function isTraditionalSale(saleType, representing) {
   return normalizeSaleType(saleType, representing) === SALE_TYPE_TRADITIONAL;
+}
+
+/** Rent/lease and Referral use Agent + Client only. */
+export function isSimplePartySale(saleType, representing) {
+  const normalized = normalizeSaleType(saleType, representing);
+  return normalized === SALE_TYPE_RENT_LEASE || normalized === SALE_TYPE_REFERRAL;
 }
 
 export function fixedRolesForSaleType(saleType, representing) {

@@ -99,13 +99,22 @@ function todayYmd() {
   return `${y}-${mo}-${d}`;
 }
 
+const MEREDITH_EMAIL = 'meredith@theheydaygroup.com';
+
+function isMeredithAgent(agentId) {
+  if (agentId == null || agentId === '') return false;
+  const row = db.prepare('SELECT email FROM users WHERE id = ?').get(Number(agentId));
+  return String(row?.email || '').toLowerCase() === MEREDITH_EMAIL;
+}
+
 function buildCommissionSummary(tx) {
   const dealDate = tx.close_date || todayYmd();
   const window = anniversaryWindowForDate(dealDate);
   const agentId = tx.agent_id != null ? Number(tx.agent_id) : null;
+  const appliesMeredithPlan = isMeredithAgent(agentId);
 
   let peers = [];
-  if (agentId) {
+  if (appliesMeredithPlan && agentId) {
     peers = db.prepare(`
       SELECT id, close_date, gross_commission, commission_custom_fees,
         stage, address, value
@@ -122,7 +131,9 @@ function buildCommissionSummary(tx) {
     return dealSortsBefore(p, tx, dealDate);
   });
 
-  const priorRun = computeYearCommissions(prior);
+  const priorRun = appliesMeredithPlan
+    ? computeYearCommissions(prior)
+    : { results: [], capPaid: 0, riskPaid: 0, cappedFeesPaid: 0 };
   const gciMode = normalizeGciMode(tx.commission_gci_mode);
   const gciPercent = tx.commission_gci_percent != null && tx.commission_gci_percent !== ''
     ? Number(tx.commission_gci_percent)
@@ -137,6 +148,7 @@ function buildCommissionSummary(tx) {
 
   const overrides = {
     customFees: tx.commission_custom_fees,
+    applyPlanFees: appliesMeredithPlan,
   };
 
   const ytdBefore = {
@@ -149,21 +161,31 @@ function buildCommissionSummary(tx) {
     ? computeDealCommission(gci, ytdBefore, overrides)
     : null;
 
-  const capPaid = breakdown ? breakdown.capPaidAfter : priorRun.capPaid;
-  const riskPaid = breakdown ? breakdown.riskPaidAfter : priorRun.riskPaid;
-  const cappedFeesPaid = breakdown ? breakdown.cappedFeesPaidAfter : priorRun.cappedFeesPaid;
-  const afterCap = capPaid >= COMMISSION_SETTINGS.capAmount
-    || (breakdown ? breakdown.plan === 'after_cap' : priorRun.capPaid >= COMMISSION_SETTINGS.capAmount);
+  const capPaid = appliesMeredithPlan
+    ? (breakdown ? breakdown.capPaidAfter : priorRun.capPaid)
+    : null;
+  const riskPaid = appliesMeredithPlan
+    ? (breakdown ? breakdown.riskPaidAfter : priorRun.riskPaid)
+    : null;
+  const cappedFeesPaid = appliesMeredithPlan
+    ? (breakdown ? breakdown.cappedFeesPaidAfter : priorRun.cappedFeesPaid)
+    : null;
+  const afterCap = appliesMeredithPlan && (
+    capPaid >= COMMISSION_SETTINGS.capAmount
+    || (breakdown ? breakdown.plan === 'after_cap' : priorRun.capPaid >= COMMISSION_SETTINGS.capAmount)
+  );
 
-  // For rate display when after cap but this deal has no GCI yet:
-  const displayCappedFeeRate = afterCap
-    ? (priorRun.cappedFeesPaid >= COMMISSION_SETTINGS.cappedFeesStepDownAt
-      ? COMMISSION_SETTINGS.cappedTransactionFeeReduced
-      : COMMISSION_SETTINGS.cappedTransactionFee)
-    : (breakdown?.cappedFee || 0);
+  const displayCappedFeeRate = !appliesMeredithPlan
+    ? null
+    : afterCap
+      ? (priorRun.cappedFeesPaid >= COMMISSION_SETTINGS.cappedFeesStepDownAt
+        ? COMMISSION_SETTINGS.cappedTransactionFeeReduced
+        : COMMISSION_SETTINGS.cappedTransactionFee)
+      : (breakdown?.cappedFee || 0);
 
   return {
     settings: COMMISSION_SETTINGS,
+    applies_meredith_plan: appliesMeredithPlan,
     anniversary: {
       start: window.start,
       end: window.end,
@@ -179,13 +201,17 @@ function buildCommissionSummary(tx) {
     breakdown,
     progress: {
       capPaid,
-      capAmount: COMMISSION_SETTINGS.capAmount,
+      capAmount: appliesMeredithPlan ? COMMISSION_SETTINGS.capAmount : null,
       riskPaid,
-      riskCap: COMMISSION_SETTINGS.riskManagementAnnualCap,
+      riskCap: appliesMeredithPlan ? COMMISSION_SETTINGS.riskManagementAnnualCap : null,
       cappedFeesPaid,
-      cappedFeesStepDownAt: COMMISSION_SETTINGS.cappedFeesStepDownAt,
-      cappedFeeRate: breakdown ? (breakdown.cappedFee || displayCappedFeeRate) : displayCappedFeeRate,
-      plan: breakdown?.plan || (priorRun.capPaid >= COMMISSION_SETTINGS.capAmount ? 'after_cap' : 'before_cap'),
+      cappedFeesStepDownAt: appliesMeredithPlan ? COMMISSION_SETTINGS.cappedFeesStepDownAt : null,
+      cappedFeeRate: breakdown && appliesMeredithPlan
+        ? (breakdown.cappedFee || displayCappedFeeRate)
+        : displayCappedFeeRate,
+      plan: appliesMeredithPlan
+        ? (breakdown?.plan || (priorRun.capPaid >= COMMISSION_SETTINGS.capAmount ? 'after_cap' : 'before_cap'))
+        : null,
     },
     ytdBefore,
   };

@@ -5,7 +5,7 @@ import {
   labelForPartyRole,
   isCustomPartyRole,
   customRoleLabel,
-  SALE_TYPE_RENT_LEASE,
+  isSimplePartySale,
   validateParties,
 } from './partyRoles.js';
 
@@ -15,6 +15,7 @@ export {
   normalizePartyRole,
   normalizeSaleType,
   isTraditionalSale,
+  isSimplePartySale,
   labelForPartyRole,
   fixedRolesForSaleType,
   customRoleKey,
@@ -139,7 +140,7 @@ function enrichPartyRow(row, transaction, db) {
   }
 
   const isFixedVisible = Boolean(fixedDef);
-  const isHiddenTraditionalOnRent = saleType === SALE_TYPE_RENT_LEASE
+  const isHiddenTraditionalOnSimple = isSimplePartySale(saleType, transaction.representing)
     && ['escrow_officer', 'cooperating_agent', 'lender'].includes(normalized);
 
   return {
@@ -150,7 +151,7 @@ function enrichPartyRow(row, transaction, db) {
     label: fixedDef?.label || labelForPartyRole(role),
     is_team: normalized === 'agent' || Boolean(fixedDef?.isTeam),
     is_fixed: isFixedVisible,
-    hidden: isHiddenTraditionalOnRent,
+    hidden: isHiddenTraditionalOnSimple,
   };
 }
 
