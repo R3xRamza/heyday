@@ -1,4 +1,3 @@
-import { ChevronDown } from 'lucide-react';
 import {
   BUYER_PREAPPROVALS,
   BUYER_STATUSES,
@@ -14,30 +13,15 @@ const TH =
   'px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-on-surface-variant whitespace-nowrap bg-surface-container-low sticky top-0 z-10 border-b border-outline-variant/20';
 const TD = 'px-3 py-2.5 text-sm text-on-surface align-top border-b border-outline-variant/10';
 
+/** Borderless; single chevron from global select CSS (index.css). */
 const SELECT =
-  'w-full min-w-0 pl-0 pr-5 py-1 text-xs font-semibold bg-transparent border-0 shadow-none text-on-surface cursor-pointer focus:outline-none focus:ring-0 appearance-none [-webkit-appearance:none] [-moz-appearance:none]';
+  'buyer-flat-select w-full min-w-0 max-w-[11rem] -ml-1 pl-0 py-1 text-xs font-semibold bg-transparent border-0 shadow-none text-on-surface cursor-pointer focus:outline-none focus:ring-0';
 
 function TextCell({ children, className = '', title }) {
   return (
     <td className={`${TD} text-on-surface-variant ${className}`} title={title || undefined}>
       <span className="line-clamp-2">{children || '—'}</span>
     </td>
-  );
-}
-
-function FlatSelect({ className = '', children, ...props }) {
-  return (
-    <div className={`relative inline-flex w-full max-w-[11rem] items-center ${className}`}>
-      <select className={SELECT} {...props}>
-        {children}
-      </select>
-      <ChevronDown
-        size={12}
-        strokeWidth={2.5}
-        className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-on-surface-variant shrink-0"
-        aria-hidden
-      />
-    </div>
   );
 }
 
@@ -90,7 +74,8 @@ export default function BuyerOpportunitiesTable({ rows, onEdit, onPatch }) {
                   <span className="line-clamp-2">{row.buyer_name}</span>
                 </td>
                 <td className={TD} onClick={(e) => e.stopPropagation()}>
-                  <FlatSelect
+                  <select
+                    className={SELECT}
                     value={status}
                     aria-label="Status"
                     onChange={(e) => onPatch(row.id, { status: e.target.value })}
@@ -98,12 +83,13 @@ export default function BuyerOpportunitiesTable({ rows, onEdit, onPatch }) {
                     {BUYER_STATUSES.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
-                  </FlatSelect>
+                  </select>
                 </td>
                 <TextCell title={priceLabel}>{priceLabel}</TextCell>
                 <TextCell title={row.location}>{row.location}</TextCell>
                 <td className={TD} onClick={(e) => e.stopPropagation()}>
-                  <FlatSelect
+                  <select
+                    className={SELECT}
                     value={timing}
                     aria-label="Timing"
                     onChange={(e) => onPatch(row.id, { timing: e.target.value || null })}
@@ -112,7 +98,7 @@ export default function BuyerOpportunitiesTable({ rows, onEdit, onPatch }) {
                     {BUYER_TIMINGS.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
-                  </FlatSelect>
+                  </select>
                 </td>
                 <td className={`${TD} text-on-surface`} title={row.notes || undefined}>
                   {row.notes ? (
@@ -124,7 +110,8 @@ export default function BuyerOpportunitiesTable({ rows, onEdit, onPatch }) {
                   )}
                 </td>
                 <td className={TD} onClick={(e) => e.stopPropagation()}>
-                  <FlatSelect
+                  <select
+                    className={SELECT}
                     value={pre}
                     aria-label="Pre approved"
                     onChange={(e) => onPatch(row.id, { preapproval: e.target.value })}
@@ -135,7 +122,7 @@ export default function BuyerOpportunitiesTable({ rows, onEdit, onPatch }) {
                     {BUYER_PREAPPROVALS.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
-                  </FlatSelect>
+                  </select>
                 </td>
               </tr>
             );
