@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Icon from '../shared/Icon';
 import { formatCurrency } from '../../utils/format';
+import { useAgentScope } from '../../context/AgentScopeContext';
+import { appendAgentScope } from '../../utils/agentScope';
 
 function formatMoney(value) {
   if (value == null || Number.isNaN(Number(value))) return '—';
@@ -119,6 +121,7 @@ function newFeeId() {
 }
 
 export default function TransactionCommission({ transactionId, salesPrice, onTransactionPatch }) {
+  const { scope } = useAgentScope();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -139,7 +142,10 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
 
   const load = useCallback(async () => {
     setError('');
-    const res = await fetch(`/api/transactions/${transactionId}/commission`, { credentials: 'include' });
+    const res = await fetch(
+      appendAgentScope(`/api/transactions/${transactionId}/commission`, scope),
+      { credentials: 'include' },
+    );
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
       setError(json.error || 'Could not load commission');
@@ -149,7 +155,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
     const json = await res.json();
     applyServer(json);
     setLoading(false);
-  }, [transactionId, applyServer]);
+  }, [transactionId, scope, applyServer]);
 
   useEffect(() => {
     setLoading(true);
@@ -165,12 +171,15 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   const persist = useCallback(async (patch) => {
     setSaving(true);
     setError('');
-    const res = await fetch(`/api/transactions/${transactionId}/commission`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(patch),
-    });
+    const res = await fetch(
+      appendAgentScope(`/api/transactions/${transactionId}/commission`, scope),
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(patch),
+      },
+    );
     const json = await res.json().catch(() => ({}));
     setSaving(false);
     if (!res.ok) {
@@ -181,7 +190,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
     if (onTransactionPatch && json.gross_commission !== undefined) {
       onTransactionPatch({ gross_commission: json.gross_commission });
     }
-  }, [transactionId, onTransactionPatch, applyServer]);
+  }, [transactionId, scope, onTransactionPatch, applyServer]);
 
   function schedulePersist(patch) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -200,6 +209,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   const breakdown = data?.breakdown;
   const anniversary = data?.anniversary;
   const price = salesPrice ?? data?.sales_price;
+  const appliesMeredithPlan = data?.applies_meredith_plan === true;
 
   function switchGciMode(nextMode) {
     if (nextMode === gciMode) return;
@@ -271,60 +281,64 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
             />
           </div>
 
-          <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive border-l-4 border-l-secondary">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-              <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
-                Anniversary Year
-              </h3>
-              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide ${
-                progress?.plan === 'after_cap'
-                  ? 'bg-secondary/15 text-secondary'
-                  : 'bg-primary-container/15 text-primary-container'
-              }`}
-              >
-                {progress?.plan === 'after_cap' ? 'After cap' : 'Before cap'}
-              </span>
-            </div>
-            <p className="text-sm text-primary font-semibold mb-4">
-              {formatDateLabel(anniversary?.start)} – {formatDateLabel(anniversary?.end)}
-            </p>
+          {appliesMeredithPlan && (
+            <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive border-l-4 border-l-secondary">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                  Anniversary Year
+                </h3>
+                {progress?.plan && (
+                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide ${
+                    progress.plan === 'after_cap'
+                      ? 'bg-secondary/15 text-secondary'
+                      : 'bg-primary-container/15 text-primary-container'
+                  }`}
+                  >
+                    {progress.plan === 'after_cap' ? 'After cap' : 'Before cap'}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-primary font-semibold mb-4">
+                {formatDateLabel(anniversary?.start)} – {formatDateLabel(anniversary?.end)}
+              </p>
 
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-on-surface-variant font-semibold">eXp split paid</span>
-                  <span className="tabular-nums font-bold text-primary">
-                    {formatMoney(progress?.capPaid)} / {formatMoney(progress?.capAmount)}
-                  </span>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-on-surface-variant font-semibold">eXp split paid</span>
+                    <span className="tabular-nums font-bold text-primary">
+                      {formatMoney(progress?.capPaid)} / {formatMoney(progress?.capAmount)}
+                    </span>
+                  </div>
+                  <ProgressBar value={progress?.capPaid || 0} max={progress?.capAmount || 16000} tone="feather" />
                 </div>
-                <ProgressBar value={progress?.capPaid || 0} max={progress?.capAmount || 16000} tone="feather" />
-              </div>
-              <div>
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-on-surface-variant font-semibold">Risk management</span>
-                  <span className="tabular-nums font-bold text-primary">
-                    {formatMoney(progress?.riskPaid)} / {formatMoney(progress?.riskCap)}
-                  </span>
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-on-surface-variant font-semibold">Risk management</span>
+                    <span className="tabular-nums font-bold text-primary">
+                      {formatMoney(progress?.riskPaid)} / {formatMoney(progress?.riskCap)}
+                    </span>
+                  </div>
+                  <ProgressBar value={progress?.riskPaid || 0} max={progress?.riskCap || 750} />
                 </div>
-                <ProgressBar value={progress?.riskPaid || 0} max={progress?.riskCap || 750} />
-              </div>
-              <div>
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-on-surface-variant font-semibold">Capped-trans fees</span>
-                  <span className="tabular-nums font-bold text-primary">
-                    {formatMoney(progress?.cappedFeesPaid)} / {formatMoney(progress?.cappedFeesStepDownAt)}
-                  </span>
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-on-surface-variant font-semibold">Capped-trans fees</span>
+                    <span className="tabular-nums font-bold text-primary">
+                      {formatMoney(progress?.cappedFeesPaid)} / {formatMoney(progress?.cappedFeesStepDownAt)}
+                    </span>
+                  </div>
+                  <ProgressBar value={progress?.cappedFeesPaid || 0} max={progress?.cappedFeesStepDownAt || 5000} tone="lemon" />
+                  <p className="text-[11px] text-on-surface-variant mt-2">
+                    Current capped fee rate:{' '}
+                    <span className="font-semibold text-primary">
+                      {progress?.plan === 'after_cap' ? formatMoney(progress?.cappedFeeRate || 250) : '— (before cap)'}
+                    </span>
+                  </p>
                 </div>
-                <ProgressBar value={progress?.cappedFeesPaid || 0} max={progress?.cappedFeesStepDownAt || 5000} tone="lemon" />
-                <p className="text-[11px] text-on-surface-variant mt-2">
-                  Current capped fee rate:{' '}
-                  <span className="font-semibold text-primary">
-                    {progress?.plan === 'after_cap' ? formatMoney(progress?.cappedFeeRate || 250) : '— (before cap)'}
-                  </span>
-                </p>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="col-span-12 lg:col-span-7">
@@ -348,18 +362,20 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                   <span>Gross commission</span>
                   <span className="tabular-nums">{formatMoney(breakdown.gci)}</span>
                 </div>
-                <ul className="space-y-2 border-t border-outline-variant/10 pt-3">
-                  {breakdown.lines
-                    .filter((line) => !String(line.key).startsWith('custom_'))
-                    .map((line) => (
-                      <li key={line.key} className="flex justify-between text-sm gap-4">
-                        <span className="text-on-surface-variant">{line.label}</span>
-                        <span className={`tabular-nums font-semibold shrink-0 ${line.amount < 0 ? 'text-error' : 'text-on-surface-variant'}`}>
-                          {line.amount === 0 ? '$0' : formatMoney(line.amount)}
-                        </span>
-                      </li>
-                    ))}
-                </ul>
+                {appliesMeredithPlan && (
+                  <ul className="space-y-2 border-t border-outline-variant/10 pt-3">
+                    {breakdown.lines
+                      .filter((line) => !String(line.key).startsWith('custom_'))
+                      .map((line) => (
+                        <li key={line.key} className="flex justify-between text-sm gap-4">
+                          <span className="text-on-surface-variant">{line.label}</span>
+                          <span className={`tabular-nums font-semibold shrink-0 ${line.amount < 0 ? 'text-error' : 'text-on-surface-variant'}`}>
+                            {line.amount === 0 ? '$0' : formatMoney(line.amount)}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                )}
               </>
             )}
 
@@ -454,22 +470,26 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
 
             {breakdown && (
               <div className="mt-5 pt-4 border-t border-outline-variant/15 space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Post-split</span>
-                  <span className="tabular-nums font-bold text-primary">{formatMoney(breakdown.postSplit)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Total fees</span>
-                  <span className="tabular-nums font-bold text-primary">
-                    {formatMoney(breakdown.fixedFees + breakdown.customSum)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Team splits</span>
-                  <span className="tabular-nums font-bold text-primary">{formatMoney(breakdown.teamSplits)}</span>
-                </div>
-                <div className="flex justify-between text-base font-black text-secondary pt-2 border-t border-primary/10">
-                  <span>Net to Meredith</span>
+                {appliesMeredithPlan && (
+                  <>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Post-split</span>
+                      <span className="tabular-nums font-bold text-primary">{formatMoney(breakdown.postSplit)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Total fees</span>
+                      <span className="tabular-nums font-bold text-primary">
+                        {formatMoney(breakdown.fixedFees + breakdown.customSum)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Team splits</span>
+                      <span className="tabular-nums font-bold text-primary">{formatMoney(breakdown.teamSplits)}</span>
+                    </div>
+                  </>
+                )}
+                <div className={`flex justify-between text-base font-black text-secondary ${appliesMeredithPlan ? 'pt-2 border-t border-primary/10' : ''}`}>
+                  <span>{appliesMeredithPlan ? 'Net to Meredith' : 'Net'}</span>
                   <span className="tabular-nums">{formatMoney(breakdown.net)}</span>
                 </div>
               </div>

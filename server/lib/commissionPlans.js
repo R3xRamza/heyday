@@ -151,12 +151,14 @@ function normalizeYtd(startingYtd = {}) {
 /**
  * Compute one deal's commission breakdown.
  * Sliding scale takes 20% of GCI to eXp, but never more than remaining cap room.
+ * Set overrides.applyPlanFees = false for non-Meredith agents (no eXp / team fees).
  */
 export function computeDealCommission(gci, startingYtd = {}, overrides = {}, settings = COMMISSION_SETTINGS) {
+  const applyPlanFees = overrides.applyPlanFees !== false;
   const ytd = normalizeYtd(startingYtd);
-  const capPaidBefore = ytd.capPaid;
-  const riskPaidBefore = ytd.riskPaid;
-  const cappedFeesPaidBefore = ytd.cappedFeesPaid;
+  const capPaidBefore = applyPlanFees ? ytd.capPaid : 0;
+  const riskPaidBefore = applyPlanFees ? ytd.riskPaid : 0;
+  const cappedFeesPaidBefore = applyPlanFees ? ytd.cappedFeesPaid : 0;
 
   const customFees = parseCustomFees(overrides.customFees);
   const gciN = round2(Number(gci) || 0);
@@ -165,6 +167,39 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, set
     dollars: customFeeDollars(fee, gciN),
   }));
   const customSum = round2(resolvedFees.reduce((sum, f) => sum + f.dollars, 0));
+
+  if (!applyPlanFees) {
+    const lines = [];
+    for (const fee of resolvedFees) {
+      if (!fee.label && !(fee.dollars > 0)) continue;
+      const pctLabel = fee.unit === 'percent' ? ` (${fee.amount}%)` : '';
+      lines.push({
+        key: `custom_${fee.id}`,
+        label: `${fee.label || 'Custom fee'}${pctLabel}`,
+        amount: -fee.dollars,
+      });
+    }
+    return {
+      plan: null,
+      applyPlanFees: false,
+      gci: gciN,
+      expSplit: 0,
+      postSplit: gciN,
+      riskFee: 0,
+      brokerReview: 0,
+      cappedFee: 0,
+      tessa: 0,
+      margaret: 0,
+      customSum,
+      fixedFees: 0,
+      teamSplits: 0,
+      net: round2(gciN - customSum),
+      capPaidAfter: 0,
+      riskPaidAfter: 0,
+      cappedFeesPaidAfter: 0,
+      lines,
+    };
+  }
 
   const capRemaining = Math.max(0, round2(settings.capAmount - capPaidBefore));
   const beforeCap = capRemaining > 0;
@@ -223,6 +258,7 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, set
 
   return {
     plan: beforeCap ? 'before_cap' : 'after_cap',
+    applyPlanFees: true,
     gci: gciN,
     expSplit,
     postSplit,

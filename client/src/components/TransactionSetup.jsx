@@ -14,6 +14,7 @@ import {
   validateTransactionFields,
   FIELD_LABELS,
   SALE_TYPE_OPTIONS,
+  SALE_TYPE_REFERRAL,
   saleTypeForRepresenting,
   normalizeSaleType,
   isDualCounterpartyRepresenting,
@@ -57,7 +58,12 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
   const [validationError, setValidationError] = useState('');
   const [cancelError, setCancelError] = useState('');
 
-  const requiredFields = getRequiredTransactionFields(form.representing, form.listing_visibility);
+  const isReferralSale = normalizeSaleType(form.sale_type, form.representing) === SALE_TYPE_REFERRAL;
+  const requiredFields = getRequiredTransactionFields(
+    form.representing,
+    form.listing_visibility,
+    form.sale_type,
+  );
   const isRequired = (key) => requiredFields.includes(key);
 
   function fieldLabel(key, fallback) {
@@ -207,7 +213,23 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
   }
 
   async function applyTemplates() {
-    if (selectedTemplateIds.length === 0) return;
+    if (selectedTemplateIds.length === 0) {
+      if (!isReferralSale) return;
+      setSaving(true);
+      setValidationError('');
+      const res = await fetch(
+        appendAgentScope(`/api/transactions/${transaction.id}/complete-setup`, scope),
+        { method: 'POST', credentials: 'include' },
+      );
+      const json = await res.json();
+      setSaving(false);
+      if (res.ok) {
+        onComplete(json.transaction);
+      } else {
+        setValidationError(json.error || 'Could not complete setup. Fill Agent and Client under parties.');
+      }
+      return;
+    }
     setSaving(true);
     const res = await fetch(appendAgentScope(`/api/transactions/${transaction.id}/apply-checklists`, scope), {
       method: 'POST',
@@ -529,8 +551,15 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
         <div className="w-full bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4">
           <h2 className="text-xl font-bold text-primary">Pick Task Templates</h2>
           <p className="text-sm text-on-surface-variant">
-            Select one or more checklists. Tasks merge without duplicates.
+            {isReferralSale
+              ? 'Optional for referrals — select checklists if you want tasks, or continue without.'
+              : 'Select one or more checklists. Tasks merge without duplicates.'}
           </p>
+          {validationError && step === 'template' && (
+            <p className="text-sm text-error font-medium bg-error/10 border border-error/20 rounded-lg px-3 py-2" role="alert">
+              {validationError}
+            </p>
+          )}
           <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
             {templates.map((t) => {
               const checked = selectedTemplateIds.includes(t.id);
@@ -567,10 +596,16 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
             <button
               type="button"
               onClick={applyTemplates}
-              disabled={selectedTemplateIds.length === 0 || saving}
+              disabled={(!isReferralSale && selectedTemplateIds.length === 0) || saving}
               className="flex-1 py-3 bg-lemon text-feather font-bold rounded-lg disabled:opacity-50"
             >
-              {saving ? 'Applying…' : `Apply ${selectedTemplateIds.length || ''} Template(s) →`}
+              {saving
+                ? (selectedTemplateIds.length === 0 ? 'Launching…' : 'Applying…')
+                : selectedTemplateIds.length > 0
+                  ? `Apply ${selectedTemplateIds.length} Template(s) →`
+                  : isReferralSale
+                    ? 'Skip Checklist & Launch →'
+                    : 'Apply Template(s) →'}
             </button>
           </div>
         </div>
