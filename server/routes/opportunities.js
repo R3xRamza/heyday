@@ -106,7 +106,17 @@ router.get('/buyers', (req, res) => {
   const rows = db.prepare(`
     SELECT * FROM opportunity_buyers
     WHERE 1=1 ${scopeSql} ${searchSql} ${statusSql}
-    ORDER BY datetime(updated_at) DESC, id DESC
+    ORDER BY
+      CASE lower(COALESCE(status, ''))
+        WHEN 'under_contract' THEN 0
+        WHEN 'option_period' THEN 1
+        WHEN 'active' THEN 2
+        WHEN 'closed' THEN 3
+        WHEN 'on_hold' THEN 4
+        ELSE 5
+      END ASC,
+      buyer_name COLLATE NOCASE ASC,
+      id ASC
   `).all(...scopeParams, ...searchParams, ...statusParams);
 
   res.json({ buyers: rows });
