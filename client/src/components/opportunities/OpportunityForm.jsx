@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import {
   BUYER_PREAPPROVALS,
   BUYER_STATUSES,
+  BUYER_TIMINGS,
   normalizeBuyerStatus,
+  normalizeBuyerTiming,
   normalizePreapproval,
   parsePriceAmount,
 } from '../../utils/buyerOpportunity';
@@ -59,6 +61,7 @@ function initBuyerForm(initial) {
   return {
     ...base,
     status: normalizeBuyerStatus(base.status),
+    timing: normalizeBuyerTiming(base.timing) || '',
     preapproval: normalizePreapproval(base.preapproval),
     priceMode: isRange ? 'range' : 'single',
     priceSingle: isRange
@@ -281,7 +284,16 @@ export default function OpportunityForm({
               </div>
 
               <Field label="Timing">
-                <input className={INPUT} value={form.timing || ''} onChange={(e) => set('timing', e.target.value)} />
+                <select
+                  className={INPUT}
+                  value={form.timing || ''}
+                  onChange={(e) => set('timing', e.target.value)}
+                >
+                  <option value="">—</option>
+                  {BUYER_TIMINGS.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
               </Field>
               <Field label="Location">
                 <input className={INPUT} value={form.location || ''} onChange={(e) => set('location', e.target.value)} />

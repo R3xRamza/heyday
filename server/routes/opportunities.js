@@ -7,6 +7,7 @@ import {
 } from '../lib/agentScope.js';
 import {
   normalizeBuyerStatus,
+  normalizeBuyerTiming,
   normalizePreapproval,
   resolveBuyerPriceFields,
 } from '../lib/buyerOpportunityNormalize.js';
@@ -142,7 +143,7 @@ router.post('/buyers', (req, res) => {
     priceFields.price_min,
     priceFields.price_max,
     trimOrNull(req.body.location),
-    trimOrNull(req.body.timing),
+    normalizeBuyerTiming(req.body.timing) ?? trimOrNull(req.body.timing),
     trimOrNull(req.body.buyer_rep_signed),
     trimOrNull(req.body.buyer_rep_dropbox),
     trimOrNull(req.body.notes),
@@ -178,6 +179,11 @@ router.patch('/buyers/:id', (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body, 'preapproval')) {
     const mapped = normalizePreapproval(req.body.preapproval);
     preapproval = mapped != null ? mapped : trimOrNull(req.body.preapproval);
+  }
+
+  let timing = existing.timing;
+  if (Object.prototype.hasOwnProperty.call(req.body, 'timing')) {
+    timing = normalizeBuyerTiming(req.body.timing) ?? trimOrNull(req.body.timing);
   }
 
   const priceTouched = ['price', 'price_min', 'price_max'].some((k) => (
@@ -225,7 +231,7 @@ router.patch('/buyers/:id', (req, res) => {
     priceFieldsFinal.price_min,
     priceFieldsFinal.price_max,
     pick('location'),
-    pick('timing'),
+    timing,
     pick('buyer_rep_signed'),
     pick('buyer_rep_dropbox'),
     pick('notes'),

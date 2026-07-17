@@ -1,6 +1,9 @@
 /** Server-side buyer status / preapproval / price normalization. */
 
 const CANONICAL_STATUS = new Set(['active', 'under_contract', 'option_period', 'closed', 'on_hold']);
+const CANONICAL_TIMING = new Set([
+  'asap', 'near_term', 'mid_term', 'long_term', 'flexible', 'casual', 'lease_driven', 'on_hold',
+]);
 const CANONICAL_PRE = new Set(['y', 'n', 'cash']);
 
 export function normalizeBuyerStatus(raw) {
@@ -19,6 +22,40 @@ export function normalizeBuyerStatus(raw) {
   if (lower.includes('tour')) return 'option_period';
   if (lower.includes('active')) return 'active';
   return 'active';
+}
+
+export function normalizeBuyerTiming(raw) {
+  if (raw == null || String(raw).trim() === '') return null;
+  const s = String(raw).trim();
+  const lower = s.toLowerCase();
+  if (CANONICAL_TIMING.has(lower)) return lower;
+  if (lower === '?' || lower === 'x') return 'flexible';
+  if (lower.includes('asap')) return 'asap';
+  if (lower.includes('on hold') || lower === 'hold') return 'on_hold';
+  if (lower.includes('lease') || lower.includes('deadline') || lower.includes('must have') || lower.includes('before')) {
+    return 'lease_driven';
+  }
+  if (lower.includes('casual')) return 'casual';
+  if (
+    lower.includes('flexible')
+    || lower.includes('not in a hurry')
+    || lower.includes('not in a rush')
+    || lower.includes('whenever')
+    || lower.includes('right thing')
+    || lower.includes('send as we see')
+    || lower.includes('hot & cold')
+    || lower.includes('hot and cold')
+  ) {
+    return 'flexible';
+  }
+  if (lower.includes('summer') || lower.includes('this month') || /\b\d{1,2}\/\d{1,2}/.test(lower)) {
+    return 'near_term';
+  }
+  if (lower.includes('2026') || lower.includes('2027') || lower.includes('closes')) {
+    return 'mid_term';
+  }
+  if (lower.includes('year') || lower.includes('12 month')) return 'long_term';
+  return 'flexible';
 }
 
 export function normalizePreapproval(raw) {
@@ -151,14 +188,14 @@ export function resolveBuyerPriceFields({ price_min, price_max, price } = {}) {
   return { price_min: null, price_max: null, price: null };
 }
 
-/** Normalize status/preapproval and backfill price_min/max from legacy price text. */
+/** Normalize status/preapproval/timing and backfill price_min/max from legacy price text. */
 export function normalizeBuyerOpportunityRows(db) {
   const rows = db.prepare(
-    'SELECT id, status, preapproval, price, price_min, price_max FROM opportunity_buyers',
+    'SELECT id, status, preapproval, timing, price, price_min, price_max FROM opportunity_buyers',
   ).all();
   const update = db.prepare(`
     UPDATE opportunity_buyers
-    SET status = ?, preapproval = ?, price = ?, price_min = ?, price_max = ?
+    SET status = ?, preapproval = ?, timing = ?, price = ?, price_min = ?, price_max = ?
     WHERE id = ?
   `);
   let n = 0;
@@ -169,6 +206,11 @@ export function normalizeBuyerOpportunityRows(db) {
       const preapproval = mappedPre != null
         ? mappedPre
         : (row.preapproval == null || String(row.preapproval).trim() === '' ? null : row.preapproval);
+
+      const mappedTiming = normalizeBuyerTiming(row.timing);
+      const timing = mappedTiming != null
+        ? mappedTiming
+        : (row.timing == null || String(row.timing).trim() === '' ? null : row.timing);
 
       let priceMin = row.price_min;
       let priceMax = row.price_max;
@@ -186,11 +228,12 @@ export function normalizeBuyerOpportunityRows(db) {
 
       const changed = status !== row.status
         || (mappedPre != null && mappedPre !== row.preapproval)
+        || (mappedTiming != null && mappedTiming !== row.timing)
         || priceMin !== row.price_min
         || priceMax !== row.price_max
         || price !== row.price;
       if (changed) {
-        update.run(status, preapproval, price, priceMin, priceMax, row.id);
+        update.run(status, preapproval, timing, price, priceMin, priceMax, row.id);
         n += 1;
       }
     }

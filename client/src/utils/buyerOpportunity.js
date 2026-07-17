@@ -8,6 +8,17 @@ export const BUYER_STATUSES = [
   { value: 'on_hold', label: 'On hold' },
 ];
 
+export const BUYER_TIMINGS = [
+  { value: 'asap', label: 'ASAP' },
+  { value: 'near_term', label: '1–3 months' },
+  { value: 'mid_term', label: '3–6 months' },
+  { value: 'long_term', label: '6–12 months' },
+  { value: 'flexible', label: 'Flexible' },
+  { value: 'casual', label: 'Casual' },
+  { value: 'lease_driven', label: 'Lease / deadline' },
+  { value: 'on_hold', label: 'On hold' },
+];
+
 export const BUYER_PREAPPROVALS = [
   { value: 'y', label: 'Y' },
   { value: 'n', label: 'N' },
@@ -15,11 +26,18 @@ export const BUYER_PREAPPROVALS = [
 ];
 
 const CANONICAL_STATUS = new Set(BUYER_STATUSES.map((s) => s.value));
+const CANONICAL_TIMING = new Set(BUYER_TIMINGS.map((s) => s.value));
 const CANONICAL_PRE = new Set(BUYER_PREAPPROVALS.map((s) => s.value));
 
 export function buyerStatusLabel(value) {
   const v = normalizeBuyerStatus(value);
   return BUYER_STATUSES.find((s) => s.value === v)?.label || 'Active';
+}
+
+export function buyerTimingLabel(value) {
+  if (value == null || String(value).trim() === '') return '—';
+  const v = normalizeBuyerTiming(value);
+  return BUYER_TIMINGS.find((s) => s.value === v)?.label || String(value).trim();
 }
 
 export function normalizeBuyerStatus(raw) {
@@ -38,6 +56,40 @@ export function normalizeBuyerStatus(raw) {
   if (lower.includes('tour')) return 'option_period';
   if (lower.includes('active')) return 'active';
   return 'active';
+}
+
+export function normalizeBuyerTiming(raw) {
+  if (raw == null || String(raw).trim() === '') return '';
+  const s = String(raw).trim();
+  const lower = s.toLowerCase();
+  if (CANONICAL_TIMING.has(lower)) return lower;
+  if (lower === '?' || lower === 'x') return 'flexible';
+  if (lower.includes('asap')) return 'asap';
+  if (lower.includes('on hold') || lower === 'hold') return 'on_hold';
+  if (lower.includes('lease') || lower.includes('deadline') || lower.includes('must have') || lower.includes('before')) {
+    return 'lease_driven';
+  }
+  if (lower.includes('casual')) return 'casual';
+  if (
+    lower.includes('flexible')
+    || lower.includes('not in a hurry')
+    || lower.includes('not in a rush')
+    || lower.includes('whenever')
+    || lower.includes('right thing')
+    || lower.includes('send as we see')
+    || lower.includes('hot & cold')
+    || lower.includes('hot and cold')
+  ) {
+    return 'flexible';
+  }
+  if (lower.includes('summer') || lower.includes('this month') || /\b\d{1,2}\/\d{1,2}/.test(lower)) {
+    return 'near_term';
+  }
+  if (lower.includes('2026') || lower.includes('2027') || lower.includes('closes')) {
+    return 'mid_term';
+  }
+  if (lower.includes('year') || lower.includes('12 month')) return 'long_term';
+  return 'flexible';
 }
 
 export function normalizePreapproval(raw) {

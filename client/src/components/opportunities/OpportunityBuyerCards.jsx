@@ -1,6 +1,7 @@
 import OpportunityStatusBadge from './OpportunityStatusBadge';
 import BuyerRepDropboxIcons from './BuyerRepDropboxIcons';
 import {
+  buyerTimingLabel,
   formatBuyerPrice,
   normalizePreapproval,
   preapprovalLabel,
@@ -15,7 +16,11 @@ export default function OpportunityBuyerCards({ rows, onEdit }) {
     <ul className="md:hidden flex flex-col gap-3">
       {rows.map((row) => {
         const priceLabel = formatBuyerPrice(row);
-        const meta = metaJoin(priceLabel !== '—' ? priceLabel : '', row.timing);
+        const timingLabel = buyerTimingLabel(row.timing);
+        const meta = metaJoin(
+          priceLabel !== '—' ? priceLabel : '',
+          timingLabel !== '—' ? timingLabel : '',
+        );
         const pre = normalizePreapproval(row.preapproval);
 
         return (

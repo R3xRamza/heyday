@@ -1,8 +1,10 @@
 import {
   BUYER_PREAPPROVALS,
   BUYER_STATUSES,
+  BUYER_TIMINGS,
   formatBuyerPrice,
   normalizeBuyerStatus,
+  normalizeBuyerTiming,
   normalizePreapproval,
 } from '../../utils/buyerOpportunity';
 import BuyerRepDropboxIcons from './BuyerRepDropboxIcons';
@@ -51,6 +53,7 @@ export default function BuyerOpportunitiesTable({ rows, onEdit, onPatch }) {
         <tbody>
           {rows.map((row) => {
             const status = normalizeBuyerStatus(row.status);
+            const timing = normalizeBuyerTiming(row.timing) || '';
             const pre = normalizePreapproval(row.preapproval);
             const priceLabel = formatBuyerPrice(row);
 
@@ -83,7 +86,19 @@ export default function BuyerOpportunitiesTable({ rows, onEdit, onPatch }) {
                 </td>
                 <TextCell title={priceLabel}>{priceLabel}</TextCell>
                 <TextCell title={row.location}>{row.location}</TextCell>
-                <TextCell title={row.timing}>{row.timing}</TextCell>
+                <td className={TD} onClick={(e) => e.stopPropagation()}>
+                  <select
+                    className={SELECT}
+                    value={timing}
+                    aria-label="Timing"
+                    onChange={(e) => onPatch(row.id, { timing: e.target.value || null })}
+                  >
+                    <option value="">—</option>
+                    {BUYER_TIMINGS.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </td>
                 <td className={`${TD} text-on-surface`} title={row.notes || undefined}>
                   {row.notes ? (
                     <span className="line-clamp-2 text-[13px] leading-snug text-on-surface">
