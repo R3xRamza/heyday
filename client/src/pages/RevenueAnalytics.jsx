@@ -322,14 +322,20 @@ export default function RevenueAnalytics() {
             <Icon name="payments" className="text-secondary !text-[20px]" />
             <h2 className="text-base font-bold text-primary">Meredith&apos;s Commission</h2>
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {s?.anniversaryStart && s?.anniversaryEnd && (
+              <span className="text-[11px] text-on-surface-variant hidden sm:inline">
+                Dec 1 anniversary · {s.anniversaryStart.slice(0, 7)} → {s.anniversaryEnd}
+              </span>
+            )}
             <select
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
               className="px-3 py-1.5 bg-white border border-outline-variant/30 rounded-lg text-sm font-semibold text-primary"
+              title="Anniversary year ending Nov 30"
             >
               {(data?.years ?? [year]).map((y) => (
-                <option key={y} value={y}>{y}</option>
+                <option key={y} value={y}>{y} (ends Nov 30)</option>
               ))}
             </select>
           </div>

@@ -73,6 +73,10 @@ export function runMigrations(db) {
   addColumnIfMissing(db, 'transactions', 'transaction_name', 'TEXT');
   addColumnIfMissing(db, 'transactions', 'sale_type', "TEXT DEFAULT 'Traditional sale'");
   addColumnIfMissing(db, 'transactions', 'gross_commission', 'REAL');
+  addColumnIfMissing(db, 'transactions', 'commission_exp_stock', 'REAL DEFAULT 0');
+  addColumnIfMissing(db, 'transactions', 'commission_custom_fees', "TEXT DEFAULT '[]'");
+  addColumnIfMissing(db, 'transactions', 'commission_gci_mode', "TEXT DEFAULT 'amount'");
+  addColumnIfMissing(db, 'transactions', 'commission_gci_percent', 'REAL');
   addColumnIfMissing(db, 'transactions', 'buyer_agreement_date', 'DATE');
   addColumnIfMissing(db, 'transactions', 'buyer_expiration_date', 'DATE');
 

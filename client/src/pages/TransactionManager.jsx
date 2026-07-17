@@ -335,6 +335,7 @@ export default function TransactionManager() {
         onRemoveChecklist={removeChecklist}
         onApplyChecklists={applyChecklists}
         onCompleteOverdueTasks={completeOverdueTasks}
+        onTransactionPatch={(patch) => setTransaction((prev) => (prev ? { ...prev, ...patch } : prev))}
       />
     </DashboardLayout>
   );

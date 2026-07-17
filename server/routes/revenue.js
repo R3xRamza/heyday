@@ -1,21 +1,25 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { COMMISSION_SETTINGS, computeYearCommissions } from '../lib/commissionPlans.js';
+import {
+  COMMISSION_SETTINGS,
+  computeYearCommissions,
+  anniversaryWindowForEndYear,
+} from '../lib/commissionPlans.js';
 import { parseAgentScope, transactionAgentScopeClause } from '../lib/agentScope.js';
 
 const router = Router();
 
 const DEAL_SELECT = `
   SELECT t.id, t.address, t.city, t.state, t.value, t.stage, t.representing,
-    t.close_date, t.gross_commission, t.client_name, u.name as agent_name
+    t.close_date, t.gross_commission, t.commission_custom_fees,
+    t.client_name, u.name as agent_name
   FROM transactions t
   LEFT JOIN users u ON u.id = t.agent_id
 `;
 
 router.get('/', (req, res) => {
   const year = Math.min(2100, Math.max(2000, parseInt(req.query.year, 10) || new Date().getFullYear()));
-  const yearStart = `${year}-01-01`;
-  const yearEnd = `${year}-12-31`;
+  const { start: yearStart, end: yearEnd } = anniversaryWindowForEndYear(year);
   const agentScope = parseAgentScope(req.query);
   const { sql: agentFilter, params: agentParams } = transactionAgentScopeClause(agentScope, 't');
 
@@ -29,22 +33,27 @@ router.get('/', (req, res) => {
 
   const closed = computeYearCommissions(closedDeals, 0);
 
-  // Pipeline: under contract, projected with the cap where the closed year left off.
+  // Pipeline: under contract in this anniversary window, projected from closed YTD.
   const pendingDeals = db.prepare(`
     ${DEAL_SELECT}
     WHERE t.stage = 'pending' AND t.close_date IS NOT NULL
+      AND t.close_date >= ? AND t.close_date <= ?
       ${agentFilter}
     ORDER BY t.close_date ASC, t.id ASC
-  `).all(...agentParams);
+  `).all(yearStart, yearEnd, ...agentParams);
 
-  const currentYear = new Date().getFullYear();
-  const pipelineCapStart = year === currentYear ? closed.capPaid : 0;
-  const pipeline = computeYearCommissions(pendingDeals, pipelineCapStart);
+  const pipeline = computeYearCommissions(pendingDeals, {
+    capPaid: closed.capPaid,
+    riskPaid: closed.riskPaid,
+    cappedFeesPaid: closed.cappedFeesPaid,
+  });
 
   const sum = (rows, fn) => Math.round(rows.reduce((acc, r) => acc + (r.hasGci ? fn(r.breakdown) : 0), 0) * 100) / 100;
 
   const summary = {
     year,
+    anniversaryStart: yearStart,
+    anniversaryEnd: yearEnd,
     closedCount: closedDeals.length,
     closedVolume: closedDeals.reduce((acc, d) => acc + (Number(d.value) || 0), 0),
     gci: sum(closed.results, (b) => b.gci),
@@ -52,17 +61,21 @@ router.get('/', (req, res) => {
     expSplit: sum(closed.results, (b) => b.expSplit),
     tessa: sum(closed.results, (b) => b.tessa),
     margaret: sum(closed.results, (b) => b.margaret),
-    fees: sum(closed.results, (b) => b.fixedFees),
+    fees: sum(closed.results, (b) => b.fixedFees + (b.customSum || 0)),
     missingGci: closed.results.filter((r) => !r.hasGci).length,
     capPaid: closed.capPaid,
+    riskPaid: closed.riskPaid,
+    cappedFeesPaid: closed.cappedFeesPaid,
     capAmount: COMMISSION_SETTINGS.capAmount,
+    riskCap: COMMISSION_SETTINGS.riskManagementAnnualCap,
+    cappedFeesStepDownAt: COMMISSION_SETTINGS.cappedFeesStepDownAt,
     capped: closed.capPaid >= COMMISSION_SETTINGS.capAmount,
     pipelineGci: sum(pipeline.results, (b) => b.gci),
     pipelineNet: sum(pipeline.results, (b) => b.net),
     pipelineCount: pendingDeals.length,
   };
 
-  // Net + GCI by close month for the earnings chart.
+  // Net + GCI by close month for the earnings chart (calendar month within window).
   const monthly = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, gci: 0, net: 0, count: 0 }));
   for (const r of closed.results) {
     if (!r.hasGci || !r.close_date) continue;
@@ -74,6 +87,7 @@ router.get('/', (req, res) => {
     }
   }
 
+  const currentYear = new Date().getFullYear();
   const years = db.prepare(`
     SELECT DISTINCT CAST(strftime('%Y', close_date) AS INTEGER) as y
     FROM transactions

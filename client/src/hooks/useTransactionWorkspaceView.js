@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-const VALID_VIEWS = new Set(['details', 'checklist', 'activity']);
+const VALID_VIEWS = new Set(['details', 'checklist', 'activity', 'commission']);
 
 function normalizeView(value) {
   return VALID_VIEWS.has(value) ? value : 'details';

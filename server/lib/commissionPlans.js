@@ -1,88 +1,254 @@
 /**
- * Meredith (MPA) eXp commission plans, mirrored from Brokermint.
+ * Meredith (MPA) eXp commission plans.
  *
- * MPA eXp (before cap) — paid by agent:
- *   eXp split (sliding scale: 20% of GCI until the $16,000 annual cap),
- *   eXp Broker Review Fee $25, eXp Risk Management Fee $60,
- *   Tessa 4% of post-split balance, exp stock $0.
+ * Anniversary year: Dec 1 → Nov 30 (not calendar year).
  *
- * MPA eXp (after cap) — paid by agent:
- *   agent keeps 100% of the balance, Capped Trans Fee $250,
- *   eXp Broker Review Fee $25, eXp Risk Management Fee $60,
- *   Tessa 4% of post-split balance, Margaret 3% of post-split balance,
- *   exp stock $0.
+ * Before cap — paid by agent:
+ *   eXp split (20% of GCI until $16,000 anniversary-year cap),
+ *   eXp Broker Review Fee $25,
+ *   eXp Risk Management Fee $60 (anniversary-year total capped at $750),
+ *   Tessa 4% of post-split, Margaret 3% of post-split,
+ *   editable custom fees.
+ *
+ * After cap — paid by agent:
+ *   agent keeps 100% of GCI (no eXp split),
+ *   Capped Trans Fee $250 until $5,000 capped fees paid in anniversary year, then $75,
+ *   Broker Review $25, Risk Management (same annual ceiling),
+ *   Tessa 4%, Margaret 3%, custom fees.
  */
+
 export const COMMISSION_SETTINGS = {
   capAmount: 16000,
   splitRate: 0.2,
   brokerReviewFee: 25,
   riskManagementFee: 60,
+  riskManagementAnnualCap: 750,
   cappedTransactionFee: 250,
+  cappedTransactionFeeReduced: 75,
+  cappedFeesStepDownAt: 5000,
   tessaRate: 0.04,
   margaretRate: 0.03,
 };
 
-function round2(n) {
+export function round2(n) {
   return Math.round(n * 100) / 100;
+}
+
+function parseYmd(dateStr) {
+  if (!dateStr) return null;
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  return { y, mo, d };
+}
+
+function todayYmd() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const mo = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${d}`;
+}
+
+/**
+ * Anniversary window containing dateStr (YYYY-MM-DD).
+ * Dec 1 of startYear → Nov 30 of startYear+1.
+ * Missing/invalid date → today.
+ */
+export function anniversaryWindowForDate(dateStr) {
+  const parsed = parseYmd(dateStr) || parseYmd(todayYmd());
+  const startYear = parsed.mo === 12 ? parsed.y : parsed.y - 1;
+  return {
+    start: `${startYear}-12-01`,
+    end: `${startYear + 1}-11-30`,
+    startYear,
+  };
+}
+
+/** Anniversary year that ends Nov 30 of `endYear` (e.g. 2026 → 2025-12-01 … 2026-11-30). */
+export function anniversaryWindowForEndYear(endYear) {
+  const y = Number(endYear);
+  return {
+    start: `${y - 1}-12-01`,
+    end: `${y}-11-30`,
+    startYear: y - 1,
+  };
+}
+
+export function parseCustomFees(raw) {
+  if (raw == null || raw === '') return [];
+  let parsed = raw;
+  if (typeof raw === 'string') {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.map((f, i) => ({
+    id: f?.id != null ? String(f.id) : `fee_${i}`,
+    label: String(f?.label ?? '').trim(),
+    amount: Math.max(0, Number(f?.amount) || 0),
+    unit: f?.unit === 'percent' ? 'percent' : 'amount',
+  }));
+}
+
+export function serializeCustomFees(fees) {
+  return JSON.stringify(parseCustomFees(fees));
+}
+
+/** Resolve a custom fee to dollars. Percent fees are of GCI. */
+export function customFeeDollars(fee, gci) {
+  const n = Math.max(0, Number(fee?.amount) || 0);
+  if (fee?.unit === 'percent') {
+    return round2((Number(gci) || 0) * n / 100);
+  }
+  return round2(n);
+}
+
+/**
+ * Resolve stored GCI input to a dollar amount.
+ * Percent mode = % of sales price (transaction.value).
+ */
+export function resolveGrossCommission({
+  mode,
+  grossCommission,
+  gciPercent,
+  salesPrice,
+} = {}) {
+  if (mode === 'percent') {
+    const pct = gciPercent == null || gciPercent === '' ? null : Number(gciPercent);
+    const price = salesPrice == null || salesPrice === '' ? null : Number(salesPrice);
+    if (pct == null || Number.isNaN(pct) || pct < 0) return null;
+    if (price == null || Number.isNaN(price) || price < 0) return null;
+    return round2(price * pct / 100);
+  }
+  if (grossCommission == null || grossCommission === '') return null;
+  const gci = Number(grossCommission);
+  if (Number.isNaN(gci) || gci < 0) return null;
+  return round2(gci);
+}
+
+export function normalizeGciMode(mode) {
+  return mode === 'percent' ? 'percent' : 'amount';
+}
+
+function normalizeYtd(startingYtd = {}) {
+  if (typeof startingYtd === 'number') {
+    return { capPaid: startingYtd, riskPaid: 0, cappedFeesPaid: 0 };
+  }
+  return {
+    capPaid: Number(startingYtd.capPaid) || 0,
+    riskPaid: Number(startingYtd.riskPaid) || 0,
+    cappedFeesPaid: Number(startingYtd.cappedFeesPaid) || 0,
+  };
 }
 
 /**
  * Compute one deal's commission breakdown.
- * The sliding scale takes 20% of GCI to eXp, but never more than what is
- * left before the cap — a straddling deal only pays up to the cap.
+ * Sliding scale takes 20% of GCI to eXp, but never more than remaining cap room.
  */
-export function computeDealCommission(gci, capPaidBefore, settings = COMMISSION_SETTINGS) {
+export function computeDealCommission(gci, startingYtd = {}, overrides = {}, settings = COMMISSION_SETTINGS) {
+  const ytd = normalizeYtd(startingYtd);
+  const capPaidBefore = ytd.capPaid;
+  const riskPaidBefore = ytd.riskPaid;
+  const cappedFeesPaidBefore = ytd.cappedFeesPaid;
+
+  const customFees = parseCustomFees(overrides.customFees);
+  const gciN = round2(Number(gci) || 0);
+  const resolvedFees = customFees.map((fee) => ({
+    ...fee,
+    dollars: customFeeDollars(fee, gciN),
+  }));
+  const customSum = round2(resolvedFees.reduce((sum, f) => sum + f.dollars, 0));
+
   const capRemaining = Math.max(0, round2(settings.capAmount - capPaidBefore));
   const beforeCap = capRemaining > 0;
 
-  const expSplit = beforeCap ? Math.min(round2(gci * settings.splitRate), capRemaining) : 0;
-  const postSplit = round2(gci - expSplit);
-  const tessa = round2(postSplit * settings.tessaRate);
-  const margaret = beforeCap ? 0 : round2(postSplit * settings.margaretRate);
-  const cappedFee = beforeCap ? 0 : settings.cappedTransactionFee;
-  const fixedFees = round2(settings.brokerReviewFee + settings.riskManagementFee + cappedFee);
-  const teamSplits = round2(tessa + margaret);
-  const net = round2(postSplit - fixedFees - teamSplits);
+  const expSplit = beforeCap ? Math.min(round2(gciN * settings.splitRate), capRemaining) : 0;
+  const postSplit = round2(gciN - expSplit);
 
-  const lines = beforeCap
-    ? [
-      { key: 'exp_split', label: 'eXp split (sliding scale)', amount: -expSplit },
-      { key: 'broker_review', label: 'eXp Broker Review Fee', amount: -settings.brokerReviewFee },
-      { key: 'risk_mgmt', label: 'eXp Risk Management Fee', amount: -settings.riskManagementFee },
-      { key: 'tessa', label: 'Tessa 4% of post-split balance', amount: -tessa },
-      { key: 'exp_stock', label: 'exp stock', amount: 0 },
-    ]
-    : [
-      { key: 'exp_split', label: 'eXp split (capped — 100% retained)', amount: 0 },
-      { key: 'capped_fee', label: 'Capped Trans Fee', amount: -settings.cappedTransactionFee },
-      { key: 'broker_review', label: 'eXp Broker Review Fee', amount: -settings.brokerReviewFee },
-      { key: 'risk_mgmt', label: 'eXp Risk Management Fee', amount: -settings.riskManagementFee },
-      { key: 'tessa', label: 'Tessa 4% of post-split balance', amount: -tessa },
-      { key: 'margaret', label: 'Margaret 3% of post-split balance', amount: -margaret },
-      { key: 'exp_stock', label: 'exp stock', amount: 0 },
-    ];
+  const riskRoom = Math.max(0, round2(settings.riskManagementAnnualCap - riskPaidBefore));
+  const riskFee = round2(Math.min(settings.riskManagementFee, riskRoom));
+  const brokerReview = settings.brokerReviewFee;
+
+  let cappedFee = 0;
+  if (!beforeCap) {
+    cappedFee = cappedFeesPaidBefore >= settings.cappedFeesStepDownAt
+      ? settings.cappedTransactionFeeReduced
+      : settings.cappedTransactionFee;
+  }
+
+  const tessa = round2(postSplit * settings.tessaRate);
+  const margaret = round2(postSplit * settings.margaretRate);
+  const teamSplits = round2(tessa + margaret);
+  const fixedFees = round2(brokerReview + riskFee + cappedFee);
+  const net = round2(postSplit - fixedFees - teamSplits - customSum);
+
+  const lines = [
+    {
+      key: 'exp_split',
+      label: beforeCap ? 'eXp split (sliding scale)' : 'eXp split (capped — 100% retained)',
+      amount: -expSplit,
+    },
+  ];
+  if (!beforeCap) {
+    lines.push({
+      key: 'capped_fee',
+      label: cappedFee === settings.cappedTransactionFeeReduced
+        ? 'Capped Trans Fee (reduced)'
+        : 'Capped Trans Fee',
+      amount: -cappedFee,
+    });
+  }
+  lines.push(
+    { key: 'broker_review', label: 'eXp Broker Review Fee', amount: -brokerReview },
+    { key: 'risk_mgmt', label: 'eXp Risk Management Fee', amount: -riskFee },
+    { key: 'tessa', label: 'Tessa 4% of post-split balance', amount: -tessa },
+    { key: 'margaret', label: 'Margaret 3% of post-split balance', amount: -margaret },
+  );
+  for (const fee of resolvedFees) {
+    if (!fee.label && !(fee.dollars > 0)) continue;
+    const pctLabel = fee.unit === 'percent' ? ` (${fee.amount}%)` : '';
+    lines.push({
+      key: `custom_${fee.id}`,
+      label: `${fee.label || 'Custom fee'}${pctLabel}`,
+      amount: -fee.dollars,
+    });
+  }
 
   return {
     plan: beforeCap ? 'before_cap' : 'after_cap',
-    gci: round2(gci),
+    gci: gciN,
     expSplit,
     postSplit,
+    riskFee,
+    brokerReview,
+    cappedFee,
     tessa,
     margaret,
+    customSum,
     fixedFees,
     teamSplits,
     net,
     capPaidAfter: round2(capPaidBefore + expSplit),
+    riskPaidAfter: round2(riskPaidBefore + riskFee),
+    cappedFeesPaidAfter: round2(cappedFeesPaidBefore + cappedFee),
     lines,
   };
 }
 
 /**
- * Run deals (ordered by close date) through the cap accumulator.
- * Deals without a GCI are passed through flagged; they do not move the cap.
+ * Run deals (ordered by close date) through anniversary-year accumulators.
+ * Deals without a GCI are passed through flagged; they do not move totals.
+ * `startingYtd` may be a number (legacy capPaid) or { capPaid, riskPaid, cappedFeesPaid }.
  */
-export function computeYearCommissions(deals, startingCapPaid = 0, settings = COMMISSION_SETTINGS) {
-  let capPaid = startingCapPaid;
+export function computeYearCommissions(deals, startingYtd = 0, settings = COMMISSION_SETTINGS) {
+  let ytd = normalizeYtd(startingYtd);
   const results = [];
 
   for (const deal of deals) {
@@ -91,10 +257,30 @@ export function computeYearCommissions(deals, startingCapPaid = 0, settings = CO
       results.push({ ...deal, hasGci: false, breakdown: null });
       continue;
     }
-    const breakdown = computeDealCommission(gci, capPaid, settings);
-    capPaid = breakdown.capPaidAfter;
+    const overrides = {
+      customFees: deal.commission_custom_fees,
+    };
+    const breakdown = computeDealCommission(gci, ytd, overrides, settings);
+    ytd = {
+      capPaid: breakdown.capPaidAfter,
+      riskPaid: breakdown.riskPaidAfter,
+      cappedFeesPaid: breakdown.cappedFeesPaidAfter,
+    };
     results.push({ ...deal, hasGci: true, breakdown });
   }
 
-  return { results, capPaid: round2(capPaid) };
+  return {
+    results,
+    capPaid: round2(ytd.capPaid),
+    riskPaid: round2(ytd.riskPaid),
+    cappedFeesPaid: round2(ytd.cappedFeesPaid),
+  };
+}
+
+/** Whether deal A sorts before deal B for YTD accumulation (close_date, then id). */
+export function dealSortsBefore(a, b, dealDateForCurrent) {
+  const aDate = a.close_date || '';
+  const bDate = b.close_date || dealDateForCurrent || '';
+  if (aDate !== bDate) return aDate < bDate;
+  return Number(a.id) < Number(b.id);
 }
