@@ -131,7 +131,7 @@ export default function UserProjectDashboard() {
                 <div className="flex flex-col items-center justify-center text-center py-20 px-4">
                   <p className="text-lg font-semibold text-primary mb-1">No projects yet</p>
                   <p className="text-sm text-on-surface-variant mb-5 max-w-sm">
-                    Track bigger initiatives here with an optional target date. Day-to-day work lives under Admin Tasks.
+                    Track bigger initiatives here with an optional date and priority. Day-to-day work lives under Admin Tasks.
                   </p>
                   {canWrite && (
                     <button
