@@ -449,6 +449,7 @@ export default function VendorsHub() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState('');
+  const [debouncedCategory, setDebouncedCategory] = useState('');
   const [sort, setSort] = useState('likes');
   const [page, setPage] = useState(1);
   const [data, setData] = useState({ vendors: [], total: 0 });
@@ -470,10 +471,11 @@ export default function VendorsHub() {
   useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedSearch(search);
+      setDebouncedCategory(category);
       setPage(1);
     }, 300);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [search, category]);
 
   const loadCategories = useCallback(async () => {
     const res = await fetch('/api/vendors/categories', { credentials: 'include' });
@@ -490,15 +492,15 @@ export default function VendorsHub() {
       order: sort === 'name' || sort === 'category' ? 'asc' : 'desc',
     });
     if (debouncedSearch) params.set('search', debouncedSearch);
-    if (category) params.set('category', category);
+    if (debouncedCategory) params.set('category', debouncedCategory);
 
     const res = await fetch(`/api/vendors?${params}`, { credentials: 'include' });
     const json = await res.json();
     setData(json);
     setLoading(false);
-  }, [page, debouncedSearch, category, sort]);
+  }, [page, debouncedSearch, debouncedCategory, sort]);
 
-  const hasFilters = !!(debouncedSearch || category);
+  const hasFilters = !!(debouncedSearch || debouncedCategory);
 
   useEffect(() => {
     loadCategories();
@@ -757,12 +759,9 @@ export default function VendorsHub() {
               type="text"
               list="vendor-filter-categories"
               value={category}
-              onChange={(e) => {
-                setCategory(e.target.value);
-                setPage(1);
-              }}
-              placeholder="Category…"
-              className={`${selectClass} w-[10rem]`}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="Category contains…"
+              className={`${selectClass} w-[11rem]`}
             />
             <datalist id="vendor-filter-categories">
               {categories.map((c) => (
