@@ -454,7 +454,7 @@ export default function VendorsHub() {
       page: String(page),
       limit: '50',
       sort,
-      order: sort === 'name' ? 'asc' : 'desc',
+      order: sort === 'name' || sort === 'category' ? 'asc' : 'desc',
     });
     if (debouncedSearch) params.set('search', debouncedSearch);
     if (category) params.set('category', category);
@@ -740,6 +740,7 @@ export default function VendorsHub() {
               className={`${selectClass} w-[9rem]`}
             >
               <option value="likes">Sort: Likes</option>
+              <option value="category">Sort: Category</option>
               <option value="name">Sort: Name</option>
               <option value="updated_at">Sort: Updated</option>
             </select>
