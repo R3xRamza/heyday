@@ -33,6 +33,83 @@ function CategoryChip({ category }) {
   );
 }
 
+function LikeNoteModal({ vendorName, busy, onClose, onSubmit }) {
+  const [wantNote, setWantNote] = useState(false);
+  const [note, setNote] = useState('');
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-primary/25 backdrop-blur-[1px]"
+        aria-label="Close"
+        onClick={onClose}
+        disabled={busy}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="like-note-title"
+        className="relative w-full max-w-md rounded-xl bg-white shadow-2xl border border-outline-variant/15 p-5 space-y-4"
+      >
+        <h3 id="like-note-title" className="text-lg font-bold text-primary">
+          Add a like
+        </h3>
+        <p className="text-sm text-on-surface-variant">
+          {vendorName ? (
+            <>
+              Liking <span className="font-semibold text-primary">{vendorName}</span>
+            </>
+          ) : (
+            'Add a like for this vendor'
+          )}
+        </p>
+
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={wantNote}
+            onChange={(e) => setWantNote(e.target.checked)}
+            className="mt-1 rounded border-outline-variant"
+            disabled={busy}
+          />
+          <span className="text-sm text-primary font-medium">Leave a note with this like</span>
+        </label>
+
+        {wantNote && (
+          <textarea
+            className={`${inputClass} min-h-[5.5rem] resize-y`}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Why you recommend them…"
+            autoFocus
+            disabled={busy}
+          />
+        )}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low rounded-lg disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onSubmit(wantNote ? note.trim() : '')}
+            className="px-4 py-2 text-sm font-semibold bg-secondary text-white rounded-lg hover:bg-secondary/90 disabled:opacity-50"
+          >
+            {busy ? 'Saving…' : 'Add like'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function formFromVendor(vendor) {
   return {
     name: vendor.name || '',
@@ -190,7 +267,7 @@ function VendorDrawer({
                 {likeBusy ? 'Saving…' : 'Add a like'}
               </button>
               <p className="text-[11px] text-on-surface-variant">
-                You’ll be asked if you want to leave a note. You can like multiple times.
+                You can like multiple times and optionally add a note each time.
               </p>
 
               {likes?.length > 0 && (
@@ -284,6 +361,7 @@ export default function VendorsHub() {
   const [likedByMe, setLikedByMe] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [likeBusy, setLikeBusy] = useState(false);
+  const [likeModal, setLikeModal] = useState(null); // { vendorId, vendorName }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -353,15 +431,6 @@ export default function VendorsHub() {
     }
   }
 
-  /** Ask whether to leave a note; returns note string or null (cancelled). */
-  function promptLikeNote() {
-    const wantNote = window.confirm('Leave a note with this like?');
-    if (!wantNote) return '';
-    const note = window.prompt('Note for this like (optional):', '');
-    if (note === null) return null; // cancelled prompt
-    return note.trim();
-  }
-
   async function postLike(vendorId, note) {
     const res = await fetch(`/api/vendors/${vendorId}/likes`, {
       method: 'POST',
@@ -372,6 +441,25 @@ export default function VendorsHub() {
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || 'Could not like');
     return json.vendor;
+  }
+
+  function openLikeModal(vendorId, vendorName) {
+    setLikeModal({ vendorId, vendorName: vendorName || '' });
+  }
+
+  async function submitLikeModal(note) {
+    if (!likeModal) return;
+    setLikeBusy(true);
+    setError('');
+    try {
+      const vendor = await postLike(likeModal.vendorId, note);
+      patchVendorInList(vendor);
+      setLikeModal(null);
+      await fetchVendors();
+    } catch (err) {
+      setError(err.message || 'Could not like');
+    }
+    setLikeBusy(false);
   }
 
   function openCreate() {
@@ -402,25 +490,13 @@ export default function VendorsHub() {
     setError('');
   }
 
-  async function handleLike() {
+  function handleLike() {
     if (drawer === 'create' || drawer == null) return;
-    const note = promptLikeNote();
-    if (note === null) return;
-    setLikeBusy(true);
-    setError('');
-    try {
-      const vendor = await postLike(drawer, note);
-      patchVendorInList(vendor);
-      await fetchVendors();
-    } catch (err) {
-      setError(err.message || 'Could not like');
-    }
-    setLikeBusy(false);
+    openLikeModal(drawer, form.name);
   }
 
   async function handleRemoveLike(likeId) {
     if (drawer === 'create' || drawer == null) return;
-    if (!window.confirm('Remove this like?')) return;
     setLikeBusy(true);
     setError('');
     try {
@@ -442,15 +518,8 @@ export default function VendorsHub() {
     setLikeBusy(false);
   }
 
-  async function addLikeFromList(vendor) {
-    const note = promptLikeNote();
-    if (note === null) return;
-    try {
-      const updated = await postLike(vendor.id, note);
-      patchVendorInList(updated);
-    } catch {
-      // silent on list
-    }
+  function addLikeFromList(vendor) {
+    openLikeModal(vendor.id, vendor.name);
   }
 
   async function handleSave() {
@@ -727,6 +796,15 @@ export default function VendorsHub() {
           onDelete={handleDelete}
           onLike={handleLike}
           onRemoveLike={handleRemoveLike}
+        />
+      )}
+
+      {likeModal && (
+        <LikeNoteModal
+          vendorName={likeModal.vendorName}
+          busy={likeBusy}
+          onClose={() => !likeBusy && setLikeModal(null)}
+          onSubmit={submitLikeModal}
         />
       )}
     </DashboardLayout>
