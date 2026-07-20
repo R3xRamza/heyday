@@ -41,7 +41,9 @@ alwaysApply: true
 | `/tasks/:userId` | Daily Task Dashboard (transaction tasks) |
 | `/tasks/:userId/admin` | Admin Task Dashboard |
 | `/tasks/:userId/projects` | Project Dashboard |
-| `/crm`, `/crm/:id` | CRM Hub, contact detail |
+| `/crm` | CRM Hub — Contacts |
+| `/crm/vendors` | CRM Hub — Vendors (notes + ratings) |
+| `/crm/:id` | Contact detail |
 | `/transactions`, `/transactions/:id` | Transactions list, TransactionManager |
 | `/marketing` | Marketing Calendar |
 | `/revenue` | Revenue Analytics |
@@ -63,6 +65,7 @@ Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · CR
 |-------|---------|
 | `/api/auth` | Login, logout, session |
 | `/api/crm` | Contacts (birthday, anniversary, FUB fields) |
+| `/api/vendors` | Vendor directory CRUD (notes, 1–5 rating, free-text category) |
 | `/api/tasks` | Tasks; filters: `assigned_to`, `transaction_id`, dates, `include_completed` |
 | `/api/transactions` | CRUD, parties, activity, checklists, import |
 | `/api/marketing` | Posts, platform-goals, birthdays, birthday-pins |
@@ -83,7 +86,7 @@ Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · CR
 - `DashboardLayout` = Sidebar + TopNav + main; `marginLeft` from `sidebarWidth`
 - Brand: feather (#134041), sky, lemon; Tailwind tokens `primary-container`, `secondary`, `surface-*`
 - `html` font-size 18px. Icons: `shared/Icon.jsx` + lucide in Sidebar
-- Full-bleed pages: no `max-w` caps that leave dead right margin on main content
+- Full-bleed pages: **no `max-w` caps** that leave dead right margin on main content — use `w-full` + horizontal padding only (CRM Hub / Vendors already follow this; prefer for other list hubs going forward)
 - Reuse `DateText`, `TeamAvatar`, `DashboardLayout`
 
 ## DOMAIN — Transactions
@@ -116,7 +119,10 @@ Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · CR
 ## DOMAIN — CRM
 
 - Contacts with birthday, anniversary, partner fields. Gmail sync → `contact_activity`
+- Hub: `/crm` Contacts + `/crm/vendors` Vendors via in-hub tabs (`CrmHubTabs`) — **no** separate sidebar Vendors item
 - Detail: `/crm/:id`
+- Vendors: standalone `vendors` table (name, company, free-text category, phone, email, website, rating 1–5, notes); any auth user CRUD via `/api/vendors`; no transaction/contact FKs yet
+- Full-width CRM content (no content `max-w` caps)
 
 ## DOMAIN — Checklists
 

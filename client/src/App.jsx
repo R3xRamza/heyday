@@ -5,6 +5,7 @@ import { AgentScopeProvider } from './context/AgentScopeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import CRMHub from './pages/CRMHub';
+import VendorsHub from './pages/VendorsHub';
 import ContactDetail from './pages/ContactDetail';
 import TeamTaskOverview from './pages/TeamTaskOverview';
 import UserTaskDashboard from './pages/UserTaskDashboard';
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/" element={<RootRedirect />} />
           <Route path="/crm">
             <Route index element={<ProtectedRoute><CRMHub /></ProtectedRoute>} />
+            <Route path="vendors" element={<ProtectedRoute><VendorsHub /></ProtectedRoute>} />
             <Route path=":id" element={<ProtectedRoute><ContactDetail /></ProtectedRoute>} />
           </Route>
           <Route path="/tasks">

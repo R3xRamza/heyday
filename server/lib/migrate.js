@@ -147,8 +147,34 @@ export function runMigrations(db) {
   addColumnIfMissing(db, 'tasks', 'recurrence', 'TEXT');
   migrateTeamHubTables(db);
   migrateHubDocItemsTable(db);
+  migrateVendorsTable(db);
   migrateOpportunitiesTables(db);
   normalizeBuyerOpportunityRows(db);
+}
+
+function migrateVendorsTable(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS vendors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      company TEXT,
+      category TEXT,
+      phone TEXT,
+      email TEXT,
+      website TEXT,
+      rating INTEGER,
+      notes TEXT,
+      created_by INTEGER REFERENCES users(id),
+      updated_by INTEGER REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      CHECK (rating IS NULL OR (rating >= 1 AND rating <= 5))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_vendors_name ON vendors(name);
+    CREATE INDEX IF NOT EXISTS idx_vendors_category ON vendors(category);
+    CREATE INDEX IF NOT EXISTS idx_vendors_rating ON vendors(rating);
+  `);
 }
 
 function migrateHubDocItemsTable(db) {
