@@ -6,6 +6,7 @@ const router = Router();
 const SORT_MAP = {
   likes: 'like_count',
   name: 'v.name',
+  category: 'v.category',
   updated_at: 'v.updated_at',
 };
 
@@ -78,9 +79,9 @@ router.get('/', (req, res) => {
 
   const sortKey = SORT_MAP[req.query.sort] || SORT_MAP.likes;
   const sortDir = req.query.order === 'asc' ? 'ASC' : 'DESC';
-  const orderBy = sortKey === 'v.name'
-    ? `v.name ${sortDir}`
-    : `${sortKey} ${sortDir}, v.name ASC`;
+  const orderBy = sortKey === 'v.name' || sortKey === 'v.category'
+    ? `${sortKey} COLLATE NOCASE ${sortDir}, v.name COLLATE NOCASE ASC`
+    : `${sortKey} ${sortDir}, v.name COLLATE NOCASE ASC`;
 
   const conditions = ['1=1'];
   const params = [];
