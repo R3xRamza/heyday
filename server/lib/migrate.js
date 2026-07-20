@@ -163,13 +163,47 @@ function migrateVendorLikesTable(db) {
       user_id INTEGER NOT NULL REFERENCES users(id),
       note TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(vendor_id, user_id)
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE INDEX IF NOT EXISTS idx_vendor_likes_vendor ON vendor_likes(vendor_id);
     CREATE INDEX IF NOT EXISTS idx_vendor_likes_user ON vendor_likes(user_id);
   `);
+
+  // Drop one-like-per-user UNIQUE so people can like (and note) multiple times
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )
+  `);
+  const done = db.prepare("SELECT 1 FROM app_meta WHERE key = 'vendor_likes_multi_v1'").get();
+  if (done) return;
+
+  const tableSql = db.prepare(`
+    SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'vendor_likes'
+  `).get()?.sql || '';
+
+  if (tableSql.includes('UNIQUE(vendor_id, user_id)')) {
+    db.exec(`
+      CREATE TABLE vendor_likes_multi (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vendor_id INTEGER NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        note TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO vendor_likes_multi (id, vendor_id, user_id, note, created_at, updated_at)
+        SELECT id, vendor_id, user_id, note, created_at, updated_at FROM vendor_likes;
+      DROP TABLE vendor_likes;
+      ALTER TABLE vendor_likes_multi RENAME TO vendor_likes;
+      CREATE INDEX IF NOT EXISTS idx_vendor_likes_vendor ON vendor_likes(vendor_id);
+      CREATE INDEX IF NOT EXISTS idx_vendor_likes_user ON vendor_likes(user_id);
+    `);
+  }
+
+  db.prepare("INSERT INTO app_meta (key, value) VALUES ('vendor_likes_multi_v1', '1')").run();
 }
 
 function migrateVendorsTable(db) {
