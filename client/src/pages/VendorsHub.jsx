@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import CrmHubTabs from '../components/crm/CrmHubTabs';
-import VendorStars from '../components/crm/VendorStars';
+import VendorLikeButton from '../components/crm/VendorLikeButton';
 import Icon from '../components/shared/Icon';
 import ListPagination from '../components/shared/ListPagination';
+import DateText from '../components/shared/DateText';
 
 const EMPTY_FORM = {
   name: '',
@@ -12,7 +13,6 @@ const EMPTY_FORM = {
   phone: '',
   email: '',
   website: '',
-  rating: null,
   notes: '',
 };
 
@@ -27,10 +27,22 @@ function CategoryChip({ category }) {
     return <span className="text-on-surface-variant/40">—</span>;
   }
   return (
-    <span className="inline-flex max-w-full px-2 py-0.5 rounded-full text-[11px] font-semibold border bg-primary-container/10 text-primary-container border-primary-container/20 truncate">
+    <span className="inline-flex max-w-full px-3 py-1 rounded-full text-sm font-semibold border bg-primary-container/10 text-primary-container border-primary-container/25 truncate">
       {category}
     </span>
   );
+}
+
+function formFromVendor(vendor) {
+  return {
+    name: vendor.name || '',
+    company: vendor.company || '',
+    category: vendor.category || '',
+    phone: vendor.phone || '',
+    email: vendor.email || '',
+    website: vendor.website || '',
+    notes: vendor.notes || '',
+  };
 }
 
 function VendorDrawer({
@@ -38,11 +50,19 @@ function VendorDrawer({
   form,
   setForm,
   categories,
+  likes,
+  likedByMe,
+  likeNote,
+  setLikeNote,
+  likeCount,
+  likeBusy,
   saving,
   error,
   onClose,
   onSave,
   onDelete,
+  onLike,
+  onUnlike,
 }) {
   const isCreate = mode === 'create';
 
@@ -143,31 +163,87 @@ function VendorDrawer({
               placeholder="https://"
             />
           </label>
-          <div className="space-y-1">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
-              Rating
-            </span>
-            <div className="flex items-center gap-2">
-              <VendorStars
-                rating={form.rating}
-                onChange={(r) => setForm((f) => ({ ...f, rating: r }))}
-              />
-              <span className="text-[11px] text-on-surface-variant">
-                {form.rating ? `${form.rating}/5` : 'Click a star · click again to clear'}
-              </span>
-            </div>
-          </div>
           <label className="block space-y-1">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
-              Notes
+              Team notes
             </span>
             <textarea
-              className={`${inputClass} min-h-[8rem] resize-y`}
+              className={`${inputClass} min-h-[5rem] resize-y`}
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              placeholder="Team notes about this vendor…"
+              placeholder="General notes about this vendor…"
             />
           </label>
+
+          {!isCreate && (
+            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low/40 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
+                  Likes
+                </p>
+                <VendorLikeButton count={likeCount} liked={likedByMe} size="md" />
+              </div>
+              <label className="block space-y-1">
+                <span className="text-[11px] text-on-surface-variant">
+                  {likedByMe ? 'Your note with this like' : 'Optional note when you like'}
+                </span>
+                <textarea
+                  className={`${inputClass} min-h-[4.5rem] resize-y bg-white`}
+                  value={likeNote}
+                  onChange={(e) => setLikeNote(e.target.value)}
+                  placeholder="Why you recommend them…"
+                  disabled={likeBusy}
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={likeBusy}
+                  onClick={onLike}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-secondary text-white hover:bg-secondary/90 disabled:opacity-50"
+                >
+                  {likeBusy ? 'Saving…' : likedByMe ? 'Update like note' : 'Like + save note'}
+                </button>
+                {likedByMe && (
+                  <button
+                    type="button"
+                    disabled={likeBusy}
+                    onClick={onUnlike}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg text-on-surface-variant hover:bg-white disabled:opacity-50"
+                  >
+                    Unlike
+                  </button>
+                )}
+              </div>
+
+              {likes?.length > 0 && (
+                <ul className="space-y-2.5 pt-2 border-t border-outline-variant/10">
+                  {likes.map((like) => (
+                    <li key={like.id} className="text-sm">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="font-semibold text-primary truncate">
+                          {like.user_name || 'Teammate'}
+                          {like.is_mine ? (
+                            <span className="ml-1 text-[10px] font-semibold uppercase text-secondary">You</span>
+                          ) : null}
+                        </p>
+                        <DateText
+                          value={like.created_at?.slice?.(0, 10) || like.created_at}
+                          className="text-[11px] text-on-surface-variant shrink-0"
+                        />
+                      </div>
+                      {like.note ? (
+                        <p className="text-on-surface-variant mt-0.5 whitespace-pre-wrap">{like.note}</p>
+                      ) : (
+                        <p className="text-on-surface-variant/50 text-xs mt-0.5 italic">Liked</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           {error && <p className="text-sm text-error">{error}</p>}
         </div>
 
@@ -208,13 +284,18 @@ export default function VendorsHub() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState('');
-  const [sort, setSort] = useState('name');
+  const [sort, setSort] = useState('likes');
   const [page, setPage] = useState(1);
   const [data, setData] = useState({ vendors: [], total: 0 });
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [drawer, setDrawer] = useState(null); // null | 'create' | vendor id
+  const [drawer, setDrawer] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [likes, setLikes] = useState([]);
+  const [likedByMe, setLikedByMe] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [likeNote, setLikeNote] = useState('');
+  const [likeBusy, setLikeBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -259,30 +340,123 @@ export default function VendorsHub() {
     fetchVendors();
   }, [fetchVendors]);
 
+  function applyVendorDetail(vendor) {
+    setForm(formFromVendor(vendor));
+    setLikes(vendor.likes || []);
+    setLikedByMe(!!vendor.liked_by_me);
+    setLikeCount(vendor.like_count ?? 0);
+    const mine = (vendor.likes || []).find((l) => l.is_mine);
+    setLikeNote(mine?.note || '');
+  }
+
+  function patchVendorInList(vendor) {
+    setData((prev) => ({
+      ...prev,
+      vendors: (prev.vendors || []).map((v) =>
+        v.id === vendor.id
+          ? {
+            ...v,
+            like_count: vendor.like_count ?? 0,
+            liked_by_me: !!vendor.liked_by_me,
+          }
+          : v,
+      ),
+    }));
+    if (drawer === vendor.id) {
+      applyVendorDetail(vendor);
+    }
+  }
+
   function openCreate() {
     setForm({ ...EMPTY_FORM });
+    setLikes([]);
+    setLikedByMe(false);
+    setLikeCount(0);
+    setLikeNote('');
     setError('');
     setDrawer('create');
   }
 
-  function openEdit(vendor) {
-    setForm({
-      name: vendor.name || '',
-      company: vendor.company || '',
-      category: vendor.category || '',
-      phone: vendor.phone || '',
-      email: vendor.email || '',
-      website: vendor.website || '',
-      rating: vendor.rating ?? null,
-      notes: vendor.notes || '',
-    });
+  async function openEdit(vendor) {
     setError('');
     setDrawer(vendor.id);
+    setForm(formFromVendor(vendor));
+    setLikedByMe(!!vendor.liked_by_me);
+    setLikeCount(vendor.like_count ?? 0);
+    setLikeNote('');
+    setLikes([]);
+
+    const res = await fetch(`/api/vendors/${vendor.id}`, { credentials: 'include' });
+    if (!res.ok) return;
+    const json = await res.json();
+    if (json.vendor) applyVendorDetail(json.vendor);
   }
 
   function closeDrawer() {
     setDrawer(null);
     setError('');
+  }
+
+  async function handleLike() {
+    if (drawer === 'create' || drawer == null) return;
+    setLikeBusy(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/vendors/${drawer}/likes`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: likeNote.trim() || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Could not like');
+        setLikeBusy(false);
+        return;
+      }
+      patchVendorInList(json.vendor);
+      await fetchVendors();
+    } catch {
+      setError('Could not like');
+    }
+    setLikeBusy(false);
+  }
+
+  async function handleUnlike() {
+    if (drawer === 'create' || drawer == null) return;
+    setLikeBusy(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/vendors/${drawer}/likes`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Could not unlike');
+        setLikeBusy(false);
+        return;
+      }
+      patchVendorInList(json.vendor);
+      setLikeNote('');
+      await fetchVendors();
+    } catch {
+      setError('Could not unlike');
+    }
+    setLikeBusy(false);
+  }
+
+  async function toggleLikeFromList(vendor) {
+    const liked = !!vendor.liked_by_me;
+    const res = await fetch(`/api/vendors/${vendor.id}/likes`, {
+      method: liked ? 'DELETE' : 'POST',
+      credentials: 'include',
+      headers: liked ? undefined : { 'Content-Type': 'application/json' },
+      body: liked ? undefined : JSON.stringify({ note: null }),
+    });
+    if (!res.ok) return;
+    const json = await res.json();
+    patchVendorInList(json.vendor);
   }
 
   async function handleSave() {
@@ -297,7 +471,6 @@ export default function VendorsHub() {
       phone: form.phone.trim() || null,
       email: form.email.trim() || null,
       website: form.website.trim() || null,
-      rating: form.rating,
       notes: form.notes.trim() || null,
     };
 
@@ -408,8 +581,8 @@ export default function VendorsHub() {
               }}
               className={`${selectClass} w-[9rem]`}
             >
+              <option value="likes">Sort: Likes</option>
               <option value="name">Sort: Name</option>
-              <option value="rating">Sort: Rating</option>
               <option value="updated_at">Sort: Updated</option>
             </select>
             <button
@@ -447,8 +620,8 @@ export default function VendorsHub() {
             <table className="w-full text-left border-collapse table-fixed min-w-[780px]">
               <colgroup>
                 <col className="w-[22%]" />
-                <col className="w-[14%]" />
-                <col className="w-[12%]" />
+                <col className="w-[16%]" />
+                <col className="w-[10%]" />
                 <col className="w-[14%]" />
                 <col className="w-[16%]" />
                 <col className="w-[18%]" />
@@ -456,7 +629,7 @@ export default function VendorsHub() {
               </colgroup>
               <thead className="bg-surface-container-low border-b border-outline-variant/10">
                 <tr>
-                  {['Vendor', 'Category', 'Rating', 'Phone', 'Email', 'Notes', ''].map((h) => (
+                  {['Vendor', 'Category', 'Likes', 'Phone', 'Email', 'Notes', ''].map((h) => (
                     <th
                       key={h || 'chevron'}
                       className="px-4 py-3 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider"
@@ -512,11 +685,11 @@ export default function VendorsHub() {
                         <CategoryChip category={v.category} />
                       </td>
                       <td className="px-4 py-3">
-                        {v.rating != null ? (
-                          <VendorStars rating={v.rating} size="sm" />
-                        ) : (
-                          <span className="text-[12px] text-on-surface-variant/40">—</span>
-                        )}
+                        <VendorLikeButton
+                          count={v.like_count ?? 0}
+                          liked={!!v.liked_by_me}
+                          onToggle={() => toggleLikeFromList(v)}
+                        />
                       </td>
                       <td className="px-4 py-3 text-[13px] text-on-surface-variant truncate">
                         {v.phone || '—'}
@@ -549,11 +722,19 @@ export default function VendorsHub() {
           form={form}
           setForm={setForm}
           categories={categories}
+          likes={likes}
+          likedByMe={likedByMe}
+          likeNote={likeNote}
+          setLikeNote={setLikeNote}
+          likeCount={likeCount}
+          likeBusy={likeBusy}
           saving={saving}
           error={error}
           onClose={closeDrawer}
           onSave={handleSave}
           onDelete={handleDelete}
+          onLike={handleLike}
+          onUnlike={handleUnlike}
         />
       )}
     </DashboardLayout>

@@ -149,9 +149,27 @@ export function runMigrations(db) {
   migrateTeamHubTables(db);
   migrateHubDocItemsTable(db);
   migrateVendorsTable(db);
+  migrateVendorLikesTable(db);
   seedVendorsFromCrm(db);
   migrateOpportunitiesTables(db);
   normalizeBuyerOpportunityRows(db);
+}
+
+function migrateVendorLikesTable(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS vendor_likes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      vendor_id INTEGER NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      note TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(vendor_id, user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_vendor_likes_vendor ON vendor_likes(vendor_id);
+    CREATE INDEX IF NOT EXISTS idx_vendor_likes_user ON vendor_likes(user_id);
+  `);
 }
 
 function migrateVendorsTable(db) {
