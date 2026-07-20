@@ -22,42 +22,14 @@ const selectClass =
 const inputClass =
   'w-full px-3 py-2 border border-outline-variant/25 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-secondary/30';
 
-function VendorCard({ vendor, selected, onClick }) {
+function CategoryChip({ category }) {
+  if (!category) {
+    return <span className="text-on-surface-variant/40">—</span>;
+  }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full text-left rounded-xl border p-4 transition-all ${
-        selected
-          ? 'border-secondary bg-secondary/5 ring-2 ring-secondary/20'
-          : 'border-outline-variant/15 bg-white hover:border-secondary/40 hover:shadow-sm'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="min-w-0">
-          <p className="font-semibold text-primary truncate">{vendor.name}</p>
-          {vendor.company && (
-            <p className="text-xs text-on-surface-variant truncate">{vendor.company}</p>
-          )}
-        </div>
-        {vendor.category && (
-          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-primary-container/10 text-primary-container border border-primary-container/20 truncate max-w-[7rem]">
-            {vendor.category}
-          </span>
-        )}
-      </div>
-      <VendorStars rating={vendor.rating} size="sm" className="mb-2" />
-      <div className="space-y-0.5 text-[12px] text-on-surface-variant">
-        {vendor.phone && <p className="truncate">{vendor.phone}</p>}
-        {vendor.email && <p className="truncate">{vendor.email}</p>}
-        {!vendor.phone && !vendor.email && <p className="text-on-surface-variant/50">No contact info</p>}
-      </div>
-      {vendor.notes && (
-        <p className="mt-2 text-[12px] text-on-surface-variant/80 line-clamp-2 whitespace-pre-wrap">
-          {vendor.notes}
-        </p>
-      )}
-    </button>
+    <span className="inline-flex max-w-full px-2 py-0.5 rounded-full text-[11px] font-semibold border bg-primary-container/10 text-primary-container border-primary-container/20 truncate">
+      {category}
+    </span>
   );
 }
 
@@ -236,7 +208,7 @@ export default function VendorsHub() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState('');
-  const [sort, setSort] = useState('rating');
+  const [sort, setSort] = useState('name');
   const [page, setPage] = useState(1);
   const [data, setData] = useState({ vendors: [], total: 0 });
   const [categories, setCategories] = useState([]);
@@ -276,6 +248,8 @@ export default function VendorsHub() {
     setData(json);
     setLoading(false);
   }, [page, debouncedSearch, category, sort]);
+
+  const hasFilters = !!(debouncedSearch || category);
 
   useEffect(() => {
     loadCategories();
@@ -377,25 +351,24 @@ export default function VendorsHub() {
   const selectedId = drawer !== 'create' && drawer != null ? drawer : null;
 
   return (
-    <DashboardLayout title="CRM Hub" headerRight={<CrmHubTabs />} className="p-6 lg:p-8">
-      <div className="w-full space-y-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-bold text-primary">Vendors</h2>
-            <p className="text-sm text-on-surface-variant mt-0.5">
-              Team directory of preferred vendors — notes and ratings shared by everyone.
-            </p>
-          </div>
+    <DashboardLayout
+      title="CRM Hub"
+      headerRight={(
+        <div className="flex items-center gap-2">
+          <CrmHubTabs />
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90"
+            className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold uppercase tracking-wide hover:bg-primary/90"
           >
-            <Icon name="add" className="!text-[18px]" />
-            Add vendor
+            <Icon name="add" className="!text-[16px]" />
+            Add
           </button>
         </div>
-
+      )}
+      className="p-6 lg:p-8"
+    >
+      <div className="w-full space-y-5">
         <div className="rounded-xl border border-outline-variant/15 bg-white p-3 sm:p-4 space-y-3 shadow-sm">
           <div className="flex flex-wrap gap-2 items-center">
             <div className="relative flex-1 min-w-[14rem]">
@@ -419,7 +392,7 @@ export default function VendorsHub() {
                 setCategory(e.target.value);
                 setPage(1);
               }}
-              placeholder="Category filter…"
+              placeholder="Category…"
               className={`${selectClass} w-[10rem]`}
             />
             <datalist id="vendor-filter-categories">
@@ -435,51 +408,139 @@ export default function VendorsHub() {
               }}
               className={`${selectClass} w-[9rem]`}
             >
-              <option value="rating">Sort: Rating</option>
               <option value="name">Sort: Name</option>
+              <option value="rating">Sort: Rating</option>
               <option value="updated_at">Sort: Updated</option>
             </select>
-          </div>
-          <p className="text-xs text-on-surface-variant">
-            {loading ? 'Loading…' : `${data.total?.toLocaleString() ?? 0} vendors`}
-          </p>
-        </div>
-
-        {loading ? (
-          <div className="rounded-xl border border-outline-variant/15 bg-white py-16 text-center text-on-surface-variant">
-            Loading vendors…
-          </div>
-        ) : data.vendors.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-outline-variant/30 bg-white py-16 px-6 text-center">
-            <Icon name="storefront" className="!text-[40px] text-on-surface-variant/40 mb-3" />
-            <p className="font-semibold text-primary mb-1">No vendors yet</p>
-            <p className="text-sm text-on-surface-variant mb-4 max-w-sm mx-auto">
-              Add inspectors, title companies, photographers, and other partners the team recommends.
-            </p>
             <button
               type="button"
               onClick={openCreate}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90"
+              className="sm:hidden inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-white text-sm font-semibold"
             >
               <Icon name="add" className="!text-[18px]" />
-              Add first vendor
+              Add
             </button>
           </div>
-        ) : (
-          <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low/40 overflow-hidden">
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 p-3 sm:p-4">
-              {data.vendors.map((v) => (
-                <VendorCard
-                  key={v.id}
-                  vendor={v}
-                  selected={selectedId === v.id}
-                  onClick={() => openEdit(v)}
-                />
-              ))}
-            </div>
-            <ListPagination page={page} total={data.total ?? 0} onPageChange={setPage} />
+          <div className="flex items-center justify-between text-xs text-on-surface-variant">
+            <span>
+              {loading ? 'Loading…' : `${data.total?.toLocaleString() ?? 0} vendors`}
+              {hasFilters && ' (filtered)'}
+            </span>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setCategory('');
+                  setPage(1);
+                }}
+                className="text-secondary font-semibold hover:underline"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
-        )}
+        </div>
+
+        <div className="rounded-xl border border-outline-variant/15 bg-white overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse table-fixed min-w-[780px]">
+              <colgroup>
+                <col className="w-[22%]" />
+                <col className="w-[14%]" />
+                <col className="w-[12%]" />
+                <col className="w-[14%]" />
+                <col className="w-[16%]" />
+                <col className="w-[18%]" />
+                <col className="w-10" />
+              </colgroup>
+              <thead className="bg-surface-container-low border-b border-outline-variant/10">
+                <tr>
+                  {['Vendor', 'Category', 'Rating', 'Phone', 'Email', 'Notes', ''].map((h) => (
+                    <th
+                      key={h || 'chevron'}
+                      className="px-4 py-3 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/5">
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-14 text-center text-on-surface-variant">
+                      Loading vendors…
+                    </td>
+                  </tr>
+                ) : data.vendors.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-14 text-center">
+                      <Icon name="storefront" className="!text-[36px] text-on-surface-variant/40 mb-2" />
+                      <p className="font-semibold text-primary mb-1">No vendors match</p>
+                      <p className="text-sm text-on-surface-variant mb-3">
+                        Try clearing filters or add a new vendor.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={openCreate}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90"
+                      >
+                        <Icon name="add" className="!text-[18px]" />
+                        Add vendor
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  data.vendors.map((v) => (
+                    <tr
+                      key={v.id}
+                      onClick={() => openEdit(v)}
+                      className={`transition-colors cursor-pointer group ${
+                        selectedId === v.id
+                          ? 'bg-secondary/5'
+                          : 'hover:bg-primary-container/5'
+                      }`}
+                    >
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-sm text-primary truncate">{v.name}</p>
+                        {v.company && (
+                          <p className="text-[11px] text-on-surface-variant truncate">{v.company}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <CategoryChip category={v.category} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {v.rating != null ? (
+                          <VendorStars rating={v.rating} size="sm" />
+                        ) : (
+                          <span className="text-[12px] text-on-surface-variant/40">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-[13px] text-on-surface-variant truncate">
+                        {v.phone || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-[13px] text-on-surface-variant truncate">
+                        {v.email || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-[12px] text-on-surface-variant/80 truncate">
+                        {v.notes || '—'}
+                      </td>
+                      <td className="px-2 py-3 text-right">
+                        <Icon
+                          name="chevron_right"
+                          className="text-outline group-hover:text-primary transition-colors !text-[20px]"
+                        />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <ListPagination page={page} total={data.total ?? 0} onPageChange={setPage} />
+        </div>
       </div>
 
       {drawer != null && (
