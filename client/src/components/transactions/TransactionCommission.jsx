@@ -209,7 +209,8 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   const breakdown = data?.breakdown;
   const anniversary = data?.anniversary;
   const price = salesPrice ?? data?.sales_price;
-  const appliesMeredithPlan = data?.applies_meredith_plan === true;
+  const appliesPlan = data?.applies_plan === true || data?.applies_meredith_plan === true;
+  const netLabel = data?.agent_label ? `Net to ${data.agent_label}` : 'Net';
 
   function switchGciMode(nextMode) {
     if (nextMode === gciMode) return;
@@ -281,7 +282,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
             />
           </div>
 
-          {appliesMeredithPlan && (
+          {appliesPlan && (
             <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive border-l-4 border-l-secondary">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                 <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
@@ -362,7 +363,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                   <span>Gross commission</span>
                   <span className="tabular-nums">{formatMoney(breakdown.gci)}</span>
                 </div>
-                {appliesMeredithPlan && (
+                {appliesPlan && (
                   <ul className="space-y-2 border-t border-outline-variant/10 pt-3">
                     {breakdown.lines
                       .filter((line) => !String(line.key).startsWith('custom_'))
@@ -470,7 +471,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
 
             {breakdown && (
               <div className="mt-5 pt-4 border-t border-outline-variant/15 space-y-2">
-                {appliesMeredithPlan && (
+                {appliesPlan && (
                   <>
                     <div className="flex justify-between text-xs">
                       <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Post-split</span>
@@ -488,8 +489,8 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                     </div>
                   </>
                 )}
-                <div className={`flex justify-between text-base font-black text-secondary ${appliesMeredithPlan ? 'pt-2 border-t border-primary/10' : ''}`}>
-                  <span>{appliesMeredithPlan ? 'Net to Meredith' : 'Net'}</span>
+                <div className={`flex justify-between text-base font-black text-secondary ${appliesPlan ? 'pt-2 border-t border-primary/10' : ''}`}>
+                  <span>{appliesPlan ? netLabel : 'Net'}</span>
                   <span className="tabular-nums">{formatMoney(breakdown.net)}</span>
                 </div>
               </div>

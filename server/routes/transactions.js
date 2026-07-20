@@ -29,7 +29,6 @@ import { runBrokermintImport, fixBrokermintAgentIds } from '../lib/brokermintImp
 import { parsePagination } from '../lib/pagination.js';
 import { SALE_TYPE_REFERRAL } from '../lib/partyRoles.js';
 import {
-  COMMISSION_SETTINGS,
   computeDealCommission,
   computeYearCommissions,
   anniversaryWindowForDate,
@@ -39,6 +38,11 @@ import {
   resolveGrossCommission,
   normalizeGciMode,
 } from '../lib/commissionPlans.js';
+import {
+  getTemplateSettingsForAgentId,
+  agentKeyFromUserId,
+  TEMPLATE_AGENT_LABELS,
+} from '../lib/revenueTemplates.js';
 
 const router = Router();
 
@@ -100,14 +104,6 @@ function todayYmd() {
   return `${y}-${mo}-${d}`;
 }
 
-const MEREDITH_EMAIL = 'meredith@theheydaygroup.com';
-
-function isMeredithAgent(agentId) {
-  if (agentId == null || agentId === '') return false;
-  const row = db.prepare('SELECT email FROM users WHERE id = ?').get(Number(agentId));
-  return String(row?.email || '').toLowerCase() === MEREDITH_EMAIL;
-}
-
 function isReferralSale(tx) {
   return normalizeSaleType(tx?.sale_type, tx?.representing) === SALE_TYPE_REFERRAL;
 }
@@ -116,11 +112,14 @@ function buildCommissionSummary(tx) {
   const dealDate = tx.close_date || todayYmd();
   const window = anniversaryWindowForDate(dealDate);
   const agentId = tx.agent_id != null ? Number(tx.agent_id) : null;
-  // eXp / team fees only for Meredith non-referral deals
-  const appliesMeredithPlan = isMeredithAgent(agentId) && !isReferralSale(tx);
+  const agentKey = agentKeyFromUserId(db, agentId);
+  const settings = getTemplateSettingsForAgentId(db, agentId);
+  // eXp / team fees for any templated agent on non-referral deals
+  const appliesPlan = Boolean(agentKey) && !isReferralSale(tx);
+  const agentLabel = agentKey ? TEMPLATE_AGENT_LABELS[agentKey] : null;
 
   let peers = [];
-  if (appliesMeredithPlan && agentId) {
+  if (appliesPlan && agentId) {
     peers = db.prepare(`
       SELECT id, close_date, gross_commission, commission_custom_fees,
         stage, address, value, sale_type, representing
@@ -138,8 +137,8 @@ function buildCommissionSummary(tx) {
     return dealSortsBefore(p, tx, dealDate);
   });
 
-  const priorRun = appliesMeredithPlan
-    ? computeYearCommissions(prior)
+  const priorRun = appliesPlan
+    ? computeYearCommissions(prior, 0, settings)
     : { results: [], capPaid: 0, riskPaid: 0, cappedFeesPaid: 0 };
   const gciMode = normalizeGciMode(tx.commission_gci_mode);
   const gciPercent = tx.commission_gci_percent != null && tx.commission_gci_percent !== ''
@@ -155,7 +154,7 @@ function buildCommissionSummary(tx) {
 
   const overrides = {
     customFees: tx.commission_custom_fees,
-    applyPlanFees: appliesMeredithPlan,
+    applyPlanFees: appliesPlan,
   };
 
   const ytdBefore = {
@@ -165,34 +164,37 @@ function buildCommissionSummary(tx) {
   };
 
   const breakdown = hasGci
-    ? computeDealCommission(gci, ytdBefore, overrides)
+    ? computeDealCommission(gci, ytdBefore, overrides, settings)
     : null;
 
-  const capPaid = appliesMeredithPlan
+  const capPaid = appliesPlan
     ? (breakdown ? breakdown.capPaidAfter : priorRun.capPaid)
     : null;
-  const riskPaid = appliesMeredithPlan
+  const riskPaid = appliesPlan
     ? (breakdown ? breakdown.riskPaidAfter : priorRun.riskPaid)
     : null;
-  const cappedFeesPaid = appliesMeredithPlan
+  const cappedFeesPaid = appliesPlan
     ? (breakdown ? breakdown.cappedFeesPaidAfter : priorRun.cappedFeesPaid)
     : null;
-  const afterCap = appliesMeredithPlan && (
-    capPaid >= COMMISSION_SETTINGS.capAmount
-    || (breakdown ? breakdown.plan === 'after_cap' : priorRun.capPaid >= COMMISSION_SETTINGS.capAmount)
+  const afterCap = appliesPlan && (
+    capPaid >= settings.capAmount
+    || (breakdown ? breakdown.plan === 'after_cap' : priorRun.capPaid >= settings.capAmount)
   );
 
-  const displayCappedFeeRate = !appliesMeredithPlan
+  const displayCappedFeeRate = !appliesPlan
     ? null
     : afterCap
-      ? (priorRun.cappedFeesPaid >= COMMISSION_SETTINGS.cappedFeesStepDownAt
-        ? COMMISSION_SETTINGS.cappedTransactionFeeReduced
-        : COMMISSION_SETTINGS.cappedTransactionFee)
+      ? (priorRun.cappedFeesPaid >= settings.cappedFeesStepDownAt
+        ? settings.cappedTransactionFeeReduced
+        : settings.cappedTransactionFee)
       : (breakdown?.cappedFee || 0);
 
   return {
-    settings: COMMISSION_SETTINGS,
-    applies_meredith_plan: appliesMeredithPlan,
+    settings,
+    agent_key: agentKey,
+    agent_label: agentLabel,
+    applies_plan: appliesPlan,
+    applies_meredith_plan: appliesPlan,
     anniversary: {
       start: window.start,
       end: window.end,
@@ -208,16 +210,16 @@ function buildCommissionSummary(tx) {
     breakdown,
     progress: {
       capPaid,
-      capAmount: appliesMeredithPlan ? COMMISSION_SETTINGS.capAmount : null,
+      capAmount: appliesPlan ? settings.capAmount : null,
       riskPaid,
-      riskCap: appliesMeredithPlan ? COMMISSION_SETTINGS.riskManagementAnnualCap : null,
+      riskCap: appliesPlan ? settings.riskManagementAnnualCap : null,
       cappedFeesPaid,
-      cappedFeesStepDownAt: appliesMeredithPlan ? COMMISSION_SETTINGS.cappedFeesStepDownAt : null,
-      cappedFeeRate: breakdown && appliesMeredithPlan
+      cappedFeesStepDownAt: appliesPlan ? settings.cappedFeesStepDownAt : null,
+      cappedFeeRate: breakdown && appliesPlan
         ? (breakdown.cappedFee || displayCappedFeeRate)
         : displayCappedFeeRate,
-      plan: appliesMeredithPlan
-        ? (breakdown?.plan || (priorRun.capPaid >= COMMISSION_SETTINGS.capAmount ? 'after_cap' : 'before_cap'))
+      plan: appliesPlan
+        ? (breakdown?.plan || (priorRun.capPaid >= settings.capAmount ? 'after_cap' : 'before_cap'))
         : null,
     },
     ytdBefore,

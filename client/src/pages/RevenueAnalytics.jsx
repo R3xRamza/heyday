@@ -8,6 +8,7 @@ import PriceInput from '../components/shared/PriceInput';
 import { formatCurrency, shortAddress } from '../utils/format';
 import { useAgentScope } from '../context/AgentScopeContext';
 import { appendAgentScope } from '../utils/agentScope';
+import SplitTemplatesPanel from '../components/revenue/SplitTemplatesPanel';
 
 const MONTH_LABELS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -35,7 +36,7 @@ function PlanBadge({ plan }) {
   );
 }
 
-function BreakdownLines({ breakdown }) {
+function BreakdownLines({ breakdown, netLabel = 'Net' }) {
   return (
     <div className="rounded-lg bg-surface-container-low/60 border border-primary/5 px-4 py-3">
       <div className="flex justify-between text-xs font-bold text-primary mb-2">
@@ -53,7 +54,7 @@ function BreakdownLines({ breakdown }) {
         ))}
       </ul>
       <div className="flex justify-between text-sm font-black text-secondary border-t border-primary/10 mt-2 pt-2">
-        <span>Net to Meredith</span>
+        <span>{netLabel}</span>
         <span>{formatMoney(breakdown.net)}</span>
       </div>
     </div>
@@ -171,7 +172,10 @@ function DealsTable({ title, icon, headerClass, deals, emptyText, onSaveGci, pro
                 {expanded === deal.id && deal.hasGci && (
                   <tr className="bg-surface-container-low/30">
                     <td colSpan={6} className="px-4 py-3">
-                      <BreakdownLines breakdown={deal.breakdown} />
+                      <BreakdownLines
+                        breakdown={deal.breakdown}
+                        netLabel={deal.agent_name ? `Net to ${deal.agent_name}` : 'Net'}
+                      />
                     </td>
                   </tr>
                 )}
@@ -238,8 +242,11 @@ function MonthlyChart({ monthly }) {
 }
 
 function DistributionPanel({ summary }) {
+  const netLabel = summary?.agent_label
+    ? `Net to ${summary.agent_label}`
+    : 'Net';
   const rows = [
-    { label: 'Net to Meredith', amount: summary?.net ?? 0, className: 'bg-secondary', emphasis: true },
+    { label: netLabel, amount: summary?.net ?? 0, className: 'bg-secondary', emphasis: true },
     { label: 'eXp splits & fees', amount: (summary?.expSplit ?? 0) + (summary?.fees ?? 0), className: 'bg-feather' },
     { label: 'Tessa', amount: summary?.tessa ?? 0, className: 'bg-sky' },
     { label: 'Margaret', amount: summary?.margaret ?? 0, className: 'bg-lemon' },
@@ -312,7 +319,13 @@ export default function RevenueAnalytics() {
   }, [fetchData]);
 
   const s = data?.summary;
-  const capPct = s ? Math.min(100, Math.round((s.capPaid / s.capAmount) * 100)) : 0;
+  const titleLabel = s?.agent_label
+    ? (s.agent_label === 'All agents' ? 'Team Commission' : `${s.agent_label}'s Commission`)
+    : 'Commission';
+  const multiAgent = s?.multi_agent === true;
+  const capPct = s?.capAmount
+    ? Math.min(100, Math.round(((s.capPaid ?? 0) / s.capAmount) * 100))
+    : 0;
 
   return (
     <DashboardLayout title="Revenue" className="p-5 md:p-6">
@@ -320,7 +333,7 @@ export default function RevenueAnalytics() {
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <Icon name="payments" className="text-secondary !text-[20px]" />
-            <h2 className="text-base font-bold text-primary">Meredith&apos;s Commission</h2>
+            <h2 className="text-base font-bold text-primary">{titleLabel}</h2>
           </div>
           <div className="ml-auto flex items-center gap-2">
             {s?.anniversaryStart && s?.anniversaryEnd && (
@@ -340,6 +353,8 @@ export default function RevenueAnalytics() {
             </select>
           </div>
         </div>
+
+        <SplitTemplatesPanel onSaved={fetchData} />
 
         {loading && !data ? (
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
@@ -380,13 +395,22 @@ export default function RevenueAnalytics() {
                     <span className="px-1.5 py-0.5 rounded-full bg-secondary text-white text-[8px] font-black uppercase">Capped</span>
                   )}
                 </div>
-                <h2 className="text-2xl font-bold text-primary leading-tight mt-0.5">
-                  {formatMoney(s?.capPaid ?? 0)}
-                  <span className="text-sm font-semibold text-on-surface-variant"> / {formatCurrency(s?.capAmount ?? 0)}</span>
-                </h2>
-                <div className="w-full bg-white/70 h-1.5 rounded-full overflow-hidden mt-2">
-                  <div className="bg-secondary h-full rounded-full transition-all" style={{ width: `${capPct}%` }} />
-                </div>
+                {multiAgent ? (
+                  <>
+                    <h2 className="text-2xl font-bold text-primary leading-tight mt-0.5">Per agent</h2>
+                    <p className="text-[11px] text-on-surface-variant mt-1">Pick an agent in the scope toggle for cap progress</p>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-2xl font-bold text-primary leading-tight mt-0.5">
+                      {formatMoney(s?.capPaid ?? 0)}
+                      <span className="text-sm font-semibold text-on-surface-variant"> / {formatCurrency(s?.capAmount ?? 0)}</span>
+                    </h2>
+                    <div className="w-full bg-white/70 h-1.5 rounded-full overflow-hidden mt-2">
+                      <div className="bg-secondary h-full rounded-full transition-all" style={{ width: `${capPct}%` }} />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="relative overflow-hidden bg-gradient-to-br from-sky/25 to-secondary/10 p-4 rounded-xl border border-white/60 shadow-executive">
