@@ -124,8 +124,8 @@ router.get('/', (req, res) => {
 
   const category = (req.query.category || '').trim();
   if (category) {
-    conditions.push('LOWER(v.category) = LOWER(?)');
-    params.push(category);
+    conditions.push('LOWER(IFNULL(v.category,\'\')) LIKE ?');
+    params.push(`%${category.toLowerCase()}%`);
   }
 
   const where = conditions.join(' AND ');
