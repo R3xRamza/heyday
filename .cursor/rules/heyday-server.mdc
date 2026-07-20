@@ -16,7 +16,7 @@ alwaysApply: false
 
 ## Route mounts (`server/index.js`)
 
-`auth`, `gmail`, `crm`, `tasks`, `revenue`, `transactions`, `marketing`, `team`, `team-hub`, `checklists`, `projects`, `user-todos`, `address`, `hub-docs`
+`auth`, `gmail`, `crm`, `vendors`, `tasks`, `revenue`, `transactions`, `marketing`, `team`, `team-hub`, `checklists`, `projects`, `user-todos`, `address`, `hub-docs`
 
 ## Agent scope
 

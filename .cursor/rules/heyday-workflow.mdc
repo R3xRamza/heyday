@@ -43,7 +43,12 @@ End with: `npm run build must pass. No commit unless asked.`
 
 One slice per session (single feature/fix). New chats load rules from `.cursor/rules/` — do not assume prior chat memory.
 
-### Last session (2026-07-09)
+### Last session (2026-07-20)
+
+- **CRM Hub redesign** — full-bleed Contacts list, stage strip + toolbar fit
+- **Vendors** `/crm/vendors` — new `vendors` table + `/api/vendors`, in-hub Contacts|Vendors tabs (no sidebar item), notes + 1–5 ratings, any auth user CRUD
+
+### Prior session (2026-07-09)
 
 - **Feedback** `/feedback` — shared bullet list, `/api/hub-docs`, sidebar link
 - **Favicon** — HUB circle logo in `client/public/`
