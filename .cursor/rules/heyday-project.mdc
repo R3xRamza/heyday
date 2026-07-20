@@ -121,7 +121,7 @@ Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · CR
 - Contacts with birthday, anniversary, partner fields. Gmail sync → `contact_activity`
 - Hub: `/crm` Contacts + `/crm/vendors` Vendors via in-hub tabs (`CrmHubTabs`) — **no** separate sidebar Vendors item
 - Detail: `/crm/:id`
-- Vendors: standalone `vendors` table (name, company, free-text category, phone, email, website, notes); team **likes** via `vendor_likes` (multiple likes + optional notes per person); any auth user CRUD via `/api/vendors` (+ `POST /:id/likes`, `DELETE /:id/likes/:likeId`); seeded from bundled `server/data/vendors-seed.json` + CRM stage Vendors links; no transaction FKs yet
+- Vendors: standalone `vendors` table (name, company, free-text category, phone, email, website, notes); team **likes** via `vendor_likes` (multiple likes + optional notes per person); any auth user can add/edit/remove any like via `/api/vendors` (`POST|PATCH|DELETE …/likes`); seeded from bundled `server/data/vendors-seed.json` + CRM stage Vendors links; no transaction FKs yet
 - Full-width CRM content (no content `max-w` caps)
 
 ## DOMAIN — Checklists

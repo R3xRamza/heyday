@@ -215,18 +215,38 @@ router.post('/:id/likes', (req, res) => {
   res.status(201).json({ vendor: getVendor(vendor.id, req.user.id) });
 });
 
-/** Remove one like entry (own likes only). */
+/** Edit a like note — any auth user. */
+router.patch('/:id/likes/:likeId', (req, res) => {
+  const vendor = db.prepare('SELECT id FROM vendors WHERE id = ?').get(req.params.id);
+  if (!vendor) return res.status(404).json({ error: 'Not found' });
+
+  const like = db.prepare(`
+    SELECT id FROM vendor_likes WHERE id = ? AND vendor_id = ?
+  `).get(req.params.likeId, vendor.id);
+  if (!like) return res.status(404).json({ error: 'Like not found' });
+
+  if (!('note' in req.body)) {
+    return res.status(400).json({ error: 'note is required' });
+  }
+
+  db.prepare(`
+    UPDATE vendor_likes
+    SET note = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(trimOrNull(req.body.note), like.id);
+
+  res.json({ vendor: getVendor(vendor.id, req.user.id) });
+});
+
+/** Remove a like — any auth user. */
 router.delete('/:id/likes/:likeId', (req, res) => {
   const vendor = db.prepare('SELECT id FROM vendors WHERE id = ?').get(req.params.id);
   if (!vendor) return res.status(404).json({ error: 'Not found' });
 
   const like = db.prepare(`
-    SELECT id, user_id FROM vendor_likes WHERE id = ? AND vendor_id = ?
+    SELECT id FROM vendor_likes WHERE id = ? AND vendor_id = ?
   `).get(req.params.likeId, vendor.id);
   if (!like) return res.status(404).json({ error: 'Like not found' });
-  if (like.user_id !== req.user.id) {
-    return res.status(403).json({ error: 'You can only remove your own likes' });
-  }
 
   db.prepare('DELETE FROM vendor_likes WHERE id = ?').run(like.id);
   res.json({ vendor: getVendor(vendor.id, req.user.id) });

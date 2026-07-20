@@ -110,6 +110,67 @@ function LikeNoteModal({ vendorName, busy, onClose, onSubmit }) {
   );
 }
 
+function EditLikeNoteModal({ like, busy, onClose, onSubmit }) {
+  const [note, setNote] = useState(like?.note || '');
+
+  useEffect(() => {
+    setNote(like?.note || '');
+  }, [like]);
+
+  if (!like) return null;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-primary/25 backdrop-blur-[1px]"
+        aria-label="Close"
+        onClick={onClose}
+        disabled={busy}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-like-title"
+        className="relative w-full max-w-md rounded-xl bg-white shadow-2xl border border-outline-variant/15 p-5 space-y-4"
+      >
+        <h3 id="edit-like-title" className="text-lg font-bold text-primary">
+          Edit like note
+        </h3>
+        <p className="text-sm text-on-surface-variant">
+          From <span className="font-semibold text-primary">{like.user_name || 'Teammate'}</span>
+        </p>
+        <textarea
+          className={`${inputClass} min-h-[5.5rem] resize-y`}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Note (optional — leave blank to clear)"
+          autoFocus
+          disabled={busy}
+        />
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="px-4 py-2 text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low rounded-lg disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onSubmit(note.trim())}
+            className="px-4 py-2 text-sm font-semibold bg-secondary text-white rounded-lg hover:bg-secondary/90 disabled:opacity-50"
+          >
+            {busy ? 'Saving…' : 'Save note'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function formFromVendor(vendor) {
   return {
     name: vendor.name || '',
@@ -137,6 +198,7 @@ function VendorDrawer({
   onSave,
   onDelete,
   onLike,
+  onEditLike,
   onRemoveLike,
 }) {
   const isCreate = mode === 'create';
@@ -286,16 +348,22 @@ function VendorDrawer({
                             value={like.created_at?.slice?.(0, 10) || like.created_at}
                             className="text-[11px] text-on-surface-variant"
                           />
-                          {like.is_mine && (
-                            <button
-                              type="button"
-                              disabled={likeBusy}
-                              onClick={() => onRemoveLike(like.id)}
-                              className="text-[11px] font-semibold text-error hover:underline disabled:opacity-50"
-                            >
-                              Remove
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            disabled={likeBusy}
+                            onClick={() => onEditLike(like)}
+                            className="text-[11px] font-semibold text-secondary hover:underline disabled:opacity-50"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            disabled={likeBusy}
+                            onClick={() => onRemoveLike(like.id)}
+                            className="text-[11px] font-semibold text-error hover:underline disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
                         </div>
                       </div>
                       {like.note ? (
@@ -362,6 +430,7 @@ export default function VendorsHub() {
   const [likeCount, setLikeCount] = useState(0);
   const [likeBusy, setLikeBusy] = useState(false);
   const [likeModal, setLikeModal] = useState(null); // { vendorId, vendorName }
+  const [editLike, setEditLike] = useState(null); // like object
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -514,6 +583,32 @@ export default function VendorsHub() {
       await fetchVendors();
     } catch {
       setError('Could not remove like');
+    }
+    setLikeBusy(false);
+  }
+
+  async function submitEditLike(note) {
+    if (!editLike || drawer === 'create' || drawer == null) return;
+    setLikeBusy(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/vendors/${drawer}/likes/${editLike.id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: note || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Could not update note');
+        setLikeBusy(false);
+        return;
+      }
+      patchVendorInList(json.vendor);
+      setEditLike(null);
+      await fetchVendors();
+    } catch {
+      setError('Could not update note');
     }
     setLikeBusy(false);
   }
@@ -795,6 +890,7 @@ export default function VendorsHub() {
           onSave={handleSave}
           onDelete={handleDelete}
           onLike={handleLike}
+          onEditLike={setEditLike}
           onRemoveLike={handleRemoveLike}
         />
       )}
@@ -805,6 +901,15 @@ export default function VendorsHub() {
           busy={likeBusy}
           onClose={() => !likeBusy && setLikeModal(null)}
           onSubmit={submitLikeModal}
+        />
+      )}
+
+      {editLike && (
+        <EditLikeNoteModal
+          like={editLike}
+          busy={likeBusy}
+          onClose={() => !likeBusy && setEditLike(null)}
+          onSubmit={submitEditLike}
         />
       )}
     </DashboardLayout>
