@@ -52,8 +52,6 @@ function VendorDrawer({
   categories,
   likes,
   likedByMe,
-  likeNote,
-  setLikeNote,
   likeCount,
   likeBusy,
   saving,
@@ -62,7 +60,7 @@ function VendorDrawer({
   onSave,
   onDelete,
   onLike,
-  onUnlike,
+  onRemoveLike,
 }) {
   const isCreate = mode === 'create';
 
@@ -183,38 +181,17 @@ function VendorDrawer({
                 </p>
                 <VendorLikeButton count={likeCount} liked={likedByMe} size="md" />
               </div>
-              <label className="block space-y-1">
-                <span className="text-[11px] text-on-surface-variant">
-                  {likedByMe ? 'Your note with this like' : 'Optional note when you like'}
-                </span>
-                <textarea
-                  className={`${inputClass} min-h-[4.5rem] resize-y bg-white`}
-                  value={likeNote}
-                  onChange={(e) => setLikeNote(e.target.value)}
-                  placeholder="Why you recommend them…"
-                  disabled={likeBusy}
-                />
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={likeBusy}
-                  onClick={onLike}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-secondary text-white hover:bg-secondary/90 disabled:opacity-50"
-                >
-                  {likeBusy ? 'Saving…' : likedByMe ? 'Update like note' : 'Like + save note'}
-                </button>
-                {likedByMe && (
-                  <button
-                    type="button"
-                    disabled={likeBusy}
-                    onClick={onUnlike}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-lg text-on-surface-variant hover:bg-white disabled:opacity-50"
-                  >
-                    Unlike
-                  </button>
-                )}
-              </div>
+              <button
+                type="button"
+                disabled={likeBusy}
+                onClick={onLike}
+                className="w-full px-3 py-2 text-sm font-semibold rounded-lg bg-secondary text-white hover:bg-secondary/90 disabled:opacity-50"
+              >
+                {likeBusy ? 'Saving…' : 'Add a like'}
+              </button>
+              <p className="text-[11px] text-on-surface-variant">
+                You’ll be asked if you want to leave a note. You can like multiple times.
+              </p>
 
               {likes?.length > 0 && (
                 <ul className="space-y-2.5 pt-2 border-t border-outline-variant/10">
@@ -227,10 +204,22 @@ function VendorDrawer({
                             <span className="ml-1 text-[10px] font-semibold uppercase text-secondary">You</span>
                           ) : null}
                         </p>
-                        <DateText
-                          value={like.created_at?.slice?.(0, 10) || like.created_at}
-                          className="text-[11px] text-on-surface-variant shrink-0"
-                        />
+                        <div className="flex items-center gap-2 shrink-0">
+                          <DateText
+                            value={like.created_at?.slice?.(0, 10) || like.created_at}
+                            className="text-[11px] text-on-surface-variant"
+                          />
+                          {like.is_mine && (
+                            <button
+                              type="button"
+                              disabled={likeBusy}
+                              onClick={() => onRemoveLike(like.id)}
+                              className="text-[11px] font-semibold text-error hover:underline disabled:opacity-50"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {like.note ? (
                         <p className="text-on-surface-variant mt-0.5 whitespace-pre-wrap">{like.note}</p>
@@ -294,7 +283,6 @@ export default function VendorsHub() {
   const [likes, setLikes] = useState([]);
   const [likedByMe, setLikedByMe] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
-  const [likeNote, setLikeNote] = useState('');
   const [likeBusy, setLikeBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -345,8 +333,6 @@ export default function VendorsHub() {
     setLikes(vendor.likes || []);
     setLikedByMe(!!vendor.liked_by_me);
     setLikeCount(vendor.like_count ?? 0);
-    const mine = (vendor.likes || []).find((l) => l.is_mine);
-    setLikeNote(mine?.note || '');
   }
 
   function patchVendorInList(vendor) {
@@ -367,12 +353,32 @@ export default function VendorsHub() {
     }
   }
 
+  /** Ask whether to leave a note; returns note string or null (cancelled). */
+  function promptLikeNote() {
+    const wantNote = window.confirm('Leave a note with this like?');
+    if (!wantNote) return '';
+    const note = window.prompt('Note for this like (optional):', '');
+    if (note === null) return null; // cancelled prompt
+    return note.trim();
+  }
+
+  async function postLike(vendorId, note) {
+    const res = await fetch(`/api/vendors/${vendorId}/likes`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note: note || null }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Could not like');
+    return json.vendor;
+  }
+
   function openCreate() {
     setForm({ ...EMPTY_FORM });
     setLikes([]);
     setLikedByMe(false);
     setLikeCount(0);
-    setLikeNote('');
     setError('');
     setDrawer('create');
   }
@@ -383,7 +389,6 @@ export default function VendorsHub() {
     setForm(formFromVendor(vendor));
     setLikedByMe(!!vendor.liked_by_me);
     setLikeCount(vendor.like_count ?? 0);
-    setLikeNote('');
     setLikes([]);
 
     const res = await fetch(`/api/vendors/${vendor.id}`, { credentials: 'include' });
@@ -399,64 +404,53 @@ export default function VendorsHub() {
 
   async function handleLike() {
     if (drawer === 'create' || drawer == null) return;
+    const note = promptLikeNote();
+    if (note === null) return;
     setLikeBusy(true);
     setError('');
     try {
-      const res = await fetch(`/api/vendors/${drawer}/likes`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note: likeNote.trim() || null }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error || 'Could not like');
-        setLikeBusy(false);
-        return;
-      }
-      patchVendorInList(json.vendor);
+      const vendor = await postLike(drawer, note);
+      patchVendorInList(vendor);
       await fetchVendors();
-    } catch {
-      setError('Could not like');
+    } catch (err) {
+      setError(err.message || 'Could not like');
     }
     setLikeBusy(false);
   }
 
-  async function handleUnlike() {
+  async function handleRemoveLike(likeId) {
     if (drawer === 'create' || drawer == null) return;
+    if (!window.confirm('Remove this like?')) return;
     setLikeBusy(true);
     setError('');
     try {
-      const res = await fetch(`/api/vendors/${drawer}/likes`, {
+      const res = await fetch(`/api/vendors/${drawer}/likes/${likeId}`, {
         method: 'DELETE',
         credentials: 'include',
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json.error || 'Could not unlike');
+        setError(json.error || 'Could not remove like');
         setLikeBusy(false);
         return;
       }
       patchVendorInList(json.vendor);
-      setLikeNote('');
       await fetchVendors();
     } catch {
-      setError('Could not unlike');
+      setError('Could not remove like');
     }
     setLikeBusy(false);
   }
 
-  async function toggleLikeFromList(vendor) {
-    const liked = !!vendor.liked_by_me;
-    const res = await fetch(`/api/vendors/${vendor.id}/likes`, {
-      method: liked ? 'DELETE' : 'POST',
-      credentials: 'include',
-      headers: liked ? undefined : { 'Content-Type': 'application/json' },
-      body: liked ? undefined : JSON.stringify({ note: null }),
-    });
-    if (!res.ok) return;
-    const json = await res.json();
-    patchVendorInList(json.vendor);
+  async function addLikeFromList(vendor) {
+    const note = promptLikeNote();
+    if (note === null) return;
+    try {
+      const updated = await postLike(vendor.id, note);
+      patchVendorInList(updated);
+    } catch {
+      // silent on list
+    }
   }
 
   async function handleSave() {
@@ -688,7 +682,7 @@ export default function VendorsHub() {
                         <VendorLikeButton
                           count={v.like_count ?? 0}
                           liked={!!v.liked_by_me}
-                          onToggle={() => toggleLikeFromList(v)}
+                          onToggle={() => addLikeFromList(v)}
                         />
                       </td>
                       <td className="px-4 py-3 text-[13px] text-on-surface-variant truncate">
@@ -724,8 +718,6 @@ export default function VendorsHub() {
           categories={categories}
           likes={likes}
           likedByMe={likedByMe}
-          likeNote={likeNote}
-          setLikeNote={setLikeNote}
           likeCount={likeCount}
           likeBusy={likeBusy}
           saving={saving}
@@ -734,7 +726,7 @@ export default function VendorsHub() {
           onSave={handleSave}
           onDelete={handleDelete}
           onLike={handleLike}
-          onUnlike={handleUnlike}
+          onRemoveLike={handleRemoveLike}
         />
       )}
     </DashboardLayout>
