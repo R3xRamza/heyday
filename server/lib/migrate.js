@@ -178,11 +178,15 @@ function migrateVendorsTable(db) {
     CREATE INDEX IF NOT EXISTS idx_vendors_rating ON vendors(rating);
   `);
   addColumnIfMissing(db, 'vendors', 'source_contact_id', 'INTEGER REFERENCES contacts(id)');
+  addColumnIfMissing(db, 'vendors', 'external_id', 'TEXT');
   db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_vendors_source_contact
     ON vendors(source_contact_id)
     WHERE source_contact_id IS NOT NULL
   `);
+  // Full unique index (not partial) so ON CONFLICT(external_id) works; SQLite allows multiple NULLs
+  db.exec(`DROP INDEX IF EXISTS idx_vendors_external_id`);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_vendors_external_id ON vendors(external_id)`);
 }
 
 function migrateHubDocItemsTable(db) {
