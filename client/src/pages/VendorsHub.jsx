@@ -33,9 +33,11 @@ function CategoryChip({ category }) {
   );
 }
 
-function LikeNoteModal({ vendorName, busy, onClose, onSubmit }) {
+function LikeNoteModal({ vendorName, kind = 'like', busy, onClose, onSubmit }) {
   const [wantNote, setWantNote] = useState(false);
   const [note, setNote] = useState('');
+  const isDislike = kind === 'dislike';
+  const noun = isDislike ? 'dislike' : 'like';
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -53,15 +55,16 @@ function LikeNoteModal({ vendorName, busy, onClose, onSubmit }) {
         className="relative w-full max-w-md rounded-xl bg-white shadow-2xl border border-outline-variant/15 p-5 space-y-4"
       >
         <h3 id="like-note-title" className="text-lg font-bold text-primary">
-          Add a like
+          Add a {noun}
         </h3>
         <p className="text-sm text-on-surface-variant">
           {vendorName ? (
             <>
-              Liking <span className="font-semibold text-primary">{vendorName}</span>
+              {isDislike ? 'Disliking' : 'Liking'}{' '}
+              <span className="font-semibold text-primary">{vendorName}</span>
             </>
           ) : (
-            'Add a like for this vendor'
+            `Add a ${noun} for this vendor`
           )}
         </p>
 
@@ -73,7 +76,7 @@ function LikeNoteModal({ vendorName, busy, onClose, onSubmit }) {
             className="mt-1 rounded border-outline-variant"
             disabled={busy}
           />
-          <span className="text-sm text-primary font-medium">Leave a note with this like</span>
+          <span className="text-sm text-primary font-medium">Leave a note with this {noun}</span>
         </label>
 
         {wantNote && (
@@ -81,7 +84,7 @@ function LikeNoteModal({ vendorName, busy, onClose, onSubmit }) {
             className={`${inputClass} min-h-[5.5rem] resize-y`}
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Why you recommend them…"
+            placeholder={isDislike ? 'Why you’re not recommending them…' : 'Why you recommend them…'}
             autoFocus
             disabled={busy}
           />
@@ -100,9 +103,11 @@ function LikeNoteModal({ vendorName, busy, onClose, onSubmit }) {
             type="button"
             disabled={busy}
             onClick={() => onSubmit(wantNote ? note.trim() : '')}
-            className="px-4 py-2 text-sm font-semibold bg-secondary text-white rounded-lg hover:bg-secondary/90 disabled:opacity-50"
+            className={`px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-50 ${
+              isDislike ? 'bg-error hover:bg-error/90' : 'bg-secondary hover:bg-secondary/90'
+            }`}
           >
-            {busy ? 'Saving…' : 'Add like'}
+            {busy ? 'Saving…' : `Add ${noun}`}
           </button>
         </div>
       </div>
@@ -135,7 +140,7 @@ function EditLikeNoteModal({ like, busy, onClose, onSubmit }) {
         className="relative w-full max-w-md rounded-xl bg-white shadow-2xl border border-outline-variant/15 p-5 space-y-4"
       >
         <h3 id="edit-like-title" className="text-lg font-bold text-primary">
-          Edit like note
+          Edit {like.kind === 'dislike' ? 'dislike' : 'like'} note
         </h3>
         <p className="text-sm text-on-surface-variant">
           From <span className="font-semibold text-primary">{like.user_name || 'Teammate'}</span>
@@ -190,7 +195,9 @@ function VendorDrawer({
   categories,
   likes,
   likedByMe,
+  dislikedByMe,
   likeCount,
+  dislikeCount,
   likeBusy,
   saving,
   error,
@@ -198,6 +205,7 @@ function VendorDrawer({
   onSave,
   onDelete,
   onLike,
+  onDislike,
   onEditLike,
   onRemoveLike,
 }) {
@@ -316,63 +324,86 @@ function VendorDrawer({
             <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low/40 p-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
-                  Likes
+                  Reactions
                 </p>
-                <VendorLikeButton count={likeCount} liked={likedByMe} size="md" />
+                <div className="flex items-center gap-1">
+                  <VendorLikeButton count={likeCount} active={likedByMe} kind="like" size="md" />
+                  <VendorLikeButton count={dislikeCount} active={dislikedByMe} kind="dislike" size="md" />
+                </div>
               </div>
-              <button
-                type="button"
-                disabled={likeBusy}
-                onClick={onLike}
-                className="w-full px-3 py-2 text-sm font-semibold rounded-lg bg-secondary text-white hover:bg-secondary/90 disabled:opacity-50"
-              >
-                {likeBusy ? 'Saving…' : 'Add a like'}
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={likeBusy}
+                  onClick={onLike}
+                  className="px-3 py-2 text-sm font-semibold rounded-lg bg-secondary text-white hover:bg-secondary/90 disabled:opacity-50"
+                >
+                  {likeBusy ? 'Saving…' : 'Add like'}
+                </button>
+                <button
+                  type="button"
+                  disabled={likeBusy}
+                  onClick={onDislike}
+                  className="px-3 py-2 text-sm font-semibold rounded-lg bg-error text-white hover:bg-error/90 disabled:opacity-50"
+                >
+                  {likeBusy ? 'Saving…' : 'Add dislike'}
+                </button>
+              </div>
               <p className="text-[11px] text-on-surface-variant">
-                You can like multiple times and optionally add a note each time.
+                Multiple likes or dislikes with optional notes. Anyone can edit or remove.
               </p>
 
               {likes?.length > 0 && (
                 <ul className="space-y-2.5 pt-2 border-t border-outline-variant/10">
-                  {likes.map((like) => (
-                    <li key={like.id} className="text-sm">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p className="font-semibold text-primary truncate">
-                          {like.user_name || 'Teammate'}
-                          {like.is_mine ? (
-                            <span className="ml-1 text-[10px] font-semibold uppercase text-secondary">You</span>
-                          ) : null}
-                        </p>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <DateText
-                            value={like.created_at?.slice?.(0, 10) || like.created_at}
-                            className="text-[11px] text-on-surface-variant"
-                          />
-                          <button
-                            type="button"
-                            disabled={likeBusy}
-                            onClick={() => onEditLike(like)}
-                            className="text-[11px] font-semibold text-secondary hover:underline disabled:opacity-50"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            disabled={likeBusy}
-                            onClick={() => onRemoveLike(like.id)}
-                            className="text-[11px] font-semibold text-error hover:underline disabled:opacity-50"
-                          >
-                            Remove
-                          </button>
+                  {likes.map((like) => {
+                    const isDislike = like.kind === 'dislike';
+                    return (
+                      <li key={like.id} className="text-sm">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="font-semibold text-primary truncate">
+                            <Icon
+                              name={isDislike ? 'thumb_down' : 'thumb_up'}
+                              filled
+                              className={`!text-[14px] mr-1 align-middle ${isDislike ? 'text-error' : 'text-secondary'}`}
+                            />
+                            {like.user_name || 'Teammate'}
+                            {like.is_mine ? (
+                              <span className="ml-1 text-[10px] font-semibold uppercase text-secondary">You</span>
+                            ) : null}
+                          </p>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <DateText
+                              value={like.created_at?.slice?.(0, 10) || like.created_at}
+                              className="text-[11px] text-on-surface-variant"
+                            />
+                            <button
+                              type="button"
+                              disabled={likeBusy}
+                              onClick={() => onEditLike(like)}
+                              className="text-[11px] font-semibold text-secondary hover:underline disabled:opacity-50"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              disabled={likeBusy}
+                              onClick={() => onRemoveLike(like.id)}
+                              className="text-[11px] font-semibold text-error hover:underline disabled:opacity-50"
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      {like.note ? (
-                        <p className="text-on-surface-variant mt-0.5 whitespace-pre-wrap">{like.note}</p>
-                      ) : (
-                        <p className="text-on-surface-variant/50 text-xs mt-0.5 italic">Liked</p>
-                      )}
-                    </li>
-                  ))}
+                        {like.note ? (
+                          <p className="text-on-surface-variant mt-0.5 whitespace-pre-wrap">{like.note}</p>
+                        ) : (
+                          <p className="text-on-surface-variant/50 text-xs mt-0.5 italic">
+                            {isDislike ? 'Disliked' : 'Liked'}
+                          </p>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
@@ -427,9 +458,11 @@ export default function VendorsHub() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [likes, setLikes] = useState([]);
   const [likedByMe, setLikedByMe] = useState(false);
+  const [dislikedByMe, setDislikedByMe] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [dislikeCount, setDislikeCount] = useState(0);
   const [likeBusy, setLikeBusy] = useState(false);
-  const [likeModal, setLikeModal] = useState(null); // { vendorId, vendorName }
+  const [likeModal, setLikeModal] = useState(null); // { vendorId, vendorName, kind }
   const [editLike, setEditLike] = useState(null); // like object
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -479,7 +512,9 @@ export default function VendorsHub() {
     setForm(formFromVendor(vendor));
     setLikes(vendor.likes || []);
     setLikedByMe(!!vendor.liked_by_me);
+    setDislikedByMe(!!vendor.disliked_by_me);
     setLikeCount(vendor.like_count ?? 0);
+    setDislikeCount(vendor.dislike_count ?? 0);
   }
 
   function patchVendorInList(vendor) {
@@ -490,7 +525,9 @@ export default function VendorsHub() {
           ? {
             ...v,
             like_count: vendor.like_count ?? 0,
+            dislike_count: vendor.dislike_count ?? 0,
             liked_by_me: !!vendor.liked_by_me,
+            disliked_by_me: !!vendor.disliked_by_me,
           }
           : v,
       ),
@@ -500,20 +537,20 @@ export default function VendorsHub() {
     }
   }
 
-  async function postLike(vendorId, note) {
+  async function postReaction(vendorId, note, kind = 'like') {
     const res = await fetch(`/api/vendors/${vendorId}/likes`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note: note || null }),
+      body: JSON.stringify({ note: note || null, kind }),
     });
     const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Could not like');
+    if (!res.ok) throw new Error(json.error || 'Could not save reaction');
     return json.vendor;
   }
 
-  function openLikeModal(vendorId, vendorName) {
-    setLikeModal({ vendorId, vendorName: vendorName || '' });
+  function openLikeModal(vendorId, vendorName, kind = 'like') {
+    setLikeModal({ vendorId, vendorName: vendorName || '', kind });
   }
 
   async function submitLikeModal(note) {
@@ -521,12 +558,12 @@ export default function VendorsHub() {
     setLikeBusy(true);
     setError('');
     try {
-      const vendor = await postLike(likeModal.vendorId, note);
+      const vendor = await postReaction(likeModal.vendorId, note, likeModal.kind || 'like');
       patchVendorInList(vendor);
       setLikeModal(null);
       await fetchVendors();
     } catch (err) {
-      setError(err.message || 'Could not like');
+      setError(err.message || 'Could not save reaction');
     }
     setLikeBusy(false);
   }
@@ -535,7 +572,9 @@ export default function VendorsHub() {
     setForm({ ...EMPTY_FORM });
     setLikes([]);
     setLikedByMe(false);
+    setDislikedByMe(false);
     setLikeCount(0);
+    setDislikeCount(0);
     setError('');
     setDrawer('create');
   }
@@ -545,7 +584,9 @@ export default function VendorsHub() {
     setDrawer(vendor.id);
     setForm(formFromVendor(vendor));
     setLikedByMe(!!vendor.liked_by_me);
+    setDislikedByMe(!!vendor.disliked_by_me);
     setLikeCount(vendor.like_count ?? 0);
+    setDislikeCount(vendor.dislike_count ?? 0);
     setLikes([]);
 
     const res = await fetch(`/api/vendors/${vendor.id}`, { credentials: 'include' });
@@ -561,7 +602,12 @@ export default function VendorsHub() {
 
   function handleLike() {
     if (drawer === 'create' || drawer == null) return;
-    openLikeModal(drawer, form.name);
+    openLikeModal(drawer, form.name, 'like');
+  }
+
+  function handleDislike() {
+    if (drawer === 'create' || drawer == null) return;
+    openLikeModal(drawer, form.name, 'dislike');
   }
 
   async function handleRemoveLike(likeId) {
@@ -614,7 +660,11 @@ export default function VendorsHub() {
   }
 
   function addLikeFromList(vendor) {
-    openLikeModal(vendor.id, vendor.name);
+    openLikeModal(vendor.id, vendor.name, 'like');
+  }
+
+  function addDislikeFromList(vendor) {
+    openLikeModal(vendor.id, vendor.name, 'dislike');
   }
 
   async function handleSave() {
@@ -740,6 +790,7 @@ export default function VendorsHub() {
               className={`${selectClass} w-[9rem]`}
             >
               <option value="likes">Sort: Likes</option>
+              <option value="dislikes">Sort: Dislikes</option>
               <option value="category">Sort: Category</option>
               <option value="name">Sort: Name</option>
               <option value="updated_at">Sort: Updated</option>
@@ -776,19 +827,20 @@ export default function VendorsHub() {
 
         <div className="rounded-xl border border-outline-variant/15 bg-white overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse table-fixed min-w-[780px]">
+            <table className="w-full text-left border-collapse table-fixed min-w-[860px]">
               <colgroup>
-                <col className="w-[22%]" />
-                <col className="w-[16%]" />
-                <col className="w-[10%]" />
+                <col className="w-[20%]" />
+                <col className="w-[14%]" />
+                <col className="w-[9%]" />
+                <col className="w-[9%]" />
+                <col className="w-[12%]" />
                 <col className="w-[14%]" />
                 <col className="w-[16%]" />
-                <col className="w-[18%]" />
                 <col className="w-10" />
               </colgroup>
               <thead className="bg-surface-container-low border-b border-outline-variant/10">
                 <tr>
-                  {['Vendor', 'Category', 'Likes', 'Phone', 'Email', 'Notes', ''].map((h) => (
+                  {['Vendor', 'Category', 'Likes', 'Dislikes', 'Phone', 'Email', 'Notes', ''].map((h) => (
                     <th
                       key={h || 'chevron'}
                       className="px-4 py-3 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider"
@@ -801,13 +853,13 @@ export default function VendorsHub() {
               <tbody className="divide-y divide-outline-variant/5">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-14 text-center text-on-surface-variant">
+                    <td colSpan={8} className="px-4 py-14 text-center text-on-surface-variant">
                       Loading vendors…
                     </td>
                   </tr>
                 ) : data.vendors.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-14 text-center">
+                    <td colSpan={8} className="px-4 py-14 text-center">
                       <Icon name="storefront" className="!text-[36px] text-on-surface-variant/40 mb-2" />
                       <p className="font-semibold text-primary mb-1">No vendors match</p>
                       <p className="text-sm text-on-surface-variant mb-3">
@@ -846,8 +898,17 @@ export default function VendorsHub() {
                       <td className="px-4 py-3">
                         <VendorLikeButton
                           count={v.like_count ?? 0}
-                          liked={!!v.liked_by_me}
+                          active={!!v.liked_by_me}
+                          kind="like"
                           onToggle={() => addLikeFromList(v)}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <VendorLikeButton
+                          count={v.dislike_count ?? 0}
+                          active={!!v.disliked_by_me}
+                          kind="dislike"
+                          onToggle={() => addDislikeFromList(v)}
                         />
                       </td>
                       <td className="px-4 py-3 text-[13px] text-on-surface-variant truncate">
@@ -883,7 +944,9 @@ export default function VendorsHub() {
           categories={categories}
           likes={likes}
           likedByMe={likedByMe}
+          dislikedByMe={dislikedByMe}
           likeCount={likeCount}
+          dislikeCount={dislikeCount}
           likeBusy={likeBusy}
           saving={saving}
           error={error}
@@ -891,6 +954,7 @@ export default function VendorsHub() {
           onSave={handleSave}
           onDelete={handleDelete}
           onLike={handleLike}
+          onDislike={handleDislike}
           onEditLike={setEditLike}
           onRemoveLike={handleRemoveLike}
         />
@@ -899,6 +963,7 @@ export default function VendorsHub() {
       {likeModal && (
         <LikeNoteModal
           vendorName={likeModal.vendorName}
+          kind={likeModal.kind || 'like'}
           busy={likeBusy}
           onClose={() => !likeBusy && setLikeModal(null)}
           onSubmit={submitLikeModal}

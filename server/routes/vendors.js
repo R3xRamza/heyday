@@ -5,6 +5,7 @@ const router = Router();
 
 const SORT_MAP = {
   likes: 'like_count',
+  dislikes: 'dislike_count',
   name: 'v.name',
   category: 'v.category',
   updated_at: 'v.updated_at',
@@ -21,7 +22,12 @@ function trimOrNull(val) {
   return t || null;
 }
 
-function getLikes(vendorId, userId = null) {
+function normalizeKind(val) {
+  const k = String(val || 'like').trim().toLowerCase();
+  return k === 'dislike' ? 'dislike' : 'like';
+}
+
+function getReactions(vendorId, userId = null) {
   return db.prepare(`
     SELECT vl.*, u.name as user_name, u.email as user_email,
       CASE WHEN vl.user_id = ? THEN 1 ELSE 0 END as is_mine
@@ -31,32 +37,51 @@ function getLikes(vendorId, userId = null) {
     ORDER BY datetime(vl.created_at) DESC, vl.id DESC
   `).all(userId ?? 0, vendorId).map((l) => ({
     ...l,
+    kind: normalizeKind(l.kind),
     is_mine: !!l.is_mine,
   }));
 }
 
+const VENDOR_SELECT_COUNTS = `
+  (SELECT COUNT(*) FROM vendor_likes vl WHERE vl.vendor_id = v.id AND IFNULL(vl.kind, 'like') = 'like') as like_count,
+  (SELECT COUNT(*) FROM vendor_likes vl WHERE vl.vendor_id = v.id AND vl.kind = 'dislike') as dislike_count,
+  CASE WHEN EXISTS (
+    SELECT 1 FROM vendor_likes vl
+    WHERE vl.vendor_id = v.id AND vl.user_id = ? AND IFNULL(vl.kind, 'like') = 'like'
+  ) THEN 1 ELSE 0 END as liked_by_me,
+  CASE WHEN EXISTS (
+    SELECT 1 FROM vendor_likes vl
+    WHERE vl.vendor_id = v.id AND vl.user_id = ? AND vl.kind = 'dislike'
+  ) THEN 1 ELSE 0 END as disliked_by_me
+`;
+
+function decorateVendor(row) {
+  return {
+    ...row,
+    liked_by_me: !!row.liked_by_me,
+    disliked_by_me: !!row.disliked_by_me,
+    like_count: row.like_count ?? 0,
+    dislike_count: row.dislike_count ?? 0,
+  };
+}
+
 function getVendor(id, userId = null) {
+  const uid = userId ?? 0;
   const vendor = db.prepare(`
     SELECT v.*,
       cu.name as created_by_name,
       uu.name as updated_by_name,
-      (SELECT COUNT(*) FROM vendor_likes vl WHERE vl.vendor_id = v.id) as like_count,
-      CASE WHEN EXISTS (
-        SELECT 1 FROM vendor_likes vl
-        WHERE vl.vendor_id = v.id AND vl.user_id = ?
-      ) THEN 1 ELSE 0 END as liked_by_me
+      ${VENDOR_SELECT_COUNTS}
     FROM vendors v
     LEFT JOIN users cu ON cu.id = v.created_by
     LEFT JOIN users uu ON uu.id = v.updated_by
     WHERE v.id = ?
-  `).get(userId ?? 0, id);
+  `).get(uid, uid, id);
 
   if (!vendor) return null;
   return {
-    ...vendor,
-    liked_by_me: !!vendor.liked_by_me,
-    like_count: vendor.like_count ?? 0,
-    likes: getLikes(id, userId),
+    ...decorateVendor(vendor),
+    likes: getReactions(id, userId),
   };
 }
 
@@ -110,22 +135,14 @@ router.get('/', (req, res) => {
     SELECT v.*,
       cu.name as created_by_name,
       uu.name as updated_by_name,
-      (SELECT COUNT(*) FROM vendor_likes vl WHERE vl.vendor_id = v.id) as like_count,
-      CASE WHEN EXISTS (
-        SELECT 1 FROM vendor_likes vl
-        WHERE vl.vendor_id = v.id AND vl.user_id = ?
-      ) THEN 1 ELSE 0 END as liked_by_me
+      ${VENDOR_SELECT_COUNTS}
     FROM vendors v
     LEFT JOIN users cu ON cu.id = v.created_by
     LEFT JOIN users uu ON uu.id = v.updated_by
     WHERE ${where}
     ORDER BY ${orderBy}
     LIMIT ? OFFSET ?
-  `).all(userId, ...params, limit, offset).map((v) => ({
-    ...v,
-    liked_by_me: !!v.liked_by_me,
-    like_count: v.like_count ?? 0,
-  }));
+  `).all(userId, userId, ...params, limit, offset).map(decorateVendor);
 
   res.json({ vendors, total, page, limit });
 });
@@ -202,21 +219,22 @@ router.delete('/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-/** Always insert a new like (multiple likes + notes per person allowed). */
+/** Insert a like or dislike (multiple per person allowed). */
 router.post('/:id/likes', (req, res) => {
   const vendor = db.prepare('SELECT id FROM vendors WHERE id = ?').get(req.params.id);
   if (!vendor) return res.status(404).json({ error: 'Not found' });
 
   const note = trimOrNull(req.body.note);
+  const kind = normalizeKind(req.body.kind);
   db.prepare(`
-    INSERT INTO vendor_likes (vendor_id, user_id, note)
-    VALUES (?, ?, ?)
-  `).run(vendor.id, req.user.id, note);
+    INSERT INTO vendor_likes (vendor_id, user_id, note, kind)
+    VALUES (?, ?, ?, ?)
+  `).run(vendor.id, req.user.id, note, kind);
 
   res.status(201).json({ vendor: getVendor(vendor.id, req.user.id) });
 });
 
-/** Edit a like note — any auth user. */
+/** Edit a reaction note — any auth user. */
 router.patch('/:id/likes/:likeId', (req, res) => {
   const vendor = db.prepare('SELECT id FROM vendors WHERE id = ?').get(req.params.id);
   if (!vendor) return res.status(404).json({ error: 'Not found' });
@@ -226,20 +244,29 @@ router.patch('/:id/likes/:likeId', (req, res) => {
   `).get(req.params.likeId, vendor.id);
   if (!like) return res.status(404).json({ error: 'Like not found' });
 
-  if (!('note' in req.body)) {
-    return res.status(400).json({ error: 'note is required' });
+  if (!('note' in req.body) && !('kind' in req.body)) {
+    return res.status(400).json({ error: 'note or kind is required' });
   }
 
-  db.prepare(`
-    UPDATE vendor_likes
-    SET note = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).run(trimOrNull(req.body.note), like.id);
+  const sets = [];
+  const values = [];
+  if ('note' in req.body) {
+    sets.push('note = ?');
+    values.push(trimOrNull(req.body.note));
+  }
+  if ('kind' in req.body) {
+    sets.push('kind = ?');
+    values.push(normalizeKind(req.body.kind));
+  }
+  sets.push('updated_at = CURRENT_TIMESTAMP');
+  values.push(like.id);
+
+  db.prepare(`UPDATE vendor_likes SET ${sets.join(', ')} WHERE id = ?`).run(...values);
 
   res.json({ vendor: getVendor(vendor.id, req.user.id) });
 });
 
-/** Remove a like — any auth user. */
+/** Remove a reaction — any auth user. */
 router.delete('/:id/likes/:likeId', (req, res) => {
   const vendor = db.prepare('SELECT id FROM vendors WHERE id = ?').get(req.params.id);
   if (!vendor) return res.status(404).json({ error: 'Not found' });

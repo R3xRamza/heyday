@@ -1,25 +1,31 @@
 import Icon from '../shared/Icon';
 
-/** Like count display / toggle button. */
+/** Like or dislike count / add button. */
 export default function VendorLikeButton({
   count = 0,
-  liked = false,
+  active = false,
+  kind = 'like',
   onToggle,
   size = 'sm',
   className = '',
 }) {
   const interactive = typeof onToggle === 'function';
   const iconSize = size === 'md' ? '!text-[22px]' : '!text-[18px]';
-  const label = count === 1 ? '1 like' : `${count} likes`;
+  const isDislike = kind === 'dislike';
+  const icon = isDislike ? 'thumb_down' : 'thumb_up';
+  const noun = isDislike ? 'dislike' : 'like';
+  const label = count === 1 ? `1 ${noun}` : `${count} ${noun}s`;
+  const activeColor = isDislike ? 'text-error' : 'text-secondary';
+  const activeBg = isDislike ? 'bg-error/10 hover:bg-error/15' : 'bg-secondary/10 hover:bg-secondary/15';
 
   const inner = (
     <>
       <Icon
-        name="thumb_up"
-        filled={liked}
-        className={`${iconSize} ${liked ? 'text-secondary' : 'text-outline-variant'}`}
+        name={icon}
+        filled={active}
+        className={`${iconSize} ${active ? activeColor : 'text-outline-variant'}`}
       />
-      <span className={`tabular-nums ${liked ? 'text-secondary font-semibold' : 'text-on-surface-variant'}`}>
+      <span className={`tabular-nums ${active ? `${activeColor} font-semibold` : 'text-on-surface-variant'}`}>
         {count}
       </span>
     </>
@@ -41,13 +47,10 @@ export default function VendorLikeButton({
         onToggle();
       }}
       className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg transition-colors ${
-        liked
-          ? 'bg-secondary/10 hover:bg-secondary/15'
-          : 'hover:bg-surface-container-low'
+        active ? activeBg : 'hover:bg-surface-container-low'
       } ${className}`}
-      aria-pressed={liked}
-      aria-label={liked ? `Unlike (${label})` : `Like (${label})`}
-      title={liked ? 'Unlike' : 'Like'}
+      aria-label={`Add ${noun} (${label})`}
+      title={`Add ${noun}`}
     >
       {inner}
     </button>
