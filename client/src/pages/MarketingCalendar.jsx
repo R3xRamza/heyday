@@ -22,7 +22,7 @@ import {
   monthKeyFromStr,
   monthsInDateRange,
 } from '../components/marketing/calendarUtils';
-import { mergeQuotaPosts } from '../components/marketing/quotaUtils';
+import { mergeQuotaPosts, tasksToQuotaPosts } from '../components/marketing/quotaUtils';
 import { shortAddress } from '../utils/format';
 import { findAdamMember } from '../constants/marketingTasks';
 import { useAgentScope } from '../context/AgentScopeContext';
@@ -186,8 +186,8 @@ export default function MarketingCalendar() {
   );
 
   const quotaPosts = useMemo(
-    () => mergeQuotaPosts(lastWeekPosts, weekPosts, posts),
-    [lastWeekPosts, weekPosts, posts],
+    () => mergeQuotaPosts(lastWeekPosts, weekPosts, posts, tasksToQuotaPosts(tasks)),
+    [lastWeekPosts, weekPosts, posts, tasks],
   );
 
   const range = useMemo(
@@ -232,11 +232,15 @@ export default function MarketingCalendar() {
     const today = todayStr();
     const todayCelebrationEnd = fridayCelebrationFetchEnd(today);
 
+    // Cover calendar view + current/last week so post-type tasks count in Marketing Status
+    const taskStart = [start, week.start, lastWeek.start].sort()[0];
+    const taskEnd = [end, week.end, lastWeek.end].sort().at(-1);
+
     const adamUserId = await fetchAdamUserId();
 
     const taskUrl = adamUserId
       ? appendAgentScope(
-        `/api/tasks?include_completed=true&transaction_only=true&assigned_to=${adamUserId}&due_after=${start}&due_before=${end}`,
+        `/api/tasks?include_completed=true&transaction_only=true&assigned_to=${adamUserId}&due_after=${taskStart}&due_before=${taskEnd}`,
         scope,
       )
       : null;

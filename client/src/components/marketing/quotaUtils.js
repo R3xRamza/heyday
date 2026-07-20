@@ -76,6 +76,23 @@ export function mergeQuotaPosts(...lists) {
   return [...byId.values()];
 }
 
+/** Map marketing calendar tasks with a post type into quota-compatible post shapes. */
+export function tasksToQuotaPosts(tasks) {
+  const out = [];
+  for (const t of tasks || []) {
+    const platform = (t.marketing_post_type || '').trim();
+    if (!platform || !t.due_date) continue;
+    out.push({
+      id: `task-quota-${t.id}`,
+      platform,
+      status: t.status === 'complete' ? 'done' : 'posting',
+      scheduled_date: t.due_date,
+      title: t.calendar_nickname || t.title || 'Task',
+    });
+  }
+  return out;
+}
+
 export function countPostsInRange(posts, platformKey, aliases, { start, end }) {
   return posts.filter(
     (p) =>
