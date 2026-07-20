@@ -223,11 +223,16 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, set
   const teamSplits = round2(tessa + margaret);
   const fixedFees = round2(brokerReview + riskFee + cappedFee);
   const net = round2(postSplit - fixedFees - teamSplits - customSum);
+  const tessaPct = round2(settings.tessaRate * 100);
+  const margaretPct = round2(settings.margaretRate * 100);
+  const splitPct = round2(settings.splitRate * 100);
 
   const lines = [
     {
       key: 'exp_split',
-      label: beforeCap ? 'eXp split (sliding scale)' : 'eXp split (capped — 100% retained)',
+      label: beforeCap
+        ? `eXp split (${splitPct}% sliding scale)`
+        : 'eXp split (capped — 100% retained)',
       amount: -expSplit,
     },
   ];
@@ -243,8 +248,8 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, set
   lines.push(
     { key: 'broker_review', label: 'eXp Broker Review Fee', amount: -brokerReview },
     { key: 'risk_mgmt', label: 'eXp Risk Management Fee', amount: -riskFee },
-    { key: 'tessa', label: 'Tessa 4% of post-split balance', amount: -tessa },
-    { key: 'margaret', label: 'Margaret 3% of post-split balance', amount: -margaret },
+    { key: 'tessa', label: `Tessa ${tessaPct}% of post-split balance`, amount: -tessa },
+    { key: 'margaret', label: `Margaret ${margaretPct}% of post-split balance`, amount: -margaret },
   );
   for (const fee of resolvedFees) {
     if (!fee.label && !(fee.dollars > 0)) continue;

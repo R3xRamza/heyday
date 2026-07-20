@@ -11,6 +11,7 @@ import { dedupeAllChecklistTemplates } from './checklistTaskCleanup.js';
 import { migrateOpportunitiesTables } from './seedOpportunities.js';
 import { normalizeBuyerOpportunityRows } from './buyerOpportunityNormalize.js';
 import { seedVendorsFromCrm } from './seedVendorsFromCrm.js';
+import { migrateRevenueSplitTemplates } from './revenueTemplates.js';
 
 export function addColumnIfMissing(db, table, column, definition) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
@@ -151,6 +152,7 @@ export function runMigrations(db) {
   migrateVendorsTable(db);
   migrateVendorLikesTable(db);
   seedVendorsFromCrm(db);
+  migrateRevenueSplitTemplates(db);
   migrateOpportunitiesTables(db);
   normalizeBuyerOpportunityRows(db);
 }

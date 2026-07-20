@@ -1,21 +1,173 @@
 import { Router } from 'express';
 import db from '../db.js';
 import {
-  COMMISSION_SETTINGS,
   computeYearCommissions,
   anniversaryWindowForEndYear,
 } from '../lib/commissionPlans.js';
-import { parseAgentScope, transactionAgentScopeClause } from '../lib/agentScope.js';
+import { parseAgentScope, transactionAgentScopeClause, agentScopeUserId } from '../lib/agentScope.js';
+import {
+  getTemplateSettings,
+  getTemplateSettingsForAgentId,
+  listTemplates,
+  saveTemplateSettings,
+  TEMPLATE_AGENT_KEYS,
+  TEMPLATE_AGENT_LABELS,
+  agentKeyFromUserId,
+} from '../lib/revenueTemplates.js';
 
 const router = Router();
 
 const DEAL_SELECT = `
   SELECT t.id, t.address, t.city, t.state, t.value, t.stage, t.representing, t.sale_type,
-    t.close_date, t.gross_commission, t.commission_custom_fees,
+    t.close_date, t.gross_commission, t.commission_custom_fees, t.agent_id,
     t.client_name, u.name as agent_name
   FROM transactions t
   LEFT JOIN users u ON u.id = t.agent_id
 `;
+
+/** Run deals through each agent's own template + YTD (caps are per agent). */
+function computeByAgentTemplates(deals) {
+  const groups = new Map();
+  for (const deal of deals) {
+    const key = deal.agent_id != null ? String(deal.agent_id) : 'none';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(deal);
+  }
+
+  const results = [];
+  let capPaid = 0;
+  let riskPaid = 0;
+  let cappedFeesPaid = 0;
+  let singleSettings = null;
+  let agentCount = 0;
+
+  for (const [, group] of groups) {
+    group.sort((a, b) => {
+      const ad = a.close_date || '';
+      const bd = b.close_date || '';
+      if (ad !== bd) return ad < bd ? -1 : 1;
+      return Number(a.id) - Number(b.id);
+    });
+    const agentId = group[0]?.agent_id;
+    const settings = getTemplateSettingsForAgentId(db, agentId);
+    const run = computeYearCommissions(group, 0, settings);
+    results.push(...run.results);
+    capPaid += run.capPaid;
+    riskPaid += run.riskPaid;
+    cappedFeesPaid += run.cappedFeesPaid;
+    singleSettings = settings;
+    agentCount += 1;
+  }
+
+  results.sort((a, b) => {
+    const ad = a.close_date || '';
+    const bd = b.close_date || '';
+    if (ad !== bd) return ad < bd ? -1 : 1;
+    return Number(a.id) - Number(b.id);
+  });
+
+  return {
+    results,
+    capPaid: Math.round(capPaid * 100) / 100,
+    riskPaid: Math.round(riskPaid * 100) / 100,
+    cappedFeesPaid: Math.round(cappedFeesPaid * 100) / 100,
+    settings: agentCount === 1 ? singleSettings : null,
+    multiAgent: agentCount > 1,
+  };
+}
+
+/** Pipeline continues each agent's closed YTD separately. */
+function computePipelineByAgent(pendingDeals, closedByAgentYtd) {
+  const groups = new Map();
+  for (const deal of pendingDeals) {
+    const key = deal.agent_id != null ? String(deal.agent_id) : 'none';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(deal);
+  }
+
+  const results = [];
+  let capPaid = 0;
+  let riskPaid = 0;
+  let cappedFeesPaid = 0;
+  let singleSettings = null;
+  let agentCount = 0;
+
+  for (const [agentKey, group] of groups) {
+    group.sort((a, b) => {
+      const ad = a.close_date || '';
+      const bd = b.close_date || '';
+      if (ad !== bd) return ad < bd ? -1 : 1;
+      return Number(a.id) - Number(b.id);
+    });
+    const agentId = group[0]?.agent_id;
+    const settings = getTemplateSettingsForAgentId(db, agentId);
+    const ytd = closedByAgentYtd.get(agentKey) || { capPaid: 0, riskPaid: 0, cappedFeesPaid: 0 };
+    const run = computeYearCommissions(group, ytd, settings);
+    results.push(...run.results);
+    capPaid += run.capPaid;
+    riskPaid += run.riskPaid;
+    cappedFeesPaid += run.cappedFeesPaid;
+    singleSettings = settings;
+    agentCount += 1;
+  }
+
+  results.sort((a, b) => {
+    const ad = a.close_date || '';
+    const bd = b.close_date || '';
+    if (ad !== bd) return ad < bd ? -1 : 1;
+    return Number(a.id) - Number(b.id);
+  });
+
+  return {
+    results,
+    capPaid: Math.round(capPaid * 100) / 100,
+    riskPaid: Math.round(riskPaid * 100) / 100,
+    cappedFeesPaid: Math.round(cappedFeesPaid * 100) / 100,
+    settings: agentCount === 1 ? singleSettings : null,
+    multiAgent: agentCount > 1,
+  };
+}
+
+function closedYtdByAgent(deals) {
+  const map = new Map();
+  const groups = new Map();
+  for (const deal of deals) {
+    const key = deal.agent_id != null ? String(deal.agent_id) : 'none';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(deal);
+  }
+  for (const [key, group] of groups) {
+    const settings = getTemplateSettingsForAgentId(db, group[0]?.agent_id);
+    const run = computeYearCommissions(group, 0, settings);
+    map.set(key, {
+      capPaid: run.capPaid,
+      riskPaid: run.riskPaid,
+      cappedFeesPaid: run.cappedFeesPaid,
+    });
+  }
+  return map;
+}
+
+router.get('/templates', (_req, res) => {
+  res.json({ templates: listTemplates(db) });
+});
+
+router.put('/templates/:agentKey', (req, res) => {
+  const agentKey = String(req.params.agentKey || '').toLowerCase();
+  if (!TEMPLATE_AGENT_KEYS.includes(agentKey)) {
+    return res.status(400).json({ error: 'Invalid agent_key' });
+  }
+  try {
+    const settings = saveTemplateSettings(db, agentKey, req.body?.settings ?? req.body, req.user?.id ?? null);
+    res.json({
+      agent_key: agentKey,
+      label: TEMPLATE_AGENT_LABELS[agentKey],
+      settings,
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Could not save template' });
+  }
+});
 
 router.get('/', (req, res) => {
   const year = Math.min(2100, Math.max(2000, parseInt(req.query.year, 10) || new Date().getFullYear()));
@@ -31,9 +183,9 @@ router.get('/', (req, res) => {
     ORDER BY t.close_date ASC, t.id ASC
   `).all(yearStart, yearEnd, ...agentParams);
 
-  const closed = computeYearCommissions(closedDeals, 0);
+  const closed = computeByAgentTemplates(closedDeals);
+  const closedYtdMap = closedYtdByAgent(closedDeals);
 
-  // Pipeline: under contract in this anniversary window, projected from closed YTD.
   const pendingDeals = db.prepare(`
     ${DEAL_SELECT}
     WHERE t.stage = 'pending' AND t.close_date IS NOT NULL
@@ -42,18 +194,27 @@ router.get('/', (req, res) => {
     ORDER BY t.close_date ASC, t.id ASC
   `).all(yearStart, yearEnd, ...agentParams);
 
-  const pipeline = computeYearCommissions(pendingDeals, {
-    capPaid: closed.capPaid,
-    riskPaid: closed.riskPaid,
-    cappedFeesPaid: closed.cappedFeesPaid,
-  });
+  const pipeline = computePipelineByAgent(pendingDeals, closedYtdMap);
 
   const sum = (rows, fn) => Math.round(rows.reduce((acc, r) => acc + (r.hasGci ? fn(r.breakdown) : 0), 0) * 100) / 100;
+
+  const scopeUserId = agentScopeUserId(agentScope);
+  const scopeAgentKey = scopeUserId != null ? agentKeyFromUserId(db, scopeUserId) : null;
+  const settings = scopeAgentKey
+    ? getTemplateSettings(db, scopeAgentKey)
+    : (closed.settings || getTemplateSettings(db, 'meredith'));
+  const multiAgent = agentScope === 'all' || closed.multiAgent;
+  const agentLabel = scopeAgentKey
+    ? TEMPLATE_AGENT_LABELS[scopeAgentKey]
+    : (agentScope === 'all' ? 'All agents' : 'Agent');
 
   const summary = {
     year,
     anniversaryStart: yearStart,
     anniversaryEnd: yearEnd,
+    agent_key: scopeAgentKey,
+    agent_label: agentLabel,
+    multi_agent: multiAgent,
     closedCount: closedDeals.length,
     closedVolume: closedDeals.reduce((acc, d) => acc + (Number(d.value) || 0), 0),
     gci: sum(closed.results, (b) => b.gci),
@@ -63,19 +224,19 @@ router.get('/', (req, res) => {
     margaret: sum(closed.results, (b) => b.margaret),
     fees: sum(closed.results, (b) => b.fixedFees + (b.customSum || 0)),
     missingGci: closed.results.filter((r) => !r.hasGci).length,
-    capPaid: closed.capPaid,
-    riskPaid: closed.riskPaid,
-    cappedFeesPaid: closed.cappedFeesPaid,
-    capAmount: COMMISSION_SETTINGS.capAmount,
-    riskCap: COMMISSION_SETTINGS.riskManagementAnnualCap,
-    cappedFeesStepDownAt: COMMISSION_SETTINGS.cappedFeesStepDownAt,
-    capped: closed.capPaid >= COMMISSION_SETTINGS.capAmount,
+    capPaid: multiAgent ? null : closed.capPaid,
+    riskPaid: multiAgent ? null : closed.riskPaid,
+    cappedFeesPaid: multiAgent ? null : closed.cappedFeesPaid,
+    capAmount: multiAgent ? null : settings.capAmount,
+    riskCap: multiAgent ? null : settings.riskManagementAnnualCap,
+    cappedFeesStepDownAt: multiAgent ? null : settings.cappedFeesStepDownAt,
+    capped: multiAgent ? false : closed.capPaid >= settings.capAmount,
+    settings,
     pipelineGci: sum(pipeline.results, (b) => b.gci),
     pipelineNet: sum(pipeline.results, (b) => b.net),
     pipelineCount: pendingDeals.length,
   };
 
-  // Net + GCI by close month for the earnings chart (calendar month within window).
   const monthly = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, gci: 0, net: 0, count: 0 }));
   for (const r of closed.results) {
     if (!r.hasGci || !r.close_date) continue;
