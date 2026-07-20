@@ -10,6 +10,7 @@ import { resyncNamedChecklistTemplates } from '../seed-data.js';
 import { dedupeAllChecklistTemplates } from './checklistTaskCleanup.js';
 import { migrateOpportunitiesTables } from './seedOpportunities.js';
 import { normalizeBuyerOpportunityRows } from './buyerOpportunityNormalize.js';
+import { seedVendorsFromCrm } from './seedVendorsFromCrm.js';
 
 export function addColumnIfMissing(db, table, column, definition) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
@@ -148,6 +149,7 @@ export function runMigrations(db) {
   migrateTeamHubTables(db);
   migrateHubDocItemsTable(db);
   migrateVendorsTable(db);
+  seedVendorsFromCrm(db);
   migrateOpportunitiesTables(db);
   normalizeBuyerOpportunityRows(db);
 }
@@ -174,6 +176,12 @@ function migrateVendorsTable(db) {
     CREATE INDEX IF NOT EXISTS idx_vendors_name ON vendors(name);
     CREATE INDEX IF NOT EXISTS idx_vendors_category ON vendors(category);
     CREATE INDEX IF NOT EXISTS idx_vendors_rating ON vendors(rating);
+  `);
+  addColumnIfMissing(db, 'vendors', 'source_contact_id', 'INTEGER REFERENCES contacts(id)');
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_vendors_source_contact
+    ON vendors(source_contact_id)
+    WHERE source_contact_id IS NOT NULL
   `);
 }
 
