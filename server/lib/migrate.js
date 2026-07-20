@@ -178,32 +178,38 @@ function migrateVendorLikesTable(db) {
     )
   `);
   const done = db.prepare("SELECT 1 FROM app_meta WHERE key = 'vendor_likes_multi_v1'").get();
-  if (done) return;
+  if (!done) {
+    const tableSql = db.prepare(`
+      SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'vendor_likes'
+    `).get()?.sql || '';
 
-  const tableSql = db.prepare(`
-    SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'vendor_likes'
-  `).get()?.sql || '';
+    if (tableSql.includes('UNIQUE(vendor_id, user_id)')) {
+      db.exec(`
+        CREATE TABLE vendor_likes_multi (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          vendor_id INTEGER NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          note TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO vendor_likes_multi (id, vendor_id, user_id, note, created_at, updated_at)
+          SELECT id, vendor_id, user_id, note, created_at, updated_at FROM vendor_likes;
+        DROP TABLE vendor_likes;
+        ALTER TABLE vendor_likes_multi RENAME TO vendor_likes;
+        CREATE INDEX IF NOT EXISTS idx_vendor_likes_vendor ON vendor_likes(vendor_id);
+        CREATE INDEX IF NOT EXISTS idx_vendor_likes_user ON vendor_likes(user_id);
+      `);
+    }
 
-  if (tableSql.includes('UNIQUE(vendor_id, user_id)')) {
-    db.exec(`
-      CREATE TABLE vendor_likes_multi (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        vendor_id INTEGER NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
-        user_id INTEGER NOT NULL REFERENCES users(id),
-        note TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-      INSERT INTO vendor_likes_multi (id, vendor_id, user_id, note, created_at, updated_at)
-        SELECT id, vendor_id, user_id, note, created_at, updated_at FROM vendor_likes;
-      DROP TABLE vendor_likes;
-      ALTER TABLE vendor_likes_multi RENAME TO vendor_likes;
-      CREATE INDEX IF NOT EXISTS idx_vendor_likes_vendor ON vendor_likes(vendor_id);
-      CREATE INDEX IF NOT EXISTS idx_vendor_likes_user ON vendor_likes(user_id);
-    `);
+    db.prepare("INSERT INTO app_meta (key, value) VALUES ('vendor_likes_multi_v1', '1')").run();
   }
 
-  db.prepare("INSERT INTO app_meta (key, value) VALUES ('vendor_likes_multi_v1', '1')").run();
+  addColumnIfMissing(db, 'vendor_likes', 'kind', "TEXT NOT NULL DEFAULT 'like'");
+  db.exec(`
+    UPDATE vendor_likes SET kind = 'like' WHERE kind IS NULL OR kind = '';
+    CREATE INDEX IF NOT EXISTS idx_vendor_likes_kind ON vendor_likes(vendor_id, kind);
+  `);
 }
 
 function migrateVendorsTable(db) {
