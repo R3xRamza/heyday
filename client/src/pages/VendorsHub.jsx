@@ -734,19 +734,7 @@ export default function VendorsHub() {
   return (
     <DashboardLayout
       title="CRM Hub"
-      headerRight={(
-        <div className="flex items-center gap-2">
-          <CrmHubTabs />
-          <button
-            type="button"
-            onClick={openCreate}
-            className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold uppercase tracking-wide hover:bg-primary/90"
-          >
-            <Icon name="add" className="!text-[16px]" />
-            Add
-          </button>
-        </div>
-      )}
+      headerRight={<CrmHubTabs />}
       className="p-6 lg:p-8"
     >
       <div className="w-full space-y-5">
@@ -798,10 +786,10 @@ export default function VendorsHub() {
             <button
               type="button"
               onClick={openCreate}
-              className="sm:hidden inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-white text-sm font-semibold"
+              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90"
             >
               <Icon name="add" className="!text-[18px]" />
-              Add
+              Add vendor
             </button>
           </div>
           <div className="flex items-center justify-between text-xs text-on-surface-variant">
