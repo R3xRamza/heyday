@@ -761,7 +761,7 @@ export default function VendorsHub() {
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="Category contains…"
-              className={`${selectClass} w-[11rem]`}
+              className={`${selectClass} w-[14rem]`}
             />
             <datalist id="vendor-filter-categories">
               {categories.map((c) => (
