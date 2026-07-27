@@ -364,7 +364,7 @@ export function saveParties(db, transactionId, parties, opts = {}) {
 
   // Stage gates (active / pending required roles) are enforced on complete-setup
   // and when setting close_date — not on every parties blur save, so users can
-  // fill Title / Cooperating Agent / Lender one field at a time.
+  // fill Title / Lender / Cooperating Agent one field at a time.
 
   const del = db.prepare('DELETE FROM transaction_parties WHERE transaction_id = ?');
   const insert = db.prepare(`
