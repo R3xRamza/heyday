@@ -7,7 +7,7 @@ import ListPagination from '../components/shared/ListPagination';
 import DateText from '../components/shared/DateText';
 import { useGmailSync } from '../context/GmailSyncContext';
 import { useIsMdUp } from '../hooks/useMediaQuery';
-import { formatDate } from '../utils/format';
+import { formatDate, formatPhone } from '../utils/format';
 
 const HIGHLIGHT_STAGES = [
   { key: 'Sphere', label: 'Sphere' },
@@ -32,8 +32,16 @@ function propertyLine(c) {
   return c.property_address || [c.street, c.city, c.state].filter(Boolean).join(', ') || '—';
 }
 
-const selectClass =
-  'px-3 py-2 border border-outline-variant/25 rounded-lg text-sm bg-white min-w-0 focus:outline-none focus:ring-2 focus:ring-secondary/30';
+const controlClass =
+  'h-10 px-3 border border-outline-variant/25 rounded-lg text-sm bg-white min-w-0 leading-none focus:outline-none focus:ring-2 focus:ring-secondary/30';
+
+const selectClass = controlClass;
+
+function contactSubtitle(contact) {
+  if (contact.email) return contact.email;
+  if (contact.phone) return formatPhone(contact.phone);
+  return '—';
+}
 
 function ContactMobileCard({ contact, onOpen }) {
   const assigned = contact.assigned_to_name || contact.assigned_user_name;
@@ -51,13 +59,13 @@ function ContactMobileCard({ contact, onOpen }) {
       className="w-full text-left bg-white px-4 py-3 active:bg-primary-container/5"
     >
       <div className="flex items-center gap-2 min-w-0">
-        <p className="min-w-0 flex-1 font-semibold text-sm text-primary truncate">{contact.name}</p>
-        <Icon name="chevron_right" className="text-outline shrink-0 !text-[20px]" />
+        <p className="min-w-0 flex-1 font-semibold text-sm text-primary truncate leading-snug">{contact.name}</p>
+        <Icon name="chevron_right" className="text-outline shrink-0 !text-[18px]" />
       </div>
       <p className="text-xs text-on-surface-variant truncate mt-0.5">
-        {contact.email || contact.phone || '—'}
+        {contactSubtitle(contact)}
       </p>
-      <div className="mt-2 flex items-center gap-2 min-w-0">
+      <div className="mt-1.5 flex items-center gap-2 min-w-0">
         <span
           className={`shrink-0 inline-flex max-w-[45%] px-2 py-0.5 rounded-full text-[10px] font-semibold border truncate ${stageBadgeClass(contact.stage)}`}
         >
@@ -183,21 +191,21 @@ export default function CRMHub() {
           })}
         </div>
 
-        <div className="rounded-xl border border-outline-variant/15 bg-white p-3 sm:p-4 space-y-3 shadow-sm">
+        <div className="rounded-xl border border-outline-variant/15 bg-white p-3 sm:p-4 space-y-2.5 shadow-sm">
           <div className="relative w-full">
             <Icon
               name="search"
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-[18px]"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-[18px] pointer-events-none"
             />
             <input
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={isMdUp ? 'Search name, email, phone, tags, address, notes…' : 'Search contacts…'}
-              className="w-full pl-9 pr-3 py-2 border border-outline-variant/25 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-secondary/30"
+              className={`${controlClass} w-full pl-9 pr-3`}
             />
           </div>
-          <div className="flex gap-2 items-center overflow-x-auto hide-scrollbar pb-0.5">
+          <div className="flex gap-2 items-stretch overflow-x-auto hide-scrollbar">
             <select
               value={stage}
               onChange={(e) => {
@@ -347,7 +355,7 @@ export default function CRMHub() {
                         <td className="px-4 py-3">
                           <p className="font-semibold text-sm text-primary truncate">{c.name}</p>
                           <p className="text-[11px] text-on-surface-variant truncate">
-                            {c.email || c.phone || '—'}
+                            {c.email || (c.phone ? formatPhone(c.phone) : '—')}
                           </p>
                         </td>
                         <td className="px-4 py-3">

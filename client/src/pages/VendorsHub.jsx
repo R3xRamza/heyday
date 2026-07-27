@@ -6,6 +6,7 @@ import Icon from '../components/shared/Icon';
 import ListPagination from '../components/shared/ListPagination';
 import DateText from '../components/shared/DateText';
 import { useIsMdUp } from '../hooks/useMediaQuery';
+import { formatPhone } from '../utils/format';
 
 const EMPTY_FORM = {
   name: '',
@@ -17,8 +18,10 @@ const EMPTY_FORM = {
   notes: '',
 };
 
-const selectClass =
-  'px-3 py-2 border border-outline-variant/25 rounded-lg text-sm bg-white min-w-0 focus:outline-none focus:ring-2 focus:ring-secondary/30';
+const controlClass =
+  'h-10 px-3 border border-outline-variant/25 rounded-lg text-sm bg-white min-w-0 leading-none focus:outline-none focus:ring-2 focus:ring-secondary/30';
+
+const selectClass = controlClass;
 
 const inputClass =
   'w-full px-3 py-2 border border-outline-variant/25 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-secondary/30';
@@ -190,38 +193,44 @@ function formFromVendor(vendor) {
 }
 
 function VendorMobileCard({ vendor, selected, onOpen, onLike, onDislike }) {
+  const contact = vendor.phone
+    ? formatPhone(vendor.phone)
+    : (vendor.email || '');
+
   return (
-    <div
-      className={`${selected ? 'bg-secondary/5' : 'bg-white'}`}
-    >
+    <div className={`px-4 py-3 ${selected ? 'bg-secondary/5' : 'bg-white'}`}>
       <button
         type="button"
         onClick={onOpen}
-        className="w-full text-left px-4 pt-3 pb-2 active:bg-primary-container/5"
+        className="w-full text-left active:opacity-80"
       >
         <div className="flex items-center gap-2 min-w-0">
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-sm text-primary truncate">{vendor.name}</p>
+            <p className="font-semibold text-sm text-primary truncate leading-snug">{vendor.name}</p>
             {vendor.company ? (
-              <p className="text-[11px] text-on-surface-variant truncate">{vendor.company}</p>
+              <p className="text-[11px] text-on-surface-variant truncate mt-0.5">{vendor.company}</p>
             ) : null}
           </div>
-          <Icon name="chevron_right" className="text-outline shrink-0 !text-[20px]" />
+          <Icon name="chevron_right" className="text-outline shrink-0 !text-[18px]" />
         </div>
-        <div className="mt-2 flex items-center gap-2 min-w-0">
+        <div className="mt-1.5 flex items-center gap-2 min-w-0">
           {vendor.category ? (
-            <span className="shrink-0 inline-flex max-w-[40%] px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-primary-container/10 text-primary-container border-primary-container/25 truncate">
+            <span className="shrink-0 inline-flex max-w-[42%] px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-primary-container/10 text-primary-container border-primary-container/25 truncate">
               {vendor.category}
             </span>
           ) : (
             <span className="shrink-0 text-[11px] text-on-surface-variant/50">No category</span>
           )}
-          <span className="min-w-0 flex-1 text-right text-[11px] text-on-surface-variant truncate">
-            {vendor.phone || vendor.email || '—'}
-          </span>
+          {contact ? (
+            <span className="min-w-0 flex-1 text-[11px] text-on-surface-variant tabular-nums truncate">
+              {contact}
+            </span>
+          ) : (
+            <span className="min-w-0 flex-1" />
+          )}
         </div>
       </button>
-      <div className="flex items-center gap-2 px-4 pb-3">
+      <div className="-ml-1.5 mt-1 flex items-center">
         <VendorLikeButton
           count={vendor.like_count ?? 0}
           active={!!vendor.liked_by_me}
@@ -792,38 +801,39 @@ export default function VendorsHub() {
       className="p-4 md:p-6 lg:p-8"
     >
       <div className="w-full space-y-4 md:space-y-5">
-        <div className="rounded-xl border border-outline-variant/15 bg-white p-3 sm:p-4 space-y-3 shadow-sm">
-          <div className="flex gap-2 items-center">
+        <div className="rounded-xl border border-outline-variant/15 bg-white p-3 sm:p-4 space-y-2.5 shadow-sm">
+          <div className="flex gap-2 items-stretch">
             <div className="relative flex-1 min-w-0">
               <Icon
                 name="search"
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-[18px]"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-[18px] pointer-events-none"
               />
               <input
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={isMdUp ? 'Search name, company, category, notes, phone, email…' : 'Search vendors…'}
-                className="w-full pl-9 pr-3 py-2 border border-outline-variant/25 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-secondary/30"
+                className={`${controlClass} w-full pl-9 pr-3`}
               />
             </div>
             <button
               type="button"
               onClick={openCreate}
-              className="shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90"
+              className="shrink-0 inline-flex items-center justify-center gap-1 h-10 w-10 sm:w-auto sm:px-3 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90"
+              aria-label="Add vendor"
             >
-              <Icon name="add" className="!text-[18px]" />
+              <Icon name="add" className="!text-[20px]" />
               <span className="hidden sm:inline">Add vendor</span>
             </button>
           </div>
-          <div className="flex gap-2 items-center overflow-x-auto hide-scrollbar pb-0.5">
+          <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2">
             <input
               type="text"
               list="vendor-filter-categories"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="Category…"
-              className={`${selectClass} w-[10rem] md:w-[14rem] shrink-0`}
+              className={`${controlClass} w-full md:w-[14rem]`}
             />
             <datalist id="vendor-filter-categories">
               {categories.map((c) => (
@@ -836,7 +846,7 @@ export default function VendorsHub() {
                 setSort(e.target.value);
                 setPage(1);
               }}
-              className={`${selectClass} w-[9rem] shrink-0`}
+              className={`${controlClass} w-full md:w-[9rem]`}
             >
               <option value="likes">Sort: Likes</option>
               <option value="dislikes">Sort: Dislikes</option>
@@ -986,8 +996,8 @@ export default function VendorsHub() {
                             onToggle={() => addDislikeFromList(v)}
                           />
                         </td>
-                        <td className="px-4 py-3 text-[13px] text-on-surface-variant truncate">
-                          {v.phone || '—'}
+                        <td className="px-4 py-3 text-[13px] text-on-surface-variant truncate tabular-nums">
+                          {v.phone ? formatPhone(v.phone) : '—'}
                         </td>
                         <td className="px-4 py-3 text-[13px] text-on-surface-variant truncate">
                           {v.email || '—'}

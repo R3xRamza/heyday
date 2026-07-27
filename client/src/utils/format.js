@@ -83,3 +83,15 @@ export function shortAddress(address) {
   if (!address) return '—';
   return parseTransactionAddress({ address }).street || '—';
 }
+
+/** Normalize US phone display; returns original string when not 10/11 digits. */
+export function formatPhone(value) {
+  if (value == null || value === '') return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+  const digits = raw.replace(/\D/g, '');
+  let n = digits;
+  if (n.length === 11 && n.startsWith('1')) n = n.slice(1);
+  if (n.length !== 10) return raw;
+  return `(${n.slice(0, 3)}) ${n.slice(3, 6)}-${n.slice(6)}`;
+}
