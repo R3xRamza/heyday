@@ -82,7 +82,7 @@ export function fixedRolesForSaleType(saleType, representing) {
 export function requiredPartyRoles(saleType, representing, intent) {
   const roles = ['agent', 'client'];
   if (intent === 'pending' && isTraditionalSale(saleType, representing)) {
-    roles.push('escrow_officer', 'cooperating_agent', 'lender');
+    roles.push('cooperating_agent');
   }
   return roles;
 }
