@@ -13,7 +13,7 @@ const INPUT =
   'w-full mt-1 px-3 py-3 md:py-2 border border-outline-variant/30 rounded text-base md:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary/25';
 const LABEL = 'text-xs font-semibold text-on-surface-variant uppercase';
 
-const SELLER_STATUS_SUGGESTIONS = ['Upcoming', 'Pre-listing', 'LIVE', 'PRIVATE'];
+const SELLER_STATUSES = ['Upcoming', 'Pre-listing', 'LIVE', 'PRIVATE'];
 
 const emptyBuyer = {
   status: 'active',
@@ -350,17 +350,22 @@ export default function OpportunityForm({
           ) : (
             <>
               <Field label="Status">
-                <input
-                  list="seller-status-suggestions"
+                <select
                   className={INPUT}
-                  value={form.status || ''}
+                  value={
+                    SELLER_STATUSES.includes(form.status)
+                      ? form.status
+                      : (form.status ? form.status : 'Upcoming')
+                  }
                   onChange={(e) => set('status', e.target.value)}
-                />
-                <datalist id="seller-status-suggestions">
-                  {SELLER_STATUS_SUGGESTIONS.map((s) => (
-                    <option key={s} value={s} />
+                >
+                  {!SELLER_STATUSES.includes(form.status) && form.status ? (
+                    <option value={form.status}>{form.status}</option>
+                  ) : null}
+                  {SELLER_STATUSES.map((s) => (
+                    <option key={s} value={s}>{s}</option>
                   ))}
-                </datalist>
+                </select>
               </Field>
               <Field label="Property address">
                 <input
