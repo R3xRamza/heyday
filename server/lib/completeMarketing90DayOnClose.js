@@ -10,14 +10,16 @@ function completeOpenMarketing90Tasks(db, { transactionId = null } = {}) {
   if (!templateId) return { completed: 0 };
 
   const completedAt = new Date().toISOString();
-  const params = [completedAt, templateId, templateId];
+  // Placeholder order must match SQL: completedAt, [transactionId], templateId, templateId
+  const params = [completedAt];
   let txnFilter = '';
   if (transactionId != null) {
     txnFilter = 'AND transaction_id = ?';
-    params.push(transactionId);
+    params.push(Number(transactionId));
   } else {
     txnFilter = "AND transaction_id IN (SELECT id FROM transactions WHERE stage = 'closed')";
   }
+  params.push(templateId, templateId);
 
   const result = db.prepare(`
     UPDATE tasks
@@ -26,10 +28,7 @@ function completeOpenMarketing90Tasks(db, { transactionId = null } = {}) {
       ${txnFilter}
       AND (
         template_task_id IN (SELECT id FROM template_tasks WHERE template_id = ?)
-        OR (
-          template_task_id IS NULL
-          AND title IN (SELECT title FROM template_tasks WHERE template_id = ?)
-        )
+        OR title IN (SELECT title FROM template_tasks WHERE template_id = ?)
       )
   `).run(...params);
 
