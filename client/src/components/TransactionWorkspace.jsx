@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, X } from 'lucide-react';
 import Icon from './shared/Icon';
@@ -172,6 +172,18 @@ export default function TransactionWorkspace({
   const [savedMsg, setSavedMsg] = useState('');
   const [partiesError, setPartiesError] = useState('');
   const [completingOverdue, setCompletingOverdue] = useState(false);
+  const savedMsgTimerRef = useRef(null);
+  const lastSavedDatesRef = useRef({});
+
+  function flashSaved(message = 'Saved!') {
+    if (savedMsgTimerRef.current) clearTimeout(savedMsgTimerRef.current);
+    setSavedMsg(message);
+    savedMsgTimerRef.current = setTimeout(() => setSavedMsg(''), 2500);
+  }
+
+  useEffect(() => () => {
+    if (savedMsgTimerRef.current) clearTimeout(savedMsgTimerRef.current);
+  }, []);
 
   useEffect(() => {
     const representing = normalizeRepresenting(transaction.representing);
@@ -384,11 +396,10 @@ export default function TransactionWorkspace({
       return result;
     }
     if (result?.tasksRecalculated) {
-      setSavedMsg(`Saved · ${result.tasksRecalculated} task due dates updated`);
+      flashSaved(`Saved! · ${result.tasksRecalculated} task due dates updated`);
     } else {
-      setSavedMsg('Saved');
+      flashSaved('Saved!');
     }
-    setTimeout(() => setSavedMsg(''), 4000);
     return { ok: true, ...result };
   }
 
@@ -429,6 +440,19 @@ export default function TransactionWorkspace({
   function handleFieldBlur(key, value) {
     if (transaction[key] === value || (transaction[key] == null && value === '')) return;
     saveTransaction({ [key]: value === '' ? null : value });
+  }
+
+  /** Date pickers commit on change — save immediately and show Saved! */
+  function handleDateCommit(key, rawValue) {
+    const next = rawValue === '' || rawValue == null ? null : rawValue;
+    setForm((prev) => ({ ...prev, [key]: next || '' }));
+    const server = transaction[key] ?? null;
+    const last = lastSavedDatesRef.current[key] ?? null;
+    if (String(next || '') === String(server || '') || String(next || '') === String(last || '')) {
+      return;
+    }
+    lastSavedDatesRef.current[key] = next;
+    saveTransaction({ [key]: next });
   }
 
   function handleSelectChange(key, value) {
@@ -741,9 +765,17 @@ export default function TransactionWorkspace({
                 </div>
 
                 <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-4 md:p-6 shadow-executive border-l-4 border-l-secondary min-w-0 overflow-hidden">
-                  <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-5">
-                    Critical Dates Timeline
-                  </h3>
+                  <div className="flex items-center justify-between gap-2 mb-5">
+                    <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">
+                      Critical Dates Timeline
+                    </h3>
+                    {savedMsg && (
+                      <span className="text-xs font-bold text-secondary shrink-0">{savedMsg}</span>
+                    )}
+                    {!savedMsg && savingTx && (
+                      <span className="text-xs text-on-surface-variant shrink-0">Saving…</span>
+                    )}
+                  </div>
                   {isClosingDateGateError && (
                     <p className="mb-4 text-sm text-error font-medium bg-error/10 border border-error/20 rounded-lg px-3 py-2" role="alert">
                       {partiesError}
@@ -776,8 +808,7 @@ export default function TransactionWorkspace({
                               <input
                                 type="date"
                                 value={form[item.key] || ''}
-                                onChange={(e) => handleFieldChange(item.key, e.target.value)}
-                                onBlur={(e) => handleFieldBlur(item.key, e.target.value || null)}
+                                onChange={(e) => handleDateCommit(item.key, e.target.value)}
                                 className="critical-date-input relative w-full min-w-0 max-w-full box-border text-sm text-primary bg-transparent border-0 rounded-lg pl-3 pr-10 py-2 outline-none"
                               />
                               <Icon
@@ -812,6 +843,9 @@ export default function TransactionWorkspace({
                     ))}
                   </div>
                   {savingTx && <p className="text-xs text-on-surface-variant mt-4">Saving…</p>}
+                  {!savingTx && savedMsg && (
+                    <p className="text-xs text-secondary font-bold mt-4">{savedMsg}</p>
+                  )}
 
                   <div className="mt-8 pt-8 border-t border-outline-variant/15">
                     <PartiesToTransaction
