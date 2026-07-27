@@ -1,17 +1,8 @@
-import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  Users,
-  CheckSquare,
   ListTodo,
   ClipboardList,
   FolderKanban,
-  BookUser,
-  BarChart2,
-  Building2,
-  Megaphone,
-  MessageSquare,
-  Target,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -19,20 +10,11 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useSidebar } from '../context/SidebarContext';
 import { resolveTransactionsSidebarLink } from '../utils/transactionsListPath';
+import { NAV_ITEMS } from '../constants/nav';
+import useOverdueTaskCount from '../hooks/useOverdueTaskCount';
 import TeamAvatar from './TeamAvatar';
 import heydayLogo from '../assets/heyday-logo.png';
 import { APP_HEADER_BORDER_CLASS, APP_HEADER_HEIGHT_CLASS } from '../constants/appHeader';
-
-const NAV_ITEMS = [
-  { to: '/team-ops', label: 'Team Hub', icon: Users },
-  { to: '/tasks', label: 'Task Hub', icon: CheckSquare, taskHub: true },
-  { to: '/transactions', label: 'Transactions', icon: Building2 },
-  { to: '/opportunities', label: 'Opportunities', icon: Target },
-  { to: '/marketing', label: 'Marketing', icon: Megaphone },
-  { to: '/crm', label: 'CRM Hub', icon: BookUser },
-  { to: '/revenue', label: 'Revenue', icon: BarChart2 },
-  { to: '/feedback', label: 'Feedback', icon: MessageSquare },
-];
 
 function navLinkClasses(isActive, { compact = false, collapsed = false } = {}) {
   const state = isActive
@@ -65,15 +47,7 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
   const { collapsed, toggleCollapsed, sidebarWidth } = useSidebar();
   const navigate = useNavigate();
-  const [overdueCount, setOverdueCount] = useState(0);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    fetch('/api/tasks?assigned_to=me&filter=overdue&include_completed=false', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((json) => setOverdueCount(json?.stats?.overdueCount ?? 0))
-      .catch(() => setOverdueCount(0));
-  }, [user?.id]);
+  const overdueCount = useOverdueTaskCount();
 
   async function handleLogout() {
     await logout();
@@ -82,7 +56,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className="fixed left-0 top-0 h-screen bg-feather flex flex-col z-40 overflow-hidden transition-[width] duration-200 ease-in-out"
+      className="hidden md:flex fixed left-0 top-0 h-screen bg-feather flex-col z-40 overflow-hidden transition-[width] duration-200 ease-in-out"
       style={{ width: sidebarWidth }}
     >
       <div
@@ -122,49 +96,49 @@ export default function Sidebar() {
         {NAV_ITEMS.map(({ to, label, icon: Icon, taskHub }) => {
           const linkTo = to === '/transactions' ? resolveTransactionsSidebarLink() : to;
           return (
-          <div key={to}>
-            <NavLink
-              to={linkTo}
-              end={taskHub}
-              title={collapsed ? label : undefined}
-              className={({ isActive }) => navLinkClasses(isActive, { collapsed })}
-            >
-              <Icon size={20} className="shrink-0" />
-              {!collapsed && <span className="flex-1">{label}</span>}
-              {taskHub && <OverdueBadge count={overdueCount} collapsed={collapsed} />}
-            </NavLink>
-            {taskHub && user?.id && (
-              <>
-                <NavLink
-                  to={`/tasks/${user.id}`}
-                  end
-                  title={collapsed ? 'My Transaction Tasks' : undefined}
-                  className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
-                >
-                  <ListTodo size={collapsed ? 20 : 18} className="shrink-0" />
-                  {!collapsed && <span>My Transaction Tasks</span>}
-                </NavLink>
-                <NavLink
-                  to={`/tasks/${user.id}/admin`}
-                  end
-                  title={collapsed ? 'My Admin Tasks' : undefined}
-                  className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
-                >
-                  <ClipboardList size={collapsed ? 20 : 18} className="shrink-0" />
-                  {!collapsed && <span>My Admin Tasks</span>}
-                </NavLink>
-                <NavLink
-                  to={`/tasks/${user.id}/projects`}
-                  end
-                  title={collapsed ? 'My Projects' : undefined}
-                  className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
-                >
-                  <FolderKanban size={collapsed ? 20 : 18} className="shrink-0" />
-                  {!collapsed && <span>My Projects</span>}
-                </NavLink>
-              </>
-            )}
-          </div>
+            <div key={to}>
+              <NavLink
+                to={linkTo}
+                end={taskHub}
+                title={collapsed ? label : undefined}
+                className={({ isActive }) => navLinkClasses(isActive, { collapsed })}
+              >
+                <Icon size={20} className="shrink-0" />
+                {!collapsed && <span className="flex-1">{label}</span>}
+                {taskHub && <OverdueBadge count={overdueCount} collapsed={collapsed} />}
+              </NavLink>
+              {taskHub && user?.id && (
+                <>
+                  <NavLink
+                    to={`/tasks/${user.id}`}
+                    end
+                    title={collapsed ? 'My Transaction Tasks' : undefined}
+                    className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
+                  >
+                    <ListTodo size={collapsed ? 20 : 18} className="shrink-0" />
+                    {!collapsed && <span>My Transaction Tasks</span>}
+                  </NavLink>
+                  <NavLink
+                    to={`/tasks/${user.id}/admin`}
+                    end
+                    title={collapsed ? 'My Admin Tasks' : undefined}
+                    className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
+                  >
+                    <ClipboardList size={collapsed ? 20 : 18} className="shrink-0" />
+                    {!collapsed && <span>My Admin Tasks</span>}
+                  </NavLink>
+                  <NavLink
+                    to={`/tasks/${user.id}/projects`}
+                    end
+                    title={collapsed ? 'My Projects' : undefined}
+                    className={({ isActive }) => navLinkClasses(isActive, { compact: !collapsed, collapsed })}
+                  >
+                    <FolderKanban size={collapsed ? 20 : 18} className="shrink-0" />
+                    {!collapsed && <span>My Projects</span>}
+                  </NavLink>
+                </>
+              )}
+            </div>
           );
         })}
       </nav>

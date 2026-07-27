@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { formatCurrency, formatPriceInput, parsePriceInput } from '../utils/format';
+import { useIsMdUp } from '../hooks/useMediaQuery';
 
 export default function TransactionPriceHeader({ value, onSave }) {
+  const isMdUp = useIsMdUp();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
 
@@ -17,8 +19,8 @@ export default function TransactionPriceHeader({ value, onSave }) {
 
   if (editing) {
     return (
-      <div className="flex items-baseline gap-0.5">
-        <span className="text-lg font-bold text-feather">$</span>
+      <div className="flex items-baseline gap-0.5 shrink-0">
+        <span className="text-base md:text-lg font-bold text-feather">$</span>
         <input
           type="text"
           inputMode="numeric"
@@ -33,7 +35,7 @@ export default function TransactionPriceHeader({ value, onSave }) {
               setEditing(false);
             }
           }}
-          className="text-lg font-bold text-feather bg-off-white border border-outline-variant/30 rounded-lg px-2 py-1 outline-none w-32 text-right focus:ring-2 focus:ring-feather/20"
+          className="text-base md:text-lg font-bold text-feather bg-off-white border border-outline-variant/30 rounded-lg px-2 py-1 outline-none w-24 md:w-32 text-right focus:ring-2 focus:ring-feather/20"
         />
       </div>
     );
@@ -43,13 +45,15 @@ export default function TransactionPriceHeader({ value, onSave }) {
     <button
       type="button"
       onClick={() => setEditing(true)}
-      className="text-right group"
+      className="text-right group shrink-0"
       title="Click to edit sales price"
     >
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant group-hover:text-feather">
-        Sales Price
-      </p>
-      <p className="text-lg font-bold text-feather tabular-nums">{formatCurrency(value)}</p>
+      {isMdUp && (
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant group-hover:text-feather">
+          Sales Price
+        </p>
+      )}
+      <p className="text-sm md:text-lg font-bold text-feather tabular-nums">{formatCurrency(value)}</p>
     </button>
   );
 }

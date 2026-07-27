@@ -280,10 +280,10 @@ export default function TransactionManager() {
   if (inSetup) {
     return (
       <DashboardLayout title={street} subtitle={cityLine || undefined} titleAddon={privateFlag} className="bg-surface">
-        <div className="px-8 pt-4">
+        <div className="px-4 md:px-8 pt-4">
           <Link to={returnTo} className="text-sm text-secondary hover:underline">← Back to transactions</Link>
           <div className="flex flex-wrap items-center gap-2 mt-2">
-            <h1 className="text-2xl font-bold text-primary">{street}</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-primary">{street}</h1>
             {privateFlag}
           </div>
           {cityLine && <p className="text-sm text-on-surface-variant mt-1">{cityLine}</p>}
