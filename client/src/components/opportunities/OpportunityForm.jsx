@@ -227,7 +227,7 @@ export default function OpportunityForm({
               </div>
 
               <div>
-                <span className={LABEL}>Price</span>
+                <span className={LABEL}>Budget</span>
                 <div className="mt-1 flex rounded-lg border border-outline-variant/30 overflow-hidden bg-white">
                   <button
                     type="button"
