@@ -119,7 +119,10 @@ export default function TransactionManager() {
     if (res.ok) {
       setTransaction(json.transaction);
       if (json.parties?.length) setParties(json.parties);
-      if (json.tasksRecalculated) fetchTasks();
+      const becameClosed = payload.stage === 'closed' || json.transaction?.stage === 'closed';
+      if (json.tasksRecalculated || json.marketing90Completed > 0 || becameClosed) {
+        fetchTasks();
+      }
       fetchActivities();
       return { ok: true, ...json };
     }

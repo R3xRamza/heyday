@@ -293,14 +293,16 @@ export default function TransactionWorkspace({
     onRefreshActivities?.();
   }
 
-  function revertUpdates(updates) {
+  function revertUpdates(updates, { keepCloseDate } = {}) {
     setForm((prev) => ({
       ...prev,
       ...Object.fromEntries(Object.keys(updates).map((k) => [k, transaction[k] ?? ''])),
       representing: normalizeRepresenting(transaction.representing),
       sale_type: normalizeSaleType(transaction.sale_type, transaction.representing),
       listing_visibility: normalizeListingVisibility(transaction.listing_visibility),
-      close_date: transaction.close_date || '',
+      close_date: keepCloseDate != null && keepCloseDate !== ''
+        ? keepCloseDate
+        : (transaction.close_date || ''),
       stage: transaction.stage || 'active',
     }));
   }
@@ -331,6 +333,18 @@ export default function TransactionWorkspace({
     return null;
   }
 
+  function closeDateToPreserve(updates) {
+    if ('close_date' in updates && updates.close_date) return updates.close_date;
+    if (form.close_date) return form.close_date;
+    return null;
+  }
+
+  function shouldKeepCloseDateOnError(errorMsg, updates) {
+    if (!errorMsg || /Add a Closing date/i.test(errorMsg)) return false;
+    // Party gate (or server party rejection) — keep typed Closing date in the field
+    return Boolean(closeDateToPreserve(updates));
+  }
+
   async function saveTransaction(updates) {
     setSavingTx(true);
     setSavedMsg('');
@@ -340,7 +354,11 @@ export default function TransactionWorkspace({
     if (gateError) {
       setSavingTx(false);
       setPartiesError(gateError);
-      revertUpdates(updates);
+      revertUpdates(updates, {
+        keepCloseDate: shouldKeepCloseDateOnError(gateError, updates)
+          ? closeDateToPreserve(updates)
+          : null,
+      });
       return;
     }
 
@@ -349,9 +367,13 @@ export default function TransactionWorkspace({
     setSavingTx(false);
     if (result?.ok === false) {
       setSavedMsg('');
-      setPartiesError(result.error || 'Could not save.');
-      // Revert form field if close_date / party gate failed
-      revertUpdates(updates);
+      const errMsg = result.error || 'Could not save.';
+      setPartiesError(errMsg);
+      revertUpdates(updates, {
+        keepCloseDate: shouldKeepCloseDateOnError(errMsg, updates)
+          ? closeDateToPreserve(updates)
+          : null,
+      });
       return;
     }
     if (result?.tasksRecalculated) {

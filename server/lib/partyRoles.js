@@ -134,7 +134,7 @@ export function validateParties(parties, saleType, representing, intent) {
     return {
       ok: false,
       missing,
-      message: `Fill in these party fields before moving to Pending: ${missing.join(', ')}.`,
+      message: `Fill these fields to move to Pending: ${missing.join(', ')}.`,
     };
   }
   return {
