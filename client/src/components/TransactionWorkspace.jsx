@@ -845,7 +845,7 @@ export default function TransactionWorkspace({
         )}
 
         {view === 'checklist' && (
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain custom-scrollbar p-4 md:p-6">
+          <div className={`p-4 md:p-6 ${isMdUp ? 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain custom-scrollbar' : ''}`}>
             <div className="grid grid-cols-12 gap-4 md:gap-6 items-start">
               <div className="col-span-12 lg:col-span-8">
                 <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive flex flex-col md:min-h-[32rem] md:max-h-[calc(100vh-12.5rem)]">
@@ -865,7 +865,7 @@ export default function TransactionWorkspace({
                       Add task
                     </button>
                   </div>
-                  <div className="md:flex-1 md:overflow-y-auto md:min-h-0 px-4 py-3 space-y-2 md:custom-scrollbar">
+                  <div className="md:flex-1 md:overflow-y-auto md:min-h-0 px-4 py-3 space-y-2 custom-scrollbar">
                     {checklistTasks.length === 0 ? (
                       <div className="text-center py-8">
                         <p className="text-sm text-on-surface-variant">No tasks on this checklist.</p>
