@@ -468,6 +468,7 @@ export default function TransactionWorkspace({
   const representingDisplay = representingLabel(form.representing);
   const showPrivateFlag = isPrivateListing(form);
   const portfolioType = transactionPortfolioType(form);
+  const isClosingDateGateError = /closing date/i.test(partiesError || '');
 
   const dashboardHeader = (
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-2">
@@ -622,7 +623,7 @@ export default function TransactionWorkspace({
                   <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-5">
                     Critical Dates Timeline
                   </h3>
-                  {partiesError && (
+                  {isClosingDateGateError && (
                     <p className="mb-4 text-sm text-error font-medium bg-error/10 border border-error/20 rounded-lg px-3 py-2" role="alert">
                       {partiesError}
                     </p>
@@ -671,11 +672,6 @@ export default function TransactionWorkspace({
                     Transaction Details
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    {partiesError && (
-                      <div className="sm:col-span-2 text-sm text-error font-medium bg-error/10 border border-error/20 rounded-lg px-3 py-2" role="alert">
-                        {partiesError}
-                      </div>
-                    )}
                     {visibleExtraFields.map((field) => (
                       <div key={field.key} className={field.key === 'created_at' ? 'sm:col-span-2' : undefined}>
                         <EditableField
@@ -684,7 +680,6 @@ export default function TransactionWorkspace({
                           transaction={transaction}
                           onChange={field.type === 'select' ? handleSelectChange : handleFieldChange}
                           onBlur={handleFieldBlur}
-                          error={field.key === 'stage' && partiesError ? ' ' : ''}
                         />
                       </div>
                     ))}
@@ -697,7 +692,7 @@ export default function TransactionWorkspace({
                       transaction={{ ...transaction, ...form }}
                       agentName={agentName}
                       users={users}
-                      error={partiesError}
+                      error={partiesError && !isClosingDateGateError ? partiesError : ''}
                       onSave={async (payload) => {
                         setPartiesError('');
                         const result = await onSaveParties(payload);
