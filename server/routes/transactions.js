@@ -37,11 +37,12 @@ import {
   dealSortsBefore,
   resolveGrossCommission,
   normalizeGciMode,
+  settingsProgressMeta,
 } from '../lib/commissionPlans.js';
 import {
   getTemplateSettingsForAgentId,
+  getTemplateMeta,
   agentKeyFromUserId,
-  TEMPLATE_AGENT_LABELS,
 } from '../lib/revenueTemplates.js';
 
 const router = Router();
@@ -116,7 +117,8 @@ function buildCommissionSummary(tx) {
   const settings = getTemplateSettingsForAgentId(db, agentId);
   // eXp / team fees for any templated agent on non-referral deals
   const appliesPlan = Boolean(agentKey) && !isReferralSale(tx);
-  const agentLabel = agentKey ? TEMPLATE_AGENT_LABELS[agentKey] : null;
+  const agentLabel = agentKey ? getTemplateMeta(db, agentKey).label : null;
+  const progressMeta = settingsProgressMeta(settings);
 
   let peers = [];
   if (appliesPlan && agentId) {
@@ -161,6 +163,7 @@ function buildCommissionSummary(tx) {
     capPaid: priorRun.capPaid,
     riskPaid: priorRun.riskPaid,
     cappedFeesPaid: priorRun.cappedFeesPaid,
+    feePaid: priorRun.feePaid || {},
   };
 
   const breakdown = hasGci
@@ -177,16 +180,16 @@ function buildCommissionSummary(tx) {
     ? (breakdown ? breakdown.cappedFeesPaidAfter : priorRun.cappedFeesPaid)
     : null;
   const afterCap = appliesPlan && (
-    capPaid >= settings.capAmount
-    || (breakdown ? breakdown.plan === 'after_cap' : priorRun.capPaid >= settings.capAmount)
+    capPaid >= (progressMeta.capAmount || 0)
+    || (breakdown ? breakdown.plan === 'after_cap' : priorRun.capPaid >= (progressMeta.capAmount || 0))
   );
 
   const displayCappedFeeRate = !appliesPlan
     ? null
     : afterCap
-      ? (priorRun.cappedFeesPaid >= settings.cappedFeesStepDownAt
-        ? settings.cappedTransactionFeeReduced
-        : settings.cappedTransactionFee)
+      ? (priorRun.cappedFeesPaid >= (progressMeta.cappedFeesStepDownAt || 0)
+        ? (progressMeta.cappedTransactionFeeReduced ?? progressMeta.cappedTransactionFee)
+        : progressMeta.cappedTransactionFee)
       : (breakdown?.cappedFee || 0);
 
   return {
@@ -210,16 +213,16 @@ function buildCommissionSummary(tx) {
     breakdown,
     progress: {
       capPaid,
-      capAmount: appliesPlan ? settings.capAmount : null,
+      capAmount: appliesPlan ? progressMeta.capAmount : null,
       riskPaid,
-      riskCap: appliesPlan ? settings.riskManagementAnnualCap : null,
+      riskCap: appliesPlan ? progressMeta.riskCap : null,
       cappedFeesPaid,
-      cappedFeesStepDownAt: appliesPlan ? settings.cappedFeesStepDownAt : null,
+      cappedFeesStepDownAt: appliesPlan ? progressMeta.cappedFeesStepDownAt : null,
       cappedFeeRate: breakdown && appliesPlan
         ? (breakdown.cappedFee || displayCappedFeeRate)
         : displayCappedFeeRate,
       plan: appliesPlan
-        ? (breakdown?.plan || (priorRun.capPaid >= settings.capAmount ? 'after_cap' : 'before_cap'))
+        ? (breakdown?.plan || (priorRun.capPaid >= (progressMeta.capAmount || 0) ? 'after_cap' : 'before_cap'))
         : null,
     },
     ytdBefore,

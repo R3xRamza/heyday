@@ -1,38 +1,63 @@
 /**
- * Meredith (MPA) eXp commission plans.
+ * eXp commission plans (anniversary year: Dec 1 → Nov 30).
  *
- * Anniversary year: Dec 1 → Nov 30 (not calendar year).
- *
- * Before cap — paid by agent:
- *   eXp split (20% of GCI until $16,000 anniversary-year cap),
- *   eXp Broker Review Fee $25,
- *   eXp Risk Management Fee $60 (anniversary-year total capped at $750),
- *   Tessa 4% of post-split, Margaret 3% of post-split,
- *   editable custom fees.
- *
- * After cap — paid by agent:
- *   agent keeps 100% of GCI (no eXp split),
- *   Capped Trans Fee $250 until $5,000 capped fees paid in anniversary year, then $75,
- *   Broker Review $25, Risk Management (same annual ceiling),
- *   Tessa 4%, Margaret 3%, custom fees.
+ * Settings use dynamic feeLines[] + teamSplits[]; legacy flat fields migrate on read.
  */
-
-export const COMMISSION_SETTINGS = {
-  capAmount: 16000,
-  splitRate: 0.2,
-  brokerReviewFee: 25,
-  riskManagementFee: 60,
-  riskManagementAnnualCap: 750,
-  cappedTransactionFee: 250,
-  cappedTransactionFeeReduced: 75,
-  cappedFeesStepDownAt: 5000,
-  tessaRate: 0.04,
-  margaretRate: 0.03,
-};
 
 export function round2(n) {
   return Math.round(n * 100) / 100;
 }
+
+function newId(prefix) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/** Default eXp fee lines (Meredith + other seeded agents). */
+export const DEFAULT_FEE_LINES = [
+  {
+    id: 'broker_review',
+    label: 'eXp Broker Review Fee',
+    amount: 25,
+    unit: 'amount',
+    apply: 'always',
+    annualCap: null,
+    stepDownAt: null,
+    reducedAmount: null,
+  },
+  {
+    id: 'risk_mgmt',
+    label: 'eXp Risk Management Fee',
+    amount: 60,
+    unit: 'amount',
+    apply: 'always',
+    annualCap: 750,
+    stepDownAt: null,
+    reducedAmount: null,
+  },
+  {
+    id: 'capped_trans',
+    label: 'Capped Trans Fee',
+    amount: 250,
+    unit: 'amount',
+    apply: 'after_cap',
+    annualCap: null,
+    stepDownAt: 5000,
+    reducedAmount: 75,
+  },
+];
+
+export const DEFAULT_TEAM_SPLITS_MEREDITH = [
+  { id: 'split_tessa', label: 'Tessa', userId: null, rate: 0.04 },
+  { id: 'split_margaret', label: 'Margaret', userId: null, rate: 0.03 },
+];
+
+/** Canonical default settings (Meredith-shaped). */
+export const COMMISSION_SETTINGS = {
+  capAmount: 16000,
+  splitRate: 0.2,
+  feeLines: DEFAULT_FEE_LINES.map((f) => ({ ...f })),
+  teamSplits: DEFAULT_TEAM_SPLITS_MEREDITH.map((s) => ({ ...s })),
+};
 
 function parseYmd(dateStr) {
   if (!dateStr) return null;
@@ -56,7 +81,6 @@ function todayYmd() {
 /**
  * Anniversary window containing dateStr (YYYY-MM-DD).
  * Dec 1 of startYear → Nov 30 of startYear+1.
- * Missing/invalid date → today.
  */
 export function anniversaryWindowForDate(dateStr) {
   const parsed = parseYmd(dateStr) || parseYmd(todayYmd());
@@ -68,7 +92,7 @@ export function anniversaryWindowForDate(dateStr) {
   };
 }
 
-/** Anniversary year that ends Nov 30 of `endYear` (e.g. 2026 → 2025-12-01 … 2026-11-30). */
+/** Anniversary year that ends Nov 30 of `endYear`. */
 export function anniversaryWindowForEndYear(endYear) {
   const y = Number(endYear);
   return {
@@ -110,10 +134,6 @@ export function customFeeDollars(fee, gci) {
   return round2(n);
 }
 
-/**
- * Resolve stored GCI input to a dollar amount.
- * Percent mode = % of sales price (transaction.value).
- */
 export function resolveGrossCommission({
   mode,
   grossCommission,
@@ -137,40 +157,221 @@ export function normalizeGciMode(mode) {
   return mode === 'percent' ? 'percent' : 'amount';
 }
 
+function num(v, fallback = 0) {
+  const x = Number(v);
+  return Number.isFinite(x) && x >= 0 ? x : fallback;
+}
+
+function asRate(v, fallback = 0) {
+  let x = Number(v);
+  if (!Number.isFinite(x) || x < 0) return fallback;
+  if (x > 1) x /= 100;
+  return Math.min(1, x);
+}
+
+/** Convert legacy flat settings → feeLines/teamSplits. */
+export function migrateLegacyCommissionSettings(raw = {}) {
+  if (Array.isArray(raw.feeLines) || Array.isArray(raw.teamSplits)) {
+    return raw;
+  }
+  const feeLines = [
+    {
+      id: 'broker_review',
+      label: 'eXp Broker Review Fee',
+      amount: num(raw.brokerReviewFee, 25),
+      unit: 'amount',
+      apply: 'always',
+      annualCap: null,
+      stepDownAt: null,
+      reducedAmount: null,
+    },
+    {
+      id: 'risk_mgmt',
+      label: 'eXp Risk Management Fee',
+      amount: num(raw.riskManagementFee, 60),
+      unit: 'amount',
+      apply: 'always',
+      annualCap: num(raw.riskManagementAnnualCap, 750),
+      stepDownAt: null,
+      reducedAmount: null,
+    },
+    {
+      id: 'capped_trans',
+      label: 'Capped Trans Fee',
+      amount: num(raw.cappedTransactionFee, 250),
+      unit: 'amount',
+      apply: 'after_cap',
+      annualCap: null,
+      stepDownAt: num(raw.cappedFeesStepDownAt, 5000),
+      reducedAmount: num(raw.cappedTransactionFeeReduced, 75),
+    },
+  ];
+  const teamSplits = [];
+  const tessa = asRate(raw.tessaRate, 0);
+  const margaret = asRate(raw.margaretRate, 0);
+  if (tessa > 0) {
+    teamSplits.push({ id: 'split_tessa', label: 'Tessa', userId: null, rate: tessa });
+  }
+  if (margaret > 0) {
+    teamSplits.push({ id: 'split_margaret', label: 'Margaret', userId: null, rate: margaret });
+  }
+  return {
+    capAmount: num(raw.capAmount, 16000),
+    splitRate: asRate(raw.splitRate, 0.2),
+    feeLines,
+    teamSplits,
+  };
+}
+
+function normalizeFeeLine(f, i) {
+  const apply = ['always', 'before_cap', 'after_cap'].includes(f?.apply) ? f.apply : 'always';
+  const unit = f?.unit === 'percent' ? 'percent' : 'amount';
+  let amount = num(f?.amount, 0);
+  if (unit === 'percent' && amount > 1 && amount <= 100) {
+    // stored as percent points in UI for fee % of GCI — keep as points (0–100)
+  }
+  const annualCap = f?.annualCap == null || f.annualCap === '' ? null : num(f.annualCap, 0);
+  const stepDownAt = f?.stepDownAt == null || f.stepDownAt === '' ? null : num(f.stepDownAt, 0);
+  const reducedAmount = f?.reducedAmount == null || f.reducedAmount === ''
+    ? null
+    : num(f.reducedAmount, 0);
+  return {
+    id: f?.id != null ? String(f.id) : newId(`fee${i}`),
+    label: String(f?.label ?? '').trim() || `Fee ${i + 1}`,
+    amount: round2(amount),
+    unit,
+    apply,
+    annualCap: annualCap != null ? round2(annualCap) : null,
+    stepDownAt: stepDownAt != null ? round2(stepDownAt) : null,
+    reducedAmount: reducedAmount != null ? round2(reducedAmount) : null,
+  };
+}
+
+function normalizeTeamSplit(s, i) {
+  return {
+    id: s?.id != null ? String(s.id) : newId(`split${i}`),
+    label: String(s?.label ?? '').trim() || `Split ${i + 1}`,
+    userId: s?.userId != null && s.userId !== '' ? Number(s.userId) : null,
+    rate: asRate(s?.rate, 0),
+  };
+}
+
+/** Normalize settings to feeLines/teamSplits shape + progress aliases. */
+export function normalizeCommissionSettings(raw = {}) {
+  const migrated = migrateLegacyCommissionSettings(raw || {});
+  let splitRate = asRate(migrated.splitRate, COMMISSION_SETTINGS.splitRate);
+  const feeLines = Array.isArray(migrated.feeLines)
+    ? migrated.feeLines.map(normalizeFeeLine)
+    : DEFAULT_FEE_LINES.map((f) => ({ ...f }));
+  const teamSplits = Array.isArray(migrated.teamSplits)
+    ? migrated.teamSplits.map(normalizeTeamSplit)
+    : [];
+
+  const settings = {
+    capAmount: round2(num(migrated.capAmount, COMMISSION_SETTINGS.capAmount)),
+    splitRate,
+    feeLines,
+    teamSplits,
+  };
+
+  // Progress / summary aliases derived from known fee lines
+  const risk = feeLines.find((f) => f.id === 'risk_mgmt') || feeLines.find((f) => f.annualCap != null);
+  const capped = feeLines.find((f) => f.id === 'capped_trans') || feeLines.find((f) => f.stepDownAt != null);
+  settings.riskManagementAnnualCap = risk?.annualCap ?? null;
+  settings.cappedFeesStepDownAt = capped?.stepDownAt ?? null;
+  settings.cappedTransactionFee = capped?.amount ?? null;
+  settings.cappedTransactionFeeReduced = capped?.reducedAmount ?? capped?.amount ?? null;
+  settings.brokerReviewFee = feeLines.find((f) => f.id === 'broker_review')?.amount ?? null;
+  settings.riskManagementFee = risk?.amount ?? null;
+  // Legacy team rate aliases (first matching labels)
+  const tessa = teamSplits.find((s) => /tessa/i.test(s.label));
+  const margaret = teamSplits.find((s) => /margaret/i.test(s.label));
+  settings.tessaRate = tessa?.rate ?? 0;
+  settings.margaretRate = margaret?.rate ?? 0;
+
+  return settings;
+}
+
+/** Progress meta for UI bars. */
+export function settingsProgressMeta(settings) {
+  const s = normalizeCommissionSettings(settings);
+  return {
+    capAmount: s.capAmount,
+    riskCap: s.riskManagementAnnualCap,
+    cappedFeesStepDownAt: s.cappedFeesStepDownAt,
+    cappedTransactionFee: s.cappedTransactionFee,
+    cappedTransactionFeeReduced: s.cappedTransactionFeeReduced,
+  };
+}
+
 function normalizeYtd(startingYtd = {}) {
   if (typeof startingYtd === 'number') {
-    return { capPaid: startingYtd, riskPaid: 0, cappedFeesPaid: 0 };
+    return { capPaid: startingYtd, riskPaid: 0, cappedFeesPaid: 0, feePaid: {} };
+  }
+  const feePaid = startingYtd.feePaid && typeof startingYtd.feePaid === 'object'
+    ? { ...startingYtd.feePaid }
+    : {};
+  // Backfill known trackers into feePaid
+  if (startingYtd.riskPaid != null && feePaid.risk_mgmt == null) {
+    feePaid.risk_mgmt = Number(startingYtd.riskPaid) || 0;
+  }
+  if (startingYtd.cappedFeesPaid != null && feePaid.capped_trans == null) {
+    feePaid.capped_trans = Number(startingYtd.cappedFeesPaid) || 0;
   }
   return {
     capPaid: Number(startingYtd.capPaid) || 0,
     riskPaid: Number(startingYtd.riskPaid) || 0,
     cappedFeesPaid: Number(startingYtd.cappedFeesPaid) || 0,
+    feePaid,
   };
+}
+
+function feeLineDollars(fee, gciN, postSplit, paidBefore) {
+  let base;
+  if (fee.unit === 'percent') {
+    // percent of GCI (same as deal custom fees)
+    base = round2(gciN * (fee.amount / 100));
+  } else {
+    base = round2(fee.amount);
+  }
+
+  if (fee.stepDownAt != null && fee.reducedAmount != null && paidBefore >= fee.stepDownAt) {
+    if (fee.unit === 'percent') {
+      base = round2(gciN * (fee.reducedAmount / 100));
+    } else {
+      base = round2(fee.reducedAmount);
+    }
+  }
+
+  if (fee.annualCap != null) {
+    const room = Math.max(0, round2(fee.annualCap - paidBefore));
+    base = round2(Math.min(base, room));
+  }
+
+  return base;
 }
 
 /**
  * Compute one deal's commission breakdown.
- * Sliding scale takes 20% of GCI to eXp, but never more than remaining cap room.
- * Set overrides.applyPlanFees = false for non-Meredith agents (no eXp / team fees).
+ * Set overrides.applyPlanFees = false to skip eXp/team template fees.
  */
-export function computeDealCommission(gci, startingYtd = {}, overrides = {}, settings = COMMISSION_SETTINGS) {
+export function computeDealCommission(gci, startingYtd = {}, overrides = {}, rawSettings = COMMISSION_SETTINGS) {
+  const settings = normalizeCommissionSettings(rawSettings);
   const applyPlanFees = overrides.applyPlanFees !== false;
   const ytd = normalizeYtd(startingYtd);
   const capPaidBefore = applyPlanFees ? ytd.capPaid : 0;
-  const riskPaidBefore = applyPlanFees ? ytd.riskPaid : 0;
-  const cappedFeesPaidBefore = applyPlanFees ? ytd.cappedFeesPaid : 0;
 
   const customFees = parseCustomFees(overrides.customFees);
   const gciN = round2(Number(gci) || 0);
-  const resolvedFees = customFees.map((fee) => ({
+  const resolvedCustom = customFees.map((fee) => ({
     ...fee,
     dollars: customFeeDollars(fee, gciN),
   }));
-  const customSum = round2(resolvedFees.reduce((sum, f) => sum + f.dollars, 0));
+  const customSum = round2(resolvedCustom.reduce((sum, f) => sum + f.dollars, 0));
 
   if (!applyPlanFees) {
     const lines = [];
-    for (const fee of resolvedFees) {
+    for (const fee of resolvedCustom) {
       if (!fee.label && !(fee.dollars > 0)) continue;
       const pctLabel = fee.unit === 'percent' ? ` (${fee.amount}%)` : '';
       lines.push({
@@ -193,38 +394,20 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, set
       customSum,
       fixedFees: 0,
       teamSplits: 0,
+      teamSplitDetails: [],
       net: round2(gciN - customSum),
       capPaidAfter: 0,
       riskPaidAfter: 0,
       cappedFeesPaidAfter: 0,
+      feePaidAfter: {},
       lines,
     };
   }
 
   const capRemaining = Math.max(0, round2(settings.capAmount - capPaidBefore));
   const beforeCap = capRemaining > 0;
-
   const expSplit = beforeCap ? Math.min(round2(gciN * settings.splitRate), capRemaining) : 0;
   const postSplit = round2(gciN - expSplit);
-
-  const riskRoom = Math.max(0, round2(settings.riskManagementAnnualCap - riskPaidBefore));
-  const riskFee = round2(Math.min(settings.riskManagementFee, riskRoom));
-  const brokerReview = settings.brokerReviewFee;
-
-  let cappedFee = 0;
-  if (!beforeCap) {
-    cappedFee = cappedFeesPaidBefore >= settings.cappedFeesStepDownAt
-      ? settings.cappedTransactionFeeReduced
-      : settings.cappedTransactionFee;
-  }
-
-  const tessa = round2(postSplit * settings.tessaRate);
-  const margaret = round2(postSplit * settings.margaretRate);
-  const teamSplits = round2(tessa + margaret);
-  const fixedFees = round2(brokerReview + riskFee + cappedFee);
-  const net = round2(postSplit - fixedFees - teamSplits - customSum);
-  const tessaPct = round2(settings.tessaRate * 100);
-  const margaretPct = round2(settings.margaretRate * 100);
   const splitPct = round2(settings.splitRate * 100);
 
   const lines = [
@@ -236,22 +419,63 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, set
       amount: -expSplit,
     },
   ];
-  if (!beforeCap) {
+
+  const feePaidAfter = { ...ytd.feePaid };
+  let fixedFees = 0;
+  let riskFee = 0;
+  let brokerReview = 0;
+  let cappedFee = 0;
+
+  for (const fee of settings.feeLines) {
+    const applies = fee.apply === 'always'
+      || (fee.apply === 'before_cap' && beforeCap)
+      || (fee.apply === 'after_cap' && !beforeCap);
+    if (!applies) continue;
+
+    const paidBefore = Number(feePaidAfter[fee.id]) || 0;
+    const dollars = feeLineDollars(fee, gciN, postSplit, paidBefore);
+    if (!(dollars > 0) && !fee.label) continue;
+
+    feePaidAfter[fee.id] = round2(paidBefore + dollars);
+    fixedFees = round2(fixedFees + dollars);
+
+    if (fee.id === 'risk_mgmt') riskFee = dollars;
+    if (fee.id === 'broker_review') brokerReview = dollars;
+    if (fee.id === 'capped_trans') cappedFee = dollars;
+
+    let label = fee.label || 'Fee';
+    if (fee.stepDownAt != null && fee.reducedAmount != null && paidBefore >= fee.stepDownAt) {
+      label = `${label} (reduced)`;
+    }
+    if (fee.unit === 'percent') {
+      label = `${label} (${fee.amount}%)`;
+    }
     lines.push({
-      key: 'capped_fee',
-      label: cappedFee === settings.cappedTransactionFeeReduced
-        ? 'Capped Trans Fee (reduced)'
-        : 'Capped Trans Fee',
-      amount: -cappedFee,
+      key: `fee_${fee.id}`,
+      label,
+      amount: -dollars,
     });
   }
-  lines.push(
-    { key: 'broker_review', label: 'eXp Broker Review Fee', amount: -brokerReview },
-    { key: 'risk_mgmt', label: 'eXp Risk Management Fee', amount: -riskFee },
-    { key: 'tessa', label: `Tessa ${tessaPct}% of post-split balance`, amount: -tessa },
-    { key: 'margaret', label: `Margaret ${margaretPct}% of post-split balance`, amount: -margaret },
-  );
-  for (const fee of resolvedFees) {
+
+  const teamSplitDetails = [];
+  let teamSplitsTotal = 0;
+  let tessa = 0;
+  let margaret = 0;
+  for (const split of settings.teamSplits) {
+    const amount = round2(postSplit * split.rate);
+    teamSplitsTotal = round2(teamSplitsTotal + amount);
+    const pct = round2(split.rate * 100);
+    teamSplitDetails.push({ id: split.id, label: split.label, rate: split.rate, amount });
+    if (/tessa/i.test(split.label)) tessa = amount;
+    if (/margaret/i.test(split.label)) margaret = amount;
+    lines.push({
+      key: `split_${split.id}`,
+      label: `${split.label} ${pct}% of post-split balance`,
+      amount: -amount,
+    });
+  }
+
+  for (const fee of resolvedCustom) {
     if (!fee.label && !(fee.dollars > 0)) continue;
     const pctLabel = fee.unit === 'percent' ? ` (${fee.amount}%)` : '';
     lines.push({
@@ -260,6 +484,10 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, set
       amount: -fee.dollars,
     });
   }
+
+  const net = round2(postSplit - fixedFees - teamSplitsTotal - customSum);
+  const riskPaidAfter = round2(feePaidAfter.risk_mgmt || 0);
+  const cappedFeesPaidAfter = round2(feePaidAfter.capped_trans || 0);
 
   return {
     plan: beforeCap ? 'before_cap' : 'after_cap',
@@ -274,19 +502,19 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, set
     margaret,
     customSum,
     fixedFees,
-    teamSplits,
+    teamSplits: teamSplitsTotal,
+    teamSplitDetails,
     net,
     capPaidAfter: round2(capPaidBefore + expSplit),
-    riskPaidAfter: round2(riskPaidBefore + riskFee),
-    cappedFeesPaidAfter: round2(cappedFeesPaidBefore + cappedFee),
+    riskPaidAfter,
+    cappedFeesPaidAfter,
+    feePaidAfter,
     lines,
   };
 }
 
 /**
  * Run deals (ordered by close date) through anniversary-year accumulators.
- * Deals without a GCI are passed through flagged; they do not move totals.
- * `startingYtd` may be a number (legacy capPaid) or { capPaid, riskPaid, cappedFeesPaid }.
  */
 export function computeYearCommissions(deals, startingYtd = 0, settings = COMMISSION_SETTINGS) {
   let ytd = normalizeYtd(startingYtd);
@@ -310,6 +538,7 @@ export function computeYearCommissions(deals, startingYtd = 0, settings = COMMIS
         capPaid: breakdown.capPaidAfter,
         riskPaid: breakdown.riskPaidAfter,
         cappedFeesPaid: breakdown.cappedFeesPaidAfter,
+        feePaid: breakdown.feePaidAfter || {},
       };
     }
     results.push({ ...deal, hasGci: true, breakdown });
@@ -320,6 +549,7 @@ export function computeYearCommissions(deals, startingYtd = 0, settings = COMMIS
     capPaid: round2(ytd.capPaid),
     riskPaid: round2(ytd.riskPaid),
     cappedFeesPaid: round2(ytd.cappedFeesPaid),
+    feePaid: { ...ytd.feePaid },
   };
 }
 

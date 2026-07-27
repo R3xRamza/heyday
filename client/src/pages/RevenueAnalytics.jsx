@@ -248,8 +248,7 @@ function DistributionPanel({ summary }) {
   const rows = [
     { label: netLabel, amount: summary?.net ?? 0, className: 'bg-secondary', emphasis: true },
     { label: 'eXp splits & fees', amount: (summary?.expSplit ?? 0) + (summary?.fees ?? 0), className: 'bg-feather' },
-    { label: 'Tessa', amount: summary?.tessa ?? 0, className: 'bg-sky' },
-    { label: 'Margaret', amount: summary?.margaret ?? 0, className: 'bg-lemon' },
+    { label: 'Team splits', amount: summary?.teamSplits ?? ((summary?.tessa ?? 0) + (summary?.margaret ?? 0)), className: 'bg-sky' },
   ];
   const total = Math.max(1, rows.reduce((acc, r) => acc + r.amount, 0));
 

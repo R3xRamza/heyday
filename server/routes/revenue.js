@@ -8,12 +8,15 @@ import { parseAgentScope, transactionAgentScopeClause, agentScopeUserId } from '
 import {
   getTemplateSettings,
   getTemplateSettingsForAgentId,
+  getTemplateMeta,
   listTemplates,
   saveTemplateSettings,
-  TEMPLATE_AGENT_KEYS,
+  createAgentTemplate,
+  deleteAgentTemplate,
   TEMPLATE_AGENT_LABELS,
   agentKeyFromUserId,
 } from '../lib/revenueTemplates.js';
+import { settingsProgressMeta } from '../lib/commissionPlans.js';
 
 const router = Router();
 
@@ -152,20 +155,44 @@ router.get('/templates', (_req, res) => {
   res.json({ templates: listTemplates(db) });
 });
 
+router.post('/templates', (req, res) => {
+  try {
+    const created = createAgentTemplate(db, {
+      userId: req.body?.user_id,
+      label: req.body?.label,
+      agentKey: req.body?.agent_key,
+    }, req.user?.id ?? null);
+    res.status(201).json(created);
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Could not create template' });
+  }
+});
+
 router.put('/templates/:agentKey', (req, res) => {
   const agentKey = String(req.params.agentKey || '').toLowerCase();
-  if (!TEMPLATE_AGENT_KEYS.includes(agentKey)) {
-    return res.status(400).json({ error: 'Invalid agent_key' });
-  }
   try {
     const settings = saveTemplateSettings(db, agentKey, req.body?.settings ?? req.body, req.user?.id ?? null);
+    const meta = getTemplateMeta(db, agentKey);
     res.json({
       agent_key: agentKey,
-      label: TEMPLATE_AGENT_LABELS[agentKey],
+      label: meta.label,
+      user_id: meta.user_id,
+      seeded: meta.seeded,
       settings,
     });
   } catch (err) {
     res.status(400).json({ error: err.message || 'Could not save template' });
+  }
+});
+
+router.delete('/templates/:agentKey', (req, res) => {
+  const agentKey = String(req.params.agentKey || '').toLowerCase();
+  try {
+    deleteAgentTemplate(db, agentKey);
+    res.json({ ok: true });
+  } catch (err) {
+    const status = err.message === 'Not found' ? 404 : 400;
+    res.status(status).json({ error: err.message || 'Could not delete template' });
   }
 });
 
@@ -203,9 +230,10 @@ router.get('/', (req, res) => {
   const settings = scopeAgentKey
     ? getTemplateSettings(db, scopeAgentKey)
     : (closed.settings || getTemplateSettings(db, 'meredith'));
+  const progressMeta = settingsProgressMeta(settings);
   const multiAgent = agentScope === 'all' || closed.multiAgent;
   const agentLabel = scopeAgentKey
-    ? TEMPLATE_AGENT_LABELS[scopeAgentKey]
+    ? (getTemplateMeta(db, scopeAgentKey).label)
     : (agentScope === 'all' ? 'All agents' : 'Agent');
 
   const summary = {
@@ -222,15 +250,16 @@ router.get('/', (req, res) => {
     expSplit: sum(closed.results, (b) => b.expSplit),
     tessa: sum(closed.results, (b) => b.tessa),
     margaret: sum(closed.results, (b) => b.margaret),
+    teamSplits: sum(closed.results, (b) => b.teamSplits),
     fees: sum(closed.results, (b) => b.fixedFees + (b.customSum || 0)),
     missingGci: closed.results.filter((r) => !r.hasGci).length,
     capPaid: multiAgent ? null : closed.capPaid,
     riskPaid: multiAgent ? null : closed.riskPaid,
     cappedFeesPaid: multiAgent ? null : closed.cappedFeesPaid,
-    capAmount: multiAgent ? null : settings.capAmount,
-    riskCap: multiAgent ? null : settings.riskManagementAnnualCap,
-    cappedFeesStepDownAt: multiAgent ? null : settings.cappedFeesStepDownAt,
-    capped: multiAgent ? false : closed.capPaid >= settings.capAmount,
+    capAmount: multiAgent ? null : progressMeta.capAmount,
+    riskCap: multiAgent ? null : progressMeta.riskCap,
+    cappedFeesStepDownAt: multiAgent ? null : progressMeta.cappedFeesStepDownAt,
+    capped: multiAgent ? false : closed.capPaid >= (progressMeta.capAmount || 0),
     settings,
     pipelineGci: sum(pipeline.results, (b) => b.gci),
     pipelineNet: sum(pipeline.results, (b) => b.net),
