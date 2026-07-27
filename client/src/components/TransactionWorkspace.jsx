@@ -532,68 +532,6 @@ export default function TransactionWorkspace({
 
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden bg-surface flex-col md:flex-row">
-      {/* Mobile: horizontal asset / checklist chrome */}
-      {!isMdUp && (
-        <div className="shrink-0 border-b border-outline-variant/15 bg-surface-container-lowest">
-          <div className="px-3 pt-2.5 pb-1.5 flex items-center justify-between gap-2">
-            <Link to={returnTo} className="text-xs font-bold text-secondary hover:underline flex items-center gap-1 shrink-0">
-              <Icon name="arrow_back" className="!text-[14px]" /> BACK
-            </Link>
-            <span className="text-[9px] text-on-surface-variant/50 tabular-nums shrink-0">TR-{transaction.id}</span>
-          </div>
-          <div className="flex gap-1 overflow-x-auto px-2 pb-2 hide-scrollbar">
-            {ASSET_VIEWS.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setView(item.key)}
-                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap ${
-                  view === item.key
-                    ? 'bg-primary-container text-white'
-                    : 'bg-surface-container-low text-on-surface-variant'
-                }`}
-              >
-                <Icon name={item.icon} className="!text-[14px]" />
-                {item.label.replace('Transaction details', 'Details')}
-              </button>
-            ))}
-          </div>
-          {view === 'checklist' && (
-            <div className="flex gap-1.5 overflow-x-auto px-2 pb-2 hide-scrollbar items-center">
-              {sidebarChecklists.map((cl) => (
-                <button
-                  key={cl.id}
-                  type="button"
-                  onClick={() => setActiveChecklistId(cl.id)}
-                  className={`shrink-0 max-w-[12rem] truncate px-3 py-1.5 text-[11px] font-semibold rounded-full ${
-                    Number(activeChecklistId) === Number(cl.id)
-                      ? 'bg-feather text-lemon'
-                      : 'bg-surface-container-low text-primary'
-                  }`}
-                >
-                  {cl.name}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  setChecklistActionError('');
-                  setSelectedTemplateIds([]);
-                  setShowAddChecklist(true);
-                }}
-                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-secondary rounded-full border border-secondary/30"
-                aria-label="Add checklist"
-              >
-                <Plus size={12} /> Add
-              </button>
-            </div>
-          )}
-          {checklistActionError && !isMdUp && (
-            <p className="text-[10px] text-error px-3 pb-2" role="alert">{checklistActionError}</p>
-          )}
-        </div>
-      )}
-
       <aside className="hidden md:flex w-56 shrink-0 bg-surface-container-lowest border-r border-outline-variant/10 flex-col overflow-y-auto custom-scrollbar">
         <div className="p-4 border-b border-outline-variant/10">
           <Link to={returnTo} className="text-xs font-bold text-secondary hover:underline flex items-center gap-1 mb-4">
@@ -686,9 +624,75 @@ export default function TransactionWorkspace({
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div
+        className={`flex-1 flex flex-col min-w-0 min-h-0 ${
+          isMdUp ? 'overflow-hidden' : 'overflow-y-auto overscroll-y-contain custom-scrollbar'
+        }`}
+      >
+        {/* Mobile: back + tabs scroll away; TopNav keeps address/price pinned */}
+        {!isMdUp && (
+          <div className="border-b border-outline-variant/15 bg-surface-container-lowest">
+            <div className="px-3 pt-2.5 pb-1.5 flex items-center justify-between gap-2">
+              <Link to={returnTo} className="text-xs font-bold text-secondary hover:underline flex items-center gap-1 shrink-0">
+                <Icon name="arrow_back" className="!text-[14px]" /> BACK
+              </Link>
+              <span className="text-[9px] text-on-surface-variant/50 tabular-nums shrink-0">TR-{transaction.id}</span>
+            </div>
+            <div className="flex gap-1 overflow-x-auto px-2 pb-2 hide-scrollbar">
+              {ASSET_VIEWS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setView(item.key)}
+                  className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap ${
+                    view === item.key
+                      ? 'bg-primary-container text-white'
+                      : 'bg-surface-container-low text-on-surface-variant'
+                  }`}
+                >
+                  <Icon name={item.icon} className="!text-[14px]" />
+                  {item.label.replace('Transaction details', 'Details')}
+                </button>
+              ))}
+            </div>
+            {view === 'checklist' && (
+              <div className="flex gap-1.5 overflow-x-auto px-2 pb-2 hide-scrollbar items-center">
+                {sidebarChecklists.map((cl) => (
+                  <button
+                    key={cl.id}
+                    type="button"
+                    onClick={() => setActiveChecklistId(cl.id)}
+                    className={`shrink-0 max-w-[12rem] truncate px-3 py-1.5 text-[11px] font-semibold rounded-full ${
+                      Number(activeChecklistId) === Number(cl.id)
+                        ? 'bg-feather text-lemon'
+                        : 'bg-surface-container-low text-primary'
+                    }`}
+                  >
+                    {cl.name}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChecklistActionError('');
+                    setSelectedTemplateIds([]);
+                    setShowAddChecklist(true);
+                  }}
+                  className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-secondary rounded-full border border-secondary/30"
+                  aria-label="Add checklist"
+                >
+                  <Plus size={12} /> Add
+                </button>
+              </div>
+            )}
+            {checklistActionError && (
+              <p className="text-[10px] text-error px-3 pb-2" role="alert">{checklistActionError}</p>
+            )}
+          </div>
+        )}
+
         {view === 'details' && (
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8">
+          <div className={`p-4 md:p-8 space-y-6 md:space-y-8 ${isMdUp ? 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain custom-scrollbar' : ''}`}>
             {dashboardHeader}
 
             <div className="grid grid-cols-12 gap-6 items-start">
@@ -991,7 +995,7 @@ export default function TransactionWorkspace({
         )}
 
         {view === 'activity' && (
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain custom-scrollbar p-4 md:p-8 space-y-6">
+          <div className={`p-4 md:p-8 space-y-6 ${isMdUp ? 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain custom-scrollbar' : ''}`}>
             {dashboardHeader}
             <div className="grid grid-cols-12 gap-4 md:gap-6">
               <div className="col-span-12 lg:col-span-8">
@@ -1087,7 +1091,7 @@ export default function TransactionWorkspace({
         )}
 
         {view === 'commission' && (
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain custom-scrollbar p-4 md:p-8 space-y-6">
+          <div className={`p-4 md:p-8 space-y-6 ${isMdUp ? 'flex-1 min-h-0 overflow-y-auto overscroll-y-contain custom-scrollbar' : ''}`}>
             {dashboardHeader}
             <TransactionCommission
               transactionId={transaction.id}
