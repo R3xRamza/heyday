@@ -3,6 +3,7 @@ import Icon from '../shared/Icon';
 import TeamAvatar from '../TeamAvatar';
 import { formatTaskDue, shortAddress } from '../../utils/format';
 import { displayTaskTitle } from '../../utils/taskDisplay';
+import { useIsMdUp } from '../../hooks/useMediaQuery';
 
 function dueDisplayClass(task) {
   if (task.is_overdue) return 'text-error font-bold';
@@ -25,11 +26,51 @@ function taskOverviewStatus(task) {
 
 function TableSkeleton() {
   return (
-    <div className="px-6 py-4 space-y-3 animate-pulse">
+    <div className="px-4 md:px-6 py-4 space-y-3 animate-pulse">
       {[0, 1, 2, 3, 4].map((i) => (
         <div key={i} className="h-10 bg-surface-container-low rounded" />
       ))}
     </div>
+  );
+}
+
+function TaskMobileCard({ task, emailByUserId, onOpen }) {
+  const status = taskOverviewStatus(task);
+  const dueLabel = formatTaskDue(task.due_date, task.status, task.is_overdue);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full text-left px-4 py-3 active:bg-secondary/5"
+    >
+      <div className="flex items-start gap-2 min-w-0">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-sm text-primary leading-snug line-clamp-2">
+            {displayTaskTitle(task)}
+          </p>
+          <p className="text-[11px] text-on-surface-variant mt-0.5 truncate">
+            {task.transaction_id ? shortAddress(task.transaction_address) : 'Standalone task'}
+          </p>
+        </div>
+        <TeamAvatar
+          email={emailByUserId[task.assigned_to]}
+          name={task.user_name}
+          size="xs"
+        />
+      </div>
+      <div className="mt-2 flex items-center gap-2 min-w-0">
+        <span className={`shrink-0 text-[11px] whitespace-nowrap ${dueDisplayClass(task)}`}>
+          {dueLabel}
+        </span>
+        <span className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-black uppercase ${status.className}`}>
+          {status.label}
+        </span>
+        <span className="min-w-0 flex-1 text-right text-[11px] text-on-surface-variant truncate">
+          {task.user_name || 'Unassigned'}
+        </span>
+      </div>
+    </button>
   );
 }
 
@@ -40,6 +81,7 @@ export default function TeamTaskOverviewPanel({
   className = '',
 }) {
   const navigate = useNavigate();
+  const isMdUp = useIsMdUp();
 
   return (
     <section
@@ -58,9 +100,22 @@ export default function TeamTaskOverviewPanel({
       {loading ? (
         <TableSkeleton />
       ) : tasks.length === 0 ? (
-        <p className="flex-1 px-6 py-10 text-on-surface-variant">
+        <p className="flex-1 px-4 md:px-6 py-10 text-on-surface-variant text-sm">
           No open transaction tasks with due dates.
         </p>
+      ) : !isMdUp ? (
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar divide-y divide-outline-variant/10">
+          {tasks.map((task) => (
+            <TaskMobileCard
+              key={task.id}
+              task={task}
+              emailByUserId={emailByUserId}
+              onOpen={() => {
+                if (task.assigned_to) navigate(`/tasks/${task.assigned_to}`);
+              }}
+            />
+          ))}
+        </div>
       ) : (
         <div className="flex flex-col flex-1 min-h-0">
           <table className="w-full table-fixed text-left border-collapse shrink-0">
