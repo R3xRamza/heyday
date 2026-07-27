@@ -313,7 +313,7 @@ export default function MarketingCalendarToolbar({
         </button>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0 justify-end">
+      <div className="hidden md:flex items-center gap-2 shrink-0 justify-end">
         {categories.social && platforms?.length > 0 && (
           <PlatformFilterPopover
             platforms={platforms}
