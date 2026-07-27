@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, Fragment, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { SlidersHorizontal } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
+import AgentScopeToggle from '../components/AgentScopeToggle';
 import Icon from '../components/shared/Icon';
 import ListPagination from '../components/shared/ListPagination';
 import DateText from '../components/shared/DateText';
@@ -9,6 +9,7 @@ import PriceInput from '../components/shared/PriceInput';
 import { formatCurrency, shortAddress } from '../utils/format';
 import { useAgentScope } from '../context/AgentScopeContext';
 import { appendAgentScope } from '../utils/agentScope';
+import { useIsMdUp } from '../hooks/useMediaQuery';
 
 const MONTH_LABELS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -92,8 +93,80 @@ function GciEditor({ deal, onSave }) {
   );
 }
 
+function DealMobileCard({ deal, projected, expanded, onToggleExpand, onOpenTxn, onSaveGci }) {
+  const netLabel = projected ? 'Projected' : 'Net';
+
+  return (
+    <div className={`${deal.hasGci ? '' : 'bg-lemon/10'}`}>
+      <div className="px-4 py-3">
+        <div className="flex items-start gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={onOpenTxn}
+            className="min-w-0 flex-1 text-left"
+          >
+            <p className="font-semibold text-sm text-primary truncate hover:text-secondary">
+              {shortAddress(deal.address)}
+            </p>
+            <p className="text-[11px] text-on-surface-variant truncate mt-0.5">
+              {deal.client_name || deal.city || '—'}
+            </p>
+          </button>
+          {deal.hasGci ? (
+            <button
+              type="button"
+              onClick={onToggleExpand}
+              className="shrink-0 text-right"
+              aria-expanded={expanded}
+              aria-label={expanded ? 'Hide breakdown' : 'Show breakdown'}
+            >
+              <p className="text-sm font-black text-secondary tabular-nums whitespace-nowrap">
+                {formatMoney(deal.breakdown.net)}
+              </p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant mt-0.5">
+                {netLabel}
+                <Icon
+                  name={expanded ? 'expand_less' : 'expand_more'}
+                  className="!text-[14px] ml-0.5 align-middle"
+                />
+              </p>
+            </button>
+          ) : (
+            <span className="shrink-0 text-[9px] font-bold uppercase text-feather/60 pt-0.5">Needs GCI</span>
+          )}
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-on-surface-variant">
+          <span className="whitespace-nowrap">
+            Close: {deal.close_date ? <DateText value={deal.close_date} /> : '—'}
+          </span>
+          <span className="tabular-nums">{formatCurrency(deal.value)}</span>
+          {deal.hasGci ? (
+            <>
+              <span className="tabular-nums font-semibold text-primary">GCI {formatMoney(deal.breakdown.gci)}</span>
+              <PlanBadge plan={deal.breakdown.plan} />
+            </>
+          ) : (
+            <GciEditor deal={deal} onSave={onSaveGci} />
+          )}
+        </div>
+
+        {expanded && deal.hasGci && (
+          <div className="mt-3">
+            <BreakdownLines
+              breakdown={deal.breakdown}
+              netLabel={deal.agent_name ? `Net to ${deal.agent_name}` : 'Net'}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DealsTable({ title, icon, headerClass, deals, emptyText, onSaveGci, projected }) {
   const navigate = useNavigate();
+  const isMdUp = useIsMdUp();
   const [expanded, setExpanded] = useState(null);
   const [page, setPage] = useState(1);
 
@@ -120,70 +193,88 @@ function DealsTable({ title, icon, headerClass, deals, emptyText, onSaveGci, pro
         <p className="px-4 py-6 text-xs text-on-surface-variant">{emptyText}</p>
       ) : (
         <>
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-surface-container-low border-b border-primary/5">
-              {['Property', 'Close Date', 'Sale Price', 'GCI', 'Plan', projected ? 'Projected Net' : 'Net'].map((h) => (
-                <th key={h} className="px-4 py-2 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">{h}</th>
+          {!isMdUp ? (
+            <div className="divide-y divide-outline-variant/10">
+              {visibleDeals.map((deal) => (
+                <DealMobileCard
+                  key={deal.id}
+                  deal={deal}
+                  projected={projected}
+                  expanded={expanded === deal.id}
+                  onToggleExpand={() => setExpanded(expanded === deal.id ? null : deal.id)}
+                  onOpenTxn={() => navigate(`/transactions/${deal.id}`)}
+                  onSaveGci={onSaveGci}
+                />
               ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-primary/5">
-            {visibleDeals.map((deal) => (
-              <Fragment key={deal.id}>
-                <tr
-                  onClick={() => deal.hasGci && setExpanded(expanded === deal.id ? null : deal.id)}
-                  className={`transition-colors ${deal.hasGci ? 'cursor-pointer hover:bg-secondary-fixed/10' : 'bg-lemon/10'}`}
-                >
-                  <td className="px-4 py-2.5">
-                    <span
-                      role="link"
-                      tabIndex={0}
-                      onClick={(e) => { e.stopPropagation(); navigate(`/transactions/${deal.id}`); }}
-                      onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/transactions/${deal.id}`); }}
-                      className="font-semibold text-xs text-primary hover:text-secondary hover:underline"
-                    >
-                      {shortAddress(deal.address)}
-                    </span>
-                    <p className="text-[10px] text-on-surface-variant">{deal.client_name || deal.city || '—'}</p>
-                  </td>
-                  <td className="px-4 py-2.5 text-xs whitespace-nowrap">
-                    {deal.close_date ? <DateText value={deal.close_date} /> : '—'}
-                  </td>
-                  <td className="px-4 py-2.5 text-xs">{formatCurrency(deal.value)}</td>
-                  <td className="px-4 py-2.5 text-xs font-semibold">
-                    {deal.hasGci ? formatMoney(deal.breakdown.gci) : <GciEditor deal={deal} onSave={onSaveGci} />}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    {deal.hasGci ? <PlanBadge plan={deal.breakdown.plan} /> : (
-                      <span className="text-[9px] font-bold uppercase text-feather/60">Needs GCI</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 text-xs font-black text-secondary whitespace-nowrap">
-                    {deal.hasGci ? formatMoney(deal.breakdown.net) : '—'}
-                    {deal.hasGci && (
-                      <Icon
-                        name={expanded === deal.id ? 'expand_less' : 'expand_more'}
-                        className="!text-[16px] text-on-surface-variant/50 ml-1 align-middle"
-                      />
-                    )}
-                  </td>
-                </tr>
-                {expanded === deal.id && deal.hasGci && (
-                  <tr className="bg-surface-container-low/30">
-                    <td colSpan={6} className="px-4 py-3">
-                      <BreakdownLines
-                        breakdown={deal.breakdown}
-                        netLabel={deal.agent_name ? `Net to ${deal.agent_name}` : 'Net'}
-                      />
-                    </td>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[640px]">
+                <thead>
+                  <tr className="bg-surface-container-low border-b border-primary/5">
+                    {['Property', 'Close Date', 'Sale Price', 'GCI', 'Plan', projected ? 'Projected Net' : 'Net'].map((h) => (
+                      <th key={h} className="px-4 py-2 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">{h}</th>
+                    ))}
                   </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-        <ListPagination page={page} total={deals.length} onPageChange={setPage} />
+                </thead>
+                <tbody className="divide-y divide-primary/5">
+                  {visibleDeals.map((deal) => (
+                    <Fragment key={deal.id}>
+                      <tr
+                        onClick={() => deal.hasGci && setExpanded(expanded === deal.id ? null : deal.id)}
+                        className={`transition-colors ${deal.hasGci ? 'cursor-pointer hover:bg-secondary-fixed/10' : 'bg-lemon/10'}`}
+                      >
+                        <td className="px-4 py-2.5">
+                          <span
+                            role="link"
+                            tabIndex={0}
+                            onClick={(e) => { e.stopPropagation(); navigate(`/transactions/${deal.id}`); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/transactions/${deal.id}`); }}
+                            className="font-semibold text-xs text-primary hover:text-secondary hover:underline"
+                          >
+                            {shortAddress(deal.address)}
+                          </span>
+                          <p className="text-[10px] text-on-surface-variant">{deal.client_name || deal.city || '—'}</p>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs whitespace-nowrap">
+                          {deal.close_date ? <DateText value={deal.close_date} /> : '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs">{formatCurrency(deal.value)}</td>
+                        <td className="px-4 py-2.5 text-xs font-semibold">
+                          {deal.hasGci ? formatMoney(deal.breakdown.gci) : <GciEditor deal={deal} onSave={onSaveGci} />}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          {deal.hasGci ? <PlanBadge plan={deal.breakdown.plan} /> : (
+                            <span className="text-[9px] font-bold uppercase text-feather/60">Needs GCI</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs font-black text-secondary whitespace-nowrap">
+                          {deal.hasGci ? formatMoney(deal.breakdown.net) : '—'}
+                          {deal.hasGci && (
+                            <Icon
+                              name={expanded === deal.id ? 'expand_less' : 'expand_more'}
+                              className="!text-[16px] text-on-surface-variant/50 ml-1 align-middle"
+                            />
+                          )}
+                        </td>
+                      </tr>
+                      {expanded === deal.id && deal.hasGci && (
+                        <tr className="bg-surface-container-low/30">
+                          <td colSpan={6} className="px-4 py-3">
+                            <BreakdownLines
+                              breakdown={deal.breakdown}
+                              netLabel={deal.agent_name ? `Net to ${deal.agent_name}` : 'Net'}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <ListPagination page={page} total={deals.length} onPageChange={setPage} />
         </>
       )}
     </section>
@@ -327,36 +418,28 @@ export default function RevenueAnalytics() {
     : 0;
 
   return (
-    <DashboardLayout title="Revenue" className="p-5 md:p-6">
-      <div className="space-y-5">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Icon name="payments" className="text-secondary !text-[20px]" />
-            <h2 className="text-base font-bold text-primary">{titleLabel}</h2>
-          </div>
-          <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
-            {s?.anniversaryStart && s?.anniversaryEnd && (
-              <span className="text-[11px] text-on-surface-variant hidden sm:inline">
-                Dec 1 anniversary · {s.anniversaryStart.slice(0, 7)} → {s.anniversaryEnd}
-              </span>
-            )}
-            <Link
-              to="/revenue/templates"
-              className="flex items-center gap-2 px-4 py-2 bg-surface-container-highest border border-outline-variant/30 text-primary text-xs font-semibold uppercase tracking-wider hover:bg-surface-container-high"
-            >
-              <SlidersHorizontal size={16} /> Edit Split Templates
-            </Link>
-            <select
-              value={year}
-              onChange={(e) => setYear(Number(e.target.value))}
-              className="px-3 py-1.5 bg-white border border-outline-variant/30 rounded-lg text-sm font-semibold text-primary"
-              title="Anniversary year ending Nov 30"
-            >
-              {(data?.years ?? [year]).map((y) => (
-                <option key={y} value={y}>{y} (ends Nov 30)</option>
-              ))}
-            </select>
-          </div>
+    <DashboardLayout title="Revenue" headerRight={<AgentScopeToggle />} className="p-4 md:p-5 lg:p-6">
+      <div className="space-y-4 md:space-y-5">
+        <div className="flex items-center gap-2 min-w-0">
+          <Icon name="payments" className="text-secondary !text-[20px] shrink-0" />
+          <h2 className="min-w-0 flex-1 text-sm md:text-base font-bold text-primary truncate">
+            {titleLabel}
+          </h2>
+          {s?.anniversaryStart && s?.anniversaryEnd && (
+            <span className="text-[11px] text-on-surface-variant hidden lg:inline shrink-0">
+              Dec 1 anniversary · {s.anniversaryStart.slice(0, 7)} → {s.anniversaryEnd}
+            </span>
+          )}
+          <select
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="shrink-0 px-2.5 md:px-3 py-1.5 bg-white border border-outline-variant/30 rounded-lg text-sm font-semibold text-primary"
+            title="Anniversary year ending Nov 30"
+          >
+            {(data?.years ?? [year]).map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
         </div>
 
         {loading && !data ? (
