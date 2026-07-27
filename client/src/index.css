@@ -138,3 +138,26 @@ select.buyer-flat-select {
   background-position: right 0 center;
   background-size: 0.75rem;
 }
+
+/* Date inputs: prevent iOS/WebKit intrinsic min-width from blowing past the card */
+input[type='date'].critical-date-input,
+input.critical-date-input[type='date'] {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+}
+input.critical-date-input::-webkit-calendar-picker-indicator {
+  /* Custom calendar icon is shown; keep native control clickable via the field */
+  opacity: 0;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+input.critical-date-input::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}

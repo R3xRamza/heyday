@@ -712,7 +712,7 @@ export default function TransactionWorkspace({
                   </div>
                 </div>
 
-                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-4 md:p-6 shadow-executive border-l-4 border-l-secondary">
+                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-4 md:p-6 shadow-executive border-l-4 border-l-secondary min-w-0 overflow-hidden">
                   <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-5">
                     Critical Dates Timeline
                   </h3>
@@ -726,10 +726,10 @@ export default function TransactionWorkspace({
                       const hasDate = Boolean(form[item.key]);
                       const hasConnector = index < timelineDates.length - 1;
                       return (
-                        <li key={item.key} className="relative flex gap-4 items-start">
+                        <li key={item.key} className="relative flex gap-2.5 md:gap-4 items-start min-w-0">
                           {hasConnector && (
                             <div
-                              className="absolute left-5 top-10 -bottom-5 w-0.5 -translate-x-1/2 bg-outline-variant/25 rounded-full z-0"
+                              className="absolute left-[1.25rem] md:left-5 top-10 -bottom-5 w-0.5 -translate-x-1/2 bg-outline-variant/25 rounded-full z-0"
                               aria-hidden
                             />
                           )}
@@ -744,13 +744,19 @@ export default function TransactionWorkspace({
                           </div>
                           <div className="flex-1 min-w-0 pt-0.5">
                             <p className="text-xs font-bold text-primary leading-snug">{item.label}</p>
-                            <input
-                              type="date"
-                              value={form[item.key] || ''}
-                              onChange={(e) => handleFieldChange(item.key, e.target.value)}
-                              onBlur={(e) => handleFieldBlur(item.key, e.target.value || null)}
-                              className="mt-1.5 w-full text-sm text-primary bg-surface-container-low border border-outline-variant/20 rounded-lg px-3 py-2 focus:ring-2 focus:ring-secondary/30 outline-none"
-                            />
+                            <div className="relative mt-1.5 w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-outline-variant/20 bg-surface-container-low focus-within:ring-2 focus-within:ring-secondary/30">
+                              <input
+                                type="date"
+                                value={form[item.key] || ''}
+                                onChange={(e) => handleFieldChange(item.key, e.target.value)}
+                                onBlur={(e) => handleFieldBlur(item.key, e.target.value || null)}
+                                className="critical-date-input relative w-full min-w-0 max-w-full box-border text-sm text-primary bg-transparent border-0 rounded-lg pl-3 pr-10 py-2 outline-none"
+                              />
+                              <Icon
+                                name="calendar_today"
+                                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant !text-[18px]"
+                              />
+                            </div>
                           </div>
                         </li>
                       );

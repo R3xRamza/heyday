@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ListChecks, Plus, Search, X } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import DateText from '../components/shared/DateText';
-import { formatCurrency, parseTransactionAddress } from '../utils/format';
+import { formatCurrency, parseTransactionAddress, formatDate } from '../utils/format';
 import PriceInput from '../components/shared/PriceInput';
 import AddressAutocomplete from '../components/shared/AddressAutocomplete';
 import { blurActiveElement, CHROME_AUTOCOMPLETE, ChromeAddressDecoy } from '../components/shared/chromeFormGuards';
@@ -153,7 +153,7 @@ function StatCard({ label, value, sub }) {
   );
 }
 
-/** Phone-friendly row — avoids iOS Safari blank paint with wide overflow tables. */
+/** Phone-friendly row — one-line address + denser details (avoids iOS wide-table paint bugs). */
 function TransactionMobileCard({ tx, filter, dateColumn, onOpen }) {
   const { street, cityLine } = parseTransactionAddress({
     address: tx.address,
@@ -165,6 +165,14 @@ function TransactionMobileCard({ tx, filter, dateColumn, onOpen }) {
   const expiration = filter === 'current_listings'
     ? transactionDateValue(tx, 'important_date')
     : '';
+  const client = tx.client_name || tx.owner_name || '';
+  const subLine = [cityLine, client && client !== cityLine ? client : null]
+    .filter(Boolean)
+    .join(' · ') || '—';
+  const metaBits = [];
+  if (dateValue) metaBits.push(`${dateColumn.label.replace(/ Date$/i, '')}: ${formatDate(dateValue)}`);
+  if (expiration) metaBits.push(`Exp: ${formatDate(expiration)}`);
+  if (filter !== 'current_listings' && tx.agent_name) metaBits.push(tx.agent_name);
 
   return (
     <button
@@ -172,43 +180,31 @@ function TransactionMobileCard({ tx, filter, dateColumn, onOpen }) {
       onClick={onOpen}
       className="w-full text-left bg-white px-4 py-3 active:bg-secondary/5"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-semibold text-primary text-sm leading-snug">{street}</p>
-            {isPrivateListing(tx) && <PrivateListingFlag />}
-          </div>
-          <p className="text-xs text-on-surface-variant mt-0.5 truncate">
-            {cityLine || tx.client_name || tx.owner_name || '—'}
-          </p>
-          {tx.workflow_status && tx.workflow_status !== 'active' && (
-            <span className="text-[10px] text-lemon bg-feather-alt/80 px-2 py-0.5 rounded mt-1 inline-block uppercase">
-              Setup: {tx.workflow_status}
-            </span>
-          )}
-        </div>
-        <ArrowRight size={16} className="text-on-surface-variant shrink-0 mt-0.5" />
+      <div className="flex items-center gap-2 min-w-0">
+        <p className="min-w-0 flex-1 font-semibold text-primary text-sm truncate">
+          {street || '—'}
+        </p>
+        {isPrivateListing(tx) && <PrivateListingFlag />}
+        <ArrowRight size={16} className="text-on-surface-variant shrink-0" />
       </div>
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full ${portfolioTypeBadgeClass(tx)}`}>
+      <p className="text-xs text-on-surface-variant truncate mt-0.5">{subLine}</p>
+      {tx.workflow_status && tx.workflow_status !== 'active' && (
+        <span className="text-[10px] text-lemon bg-feather-alt/80 px-2 py-0.5 rounded mt-1 inline-block uppercase">
+          Setup: {tx.workflow_status}
+        </span>
+      )}
+      <div className="mt-2 flex items-center gap-2 min-w-0">
+        <span className={`shrink-0 inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full ${portfolioTypeBadgeClass(tx)}`}>
           {transactionPortfolioType(tx)}
         </span>
-        <span className="text-sm font-semibold text-primary tabular-nums">
+        <span className="shrink-0 text-sm font-semibold text-primary tabular-nums">
           {formatCurrency(tx.value)}
         </span>
-        {dateValue ? (
-          <span className="text-[11px] text-on-surface-variant">
-            {dateColumn.label}: <DateText value={dateValue} />
+        {metaBits.length > 0 && (
+          <span className="min-w-0 flex-1 text-right text-[11px] text-on-surface-variant truncate">
+            {metaBits.join(' · ')}
           </span>
-        ) : null}
-        {expiration ? (
-          <span className="text-[11px] text-on-surface-variant">
-            Exp: <DateText value={expiration} />
-          </span>
-        ) : null}
-        {filter !== 'current_listings' && tx.agent_name ? (
-          <span className="text-[11px] text-on-surface-variant truncate">{tx.agent_name}</span>
-        ) : null}
+        )}
       </div>
     </button>
   );
