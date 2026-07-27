@@ -1,3 +1,5 @@
+import { completeMarketing90DayTasksForTransaction } from './completeMarketing90DayOnClose.js';
+
 /** True when close_date is strictly before today (local calendar date). */
 export function isCloseDatePast(closeDate) {
   if (!closeDate || !String(closeDate).trim()) return false;
@@ -46,6 +48,7 @@ export function closePastDueTransactions(db) {
         row.close_date,
         null,
       );
+      completeMarketing90DayTasksForTransaction(db, row.id);
     }
   })();
 

@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 import './db.js';
 import db from './db.js';
 import { closePastDueTransactions } from './lib/transactionAutoClose.js';
+import { completeMarketing90DayTasksForClosed } from './lib/completeMarketing90DayOnClose.js';
 import { authMiddleware } from './middleware/auth.js';
 import authRoutes from './routes/auth.js';
 import crmRoutes from './routes/crm.js';
@@ -32,6 +33,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const autoClosed = closePastDueTransactions(db);
 if (autoClosed.closed > 0) {
   console.log(`Auto-closed ${autoClosed.closed} transaction(s) past close date`);
+}
+const marketing90Closed = completeMarketing90DayTasksForClosed(db);
+if (marketing90Closed.completed > 0) {
+  console.log(`Completed ${marketing90Closed.completed} Marketing 90 Day Plan task(s) on closed transactions`);
 }
 const app = express();
 const PORT = process.env.PORT || 3001;

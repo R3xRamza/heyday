@@ -23,6 +23,7 @@ import {
   mergeTransactionForValidation,
 } from '../lib/transactionValidation.js';
 import { closePastDueTransactions, deriveStageFromCloseDate } from '../lib/transactionAutoClose.js';
+import { completeMarketing90DayTasksForTransaction } from '../lib/completeMarketing90DayOnClose.js';
 import { CURRENT_LISTINGS_VIEW_SCOPE, ON_MARKET_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE } from '../lib/transactionScopes.js';
 import { parseAgentScope, transactionAgentScopeClause, assertTransactionInScope } from '../lib/agentScope.js';
 import { runBrokermintImport, fixBrokermintAgentIds } from '../lib/brokermintImport.js';
@@ -234,6 +235,9 @@ function syncStageFromCloseDate(db, transactionId, beforeStage) {
   const derived = deriveStageFromCloseDate(row);
   if (derived === row.stage) return { changed: false, stage: row.stage };
   db.prepare('UPDATE transactions SET stage = ? WHERE id = ?').run(derived, transactionId);
+  if (derived === 'closed') {
+    completeMarketing90DayTasksForTransaction(db, transactionId);
+  }
   return {
     changed: true,
     stage: derived,
@@ -755,6 +759,10 @@ router.put('/:id', (req, res) => {
   if (stageSync.changed) {
     changes.push(stageSync.change);
     after = db.prepare('SELECT * FROM transactions WHERE id = ?').get(req.params.id);
+  }
+  // Explicit stage=closed (or already closed) — keep Marketing 90 Day Plan tasks checked off
+  if (after.stage === 'closed') {
+    completeMarketing90DayTasksForTransaction(db, after.id);
   }
 
   if ('address' in req.body || 'city' in req.body || 'state' in req.body || 'zip' in req.body) {
