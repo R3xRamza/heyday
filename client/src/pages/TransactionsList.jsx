@@ -13,6 +13,7 @@ import ListPagination from '../components/shared/ListPagination';
 import AgentScopeToggle from '../components/AgentScopeToggle';
 import { useAgentScope } from '../context/AgentScopeContext';
 import { appendAgentScope } from '../utils/agentScope';
+import { useIsMdUp } from '../hooks/useMediaQuery';
 import {
   buildTransactionsListSearchParams,
   hasTransactionsListQuery,
@@ -152,8 +153,70 @@ function StatCard({ label, value, sub }) {
   );
 }
 
+/** Phone-friendly row — avoids iOS Safari blank paint with wide overflow tables. */
+function TransactionMobileCard({ tx, filter, dateColumn, onOpen }) {
+  const { street, cityLine } = parseTransactionAddress({
+    address: tx.address,
+    city: tx.city,
+    state: tx.state,
+    zip: tx.zip,
+  });
+  const dateValue = transactionDateValue(tx, dateColumn.field);
+  const expiration = filter === 'current_listings'
+    ? transactionDateValue(tx, 'important_date')
+    : '';
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full text-left bg-white px-4 py-3 active:bg-secondary/5"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold text-primary text-sm leading-snug">{street}</p>
+            {isPrivateListing(tx) && <PrivateListingFlag />}
+          </div>
+          <p className="text-xs text-on-surface-variant mt-0.5 truncate">
+            {cityLine || tx.client_name || tx.owner_name || '—'}
+          </p>
+          {tx.workflow_status && tx.workflow_status !== 'active' && (
+            <span className="text-[10px] text-lemon bg-feather-alt/80 px-2 py-0.5 rounded mt-1 inline-block uppercase">
+              Setup: {tx.workflow_status}
+            </span>
+          )}
+        </div>
+        <ArrowRight size={16} className="text-on-surface-variant shrink-0 mt-0.5" />
+      </div>
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full ${portfolioTypeBadgeClass(tx)}`}>
+          {transactionPortfolioType(tx)}
+        </span>
+        <span className="text-sm font-semibold text-primary tabular-nums">
+          {formatCurrency(tx.value)}
+        </span>
+        {dateValue ? (
+          <span className="text-[11px] text-on-surface-variant">
+            {dateColumn.label}: <DateText value={dateValue} />
+          </span>
+        ) : null}
+        {expiration ? (
+          <span className="text-[11px] text-on-surface-variant">
+            Exp: <DateText value={expiration} />
+          </span>
+        ) : null}
+        {filter !== 'current_listings' && tx.agent_name ? (
+          <span className="text-[11px] text-on-surface-variant truncate">{tx.agent_name}</span>
+        ) : null}
+      </div>
+    </button>
+  );
+}
+
 export default function TransactionsList() {
   const navigate = useNavigate();
+  const isMdUp = useIsMdUp();
   const { scope } = useAgentScope();
   const [searchParams, setSearchParams] = useSearchParams();
   const restoredRef = useRef(false);
@@ -424,12 +487,35 @@ export default function TransactionsList() {
           ))}
         </nav>
 
-        <div className="bg-white border border-outline-variant/20 shadow-executive overflow-hidden rounded-xl">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[40rem]">
-              <thead>
-                <tr className="bg-surface-container-low border-b border-outline-variant/30">
-                  {columns.map((col) => (
+        <div className="bg-white border border-outline-variant/20 shadow-executive rounded-xl overflow-hidden">
+          {!isMdUp ? (
+            <div className="divide-y divide-outline-variant/10">
+              {showInitialLoading ? (
+                <p className="px-4 py-8 text-center text-on-surface-variant text-sm">Loading…</p>
+              ) : transactions.length === 0 ? (
+                <p className="px-4 py-12 text-center text-on-surface-variant text-sm">{emptyFilterMessage(filter)}</p>
+              ) : (
+                transactions.map((tx) => (
+                  <TransactionMobileCard
+                    key={tx.id}
+                    tx={tx}
+                    filter={filter}
+                    dateColumn={DATE_COLUMN_BY_FILTER[filter] || DATE_COLUMN_BY_FILTER.all}
+                    onOpen={() => navigate(`/transactions/${tx.id}`, {
+                      state: {
+                        transactionsList: { filter, page, search, sortKey, sortDir },
+                      },
+                    })}
+                  />
+                ))
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-surface-container-low border-b border-outline-variant/30">
+                    {columns.map((col) => (
                       <th
                         key={col.key}
                         className={columnHeaderClass(col)}
@@ -439,84 +525,85 @@ export default function TransactionsList() {
                         {sortKey === col.key && (sortDir === 'asc' ? ' ↑' : ' ↓')}
                       </th>
                     ))}
-                  <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest" aria-hidden />
-                </tr>
-              </thead>
-              <tbody className={`divide-y divide-outline-variant/10 transition-opacity ${refreshing ? 'opacity-50' : ''}`}>
-                {showInitialLoading ? (
-                  <tr><td colSpan={columns.length + 1} className="px-6 py-8 text-center text-on-surface-variant">Loading…</td></tr>
-                ) : transactions.length === 0 ? (
-                  <tr><td colSpan={columns.length + 1} className="px-6 py-12 text-center text-on-surface-variant">{emptyFilterMessage(filter)}</td></tr>
-                ) : (
-                  transactions.map((tx) => {
-                    const { street, cityLine } = parseTransactionAddress({
-                      address: tx.address,
-                      city: tx.city,
-                      state: tx.state,
-                      zip: tx.zip,
-                    });
-                    return (
-                    <tr
-                      key={tx.id}
-                      onClick={() => navigate(`/transactions/${tx.id}`, {
-                        state: {
-                          transactionsList: { filter, page, search, sortKey, sortDir },
-                        },
-                      })}
-                      className="hover:bg-secondary/5 transition-colors cursor-pointer group"
-                    >
-                      <td className="px-6 py-4">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-semibold text-primary">{street}</p>
-                            {isPrivateListing(tx) && <PrivateListingFlag />}
-                          </div>
-                          <p className="text-xs text-on-surface-variant">
-                            {cityLine || tx.client_name || tx.owner_name}
-                          </p>
-                          {tx.workflow_status && tx.workflow_status !== 'active' && (
-                            <span className="text-[10px] text-lemon bg-feather-alt/80 px-2 py-0.5 rounded mt-1 inline-block uppercase">
-                              Setup: {tx.workflow_status}
+                    <th className="px-6 py-4 text-xs font-semibold text-on-surface-variant uppercase tracking-widest" aria-hidden />
+                  </tr>
+                </thead>
+                <tbody className={`divide-y divide-outline-variant/10 transition-opacity ${refreshing ? 'opacity-50' : ''}`}>
+                  {showInitialLoading ? (
+                    <tr><td colSpan={columns.length + 1} className="px-6 py-8 text-center text-on-surface-variant">Loading…</td></tr>
+                  ) : transactions.length === 0 ? (
+                    <tr><td colSpan={columns.length + 1} className="px-6 py-12 text-center text-on-surface-variant">{emptyFilterMessage(filter)}</td></tr>
+                  ) : (
+                    transactions.map((tx) => {
+                      const { street, cityLine } = parseTransactionAddress({
+                        address: tx.address,
+                        city: tx.city,
+                        state: tx.state,
+                        zip: tx.zip,
+                      });
+                      return (
+                        <tr
+                          key={tx.id}
+                          onClick={() => navigate(`/transactions/${tx.id}`, {
+                            state: {
+                              transactionsList: { filter, page, search, sortKey, sortDir },
+                            },
+                          })}
+                          className="hover:bg-secondary/5 transition-colors cursor-pointer group"
+                        >
+                          <td className="px-6 py-4">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-semibold text-primary">{street}</p>
+                                {isPrivateListing(tx) && <PrivateListingFlag />}
+                              </div>
+                              <p className="text-xs text-on-surface-variant">
+                                {cityLine || tx.client_name || tx.owner_name}
+                              </p>
+                              {tx.workflow_status && tx.workflow_status !== 'active' && (
+                                <span className="text-[10px] text-lemon bg-feather-alt/80 px-2 py-0.5 rounded mt-1 inline-block uppercase">
+                                  Setup: {tx.workflow_status}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${portfolioTypeBadgeClass(tx)}`}>
+                              {transactionPortfolioType(tx)}
                             </span>
+                          </td>
+                          <td className="px-6 py-4 font-semibold">{formatCurrency(tx.value)}</td>
+                          {columns.filter((col) => col.key === 'date').map((col) => {
+                            const dateValue = transactionDateValue(tx, col.field);
+                            return (
+                              <td key={col.key} className={DATE_COLUMN_CELL_CLASS}>
+                                {dateValue ? <DateText value={dateValue} /> : '—'}
+                              </td>
+                            );
+                          })}
+                          {columns.filter((col) => col.key === 'expiration').map((col) => {
+                            const dateValue = transactionDateValue(tx, col.field);
+                            return (
+                              <td key={col.key} className={TRAILING_COLUMN_CELL_CLASS}>
+                                {dateValue ? <DateText value={dateValue} /> : '—'}
+                              </td>
+                            );
+                          })}
+                          {filter !== 'current_listings' && (
+                            <td className={TRAILING_COLUMN_CELL_CLASS}>{tx.agent_name || '—'}</td>
                           )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${portfolioTypeBadgeClass(tx)}`}>
-                          {transactionPortfolioType(tx)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 font-semibold">{formatCurrency(tx.value)}</td>
-                      {columns.filter((col) => col.key === 'date').map((col) => {
-                        const dateValue = transactionDateValue(tx, col.field);
-                        return (
-                          <td key={col.key} className={DATE_COLUMN_CELL_CLASS}>
-                            {dateValue ? <DateText value={dateValue} /> : '—'}
+                          <td className="px-6 py-4 text-right">
+                            <ArrowRight size={18} className="text-on-surface-variant group-hover:text-primary inline" />
                           </td>
-                        );
-                      })}
-                      {columns.filter((col) => col.key === 'expiration').map((col) => {
-                        const dateValue = transactionDateValue(tx, col.field);
-                        return (
-                          <td key={col.key} className={TRAILING_COLUMN_CELL_CLASS}>
-                            {dateValue ? <DateText value={dateValue} /> : '—'}
-                          </td>
-                        );
-                      })}
-                      {filter !== 'current_listings' && (
-                        <td className={TRAILING_COLUMN_CELL_CLASS}>{tx.agent_name || '—'}</td>
-                      )}
-                      <td className="px-6 py-4 text-right">
-                        <ArrowRight size={18} className="text-on-surface-variant group-hover:text-primary inline" />
-                      </td>
-                    </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className={`px-6 py-4 bg-surface-container-low border-t border-outline-variant/30 text-xs text-on-surface-variant transition-opacity ${refreshing ? 'opacity-70' : ''}`}>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className={`px-4 md:px-6 py-4 bg-surface-container-low border-t border-outline-variant/30 text-xs text-on-surface-variant transition-opacity ${refreshing ? 'opacity-70' : ''}`}>
             Showing {transactions.length} of {(data.total ?? 0).toLocaleString()}
             {' '}
             {statsFilter === 'closed'
