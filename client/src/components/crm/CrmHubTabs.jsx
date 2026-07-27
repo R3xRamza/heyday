@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 
 const tabClass = ({ isActive }) =>
-  `min-w-0 px-2.5 md:min-w-[6.5rem] md:px-4 py-1.5 rounded-full text-[10px] md:text-xs font-semibold uppercase tracking-wide text-center transition-colors ${
+  `min-w-0 px-3 md:min-w-[6.5rem] md:px-4 py-2 md:py-1.5 rounded-full text-[11px] md:text-xs font-semibold uppercase tracking-wide text-center transition-colors ${
     isActive
       ? 'bg-primary text-white'
       : 'text-on-surface-variant hover:bg-surface-container-high'
