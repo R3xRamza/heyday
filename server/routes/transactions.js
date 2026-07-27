@@ -760,9 +760,11 @@ router.put('/:id', (req, res) => {
     changes.push(stageSync.change);
     after = db.prepare('SELECT * FROM transactions WHERE id = ?').get(req.params.id);
   }
-  // Explicit stage=closed (or already closed) — keep Marketing 90 Day Plan tasks checked off
+
+  let marketing90Completed = 0;
+  // Explicit stage=closed (or already closed) — check off Marketing 90 Day Plan tasks
   if (after.stage === 'closed') {
-    completeMarketing90DayTasksForTransaction(db, after.id);
+    marketing90Completed = completeMarketing90DayTasksForTransaction(db, after.id).completed;
   }
 
   if ('address' in req.body || 'city' in req.body || 'state' in req.body || 'zip' in req.body) {
@@ -833,7 +835,7 @@ router.put('/:id', (req, res) => {
     });
   }
 
-  const payload = { transaction: pickTransaction(after.id), tasksRecalculated };
+  const payload = { transaction: pickTransaction(after.id), tasksRecalculated, marketing90Completed };
   if (updatedParties) payload.parties = updatedParties;
   res.json(payload);
 });
