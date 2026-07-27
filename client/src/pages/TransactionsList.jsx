@@ -431,23 +431,21 @@ export default function TransactionsList() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2 sm:gap-4 shrink-0 w-full sm:w-auto sm:ml-auto">
+          <div className="hidden md:flex items-center gap-4 shrink-0 ml-auto">
             <Link
               to="/checklists"
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 sm:py-3 bg-surface-container-highest border border-outline-variant/30 text-primary text-[10px] sm:text-xs font-semibold uppercase tracking-wider hover:bg-surface-container-high"
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-surface-container-highest border border-outline-variant/30 text-primary text-xs font-semibold uppercase tracking-wider hover:bg-surface-container-high"
             >
               <ListChecks size={18} className="shrink-0" />
-              <span className="sm:hidden">Checklists</span>
-              <span className="hidden sm:inline">Edit Checklists</span>
+              Edit Checklists
             </Link>
             <button
               type="button"
               onClick={() => setShowCreate(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 sm:py-3 bg-primary-container text-white text-[10px] sm:text-xs font-semibold uppercase tracking-wider hover:brightness-110"
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-primary-container text-white text-xs font-semibold uppercase tracking-wider hover:brightness-110"
             >
               <Plus size={18} className="shrink-0" />
-              <span className="sm:hidden">New</span>
-              <span className="hidden sm:inline">New Transaction</span>
+              New Transaction
             </button>
           </div>
         </header>
