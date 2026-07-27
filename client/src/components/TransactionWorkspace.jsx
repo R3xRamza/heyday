@@ -20,7 +20,6 @@ import {
   getTimelineSteps,
   getTimelineDateKeys,
   datesToClearOnRepresentingChange,
-  transactionStageLabel,
   transactionPortfolioType,
   TRANSACTION_STAGE_OPTIONS,
   SALE_TYPE_OPTIONS,
@@ -77,10 +76,6 @@ function activityLabel(type) {
     comment: 'Comment',
   };
   return map[type] || type;
-}
-
-function stageBadge(stage) {
-  return transactionStageLabel(stage).toUpperCase();
 }
 
 function EditableField({ field, form, transaction, onChange, onBlur, error = '' }) {
@@ -395,11 +390,7 @@ export default function TransactionWorkspace({
       });
       return result;
     }
-    if (result?.tasksRecalculated) {
-      flashSaved(`Saved! · ${result.tasksRecalculated} task due dates updated`);
-    } else {
-      flashSaved('Saved!');
-    }
+    flashSaved('Saved!');
     return { ok: true, ...result };
   }
 
@@ -557,7 +548,7 @@ export default function TransactionWorkspace({
           <Icon name="chevron_right" className="!text-[14px]" />
           <span className="text-secondary font-bold">{street?.toUpperCase()}</span>
         </div>
-        {savedMsg && <p className="text-xs text-secondary mt-1 font-semibold">{savedMsg}</p>}
+        {savedMsg && <p className="text-xs text-secondary mt-1 font-semibold whitespace-nowrap">{savedMsg}</p>}
         {partiesError && (
           <p className="mt-2 text-sm text-error font-medium bg-error/10 border border-error/20 rounded-lg px-3 py-2 max-w-xl" role="alert">
             {partiesError}
@@ -566,7 +557,7 @@ export default function TransactionWorkspace({
       </div>
       <div className="flex flex-wrap gap-2">
         <span className="px-3 py-1 bg-secondary-container/30 text-secondary border border-secondary/20 rounded-full text-xs font-semibold uppercase tracking-wide">
-          {stageBadge(transaction.stage)}
+          {portfolioType}
         </span>
         {showPrivateFlag && <PrivateListingFlag />}
         {openTasks > 0 && (
@@ -589,7 +580,7 @@ export default function TransactionWorkspace({
           {cityLine && <p className="text-xs text-on-surface-variant mt-0.5">{cityLine}</p>}
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
             <span className="inline-block px-2 py-0.5 text-[10px] font-bold uppercase bg-secondary-container/40 text-secondary rounded-full">
-              {transaction.stage || 'active'}
+              {portfolioType}
             </span>
             {showPrivateFlag && <PrivateListingFlag />}
           </div>
@@ -756,9 +747,6 @@ export default function TransactionWorkspace({
                       <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase bg-white/20 rounded-full">
                         {portfolioType}
                       </span>
-                      <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase bg-white/15 rounded-full">
-                        {stageBadge(transaction.stage)}
-                      </span>
                       {showPrivateFlag && <PrivateListingFlag />}
                     </div>
                   </div>
@@ -770,10 +758,10 @@ export default function TransactionWorkspace({
                       Critical Dates Timeline
                     </h3>
                     {savedMsg && (
-                      <span className="text-xs font-bold text-secondary shrink-0">{savedMsg}</span>
+                      <span className="text-xs font-bold text-secondary shrink-0 whitespace-nowrap">{savedMsg}</span>
                     )}
                     {!savedMsg && savingTx && (
-                      <span className="text-xs text-on-surface-variant shrink-0">Saving…</span>
+                      <span className="text-xs text-on-surface-variant shrink-0 whitespace-nowrap">Saving…</span>
                     )}
                   </div>
                   {isClosingDateGateError && (
@@ -844,7 +832,7 @@ export default function TransactionWorkspace({
                   </div>
                   {savingTx && <p className="text-xs text-on-surface-variant mt-4">Saving…</p>}
                   {!savingTx && savedMsg && (
-                    <p className="text-xs text-secondary font-bold mt-4">{savedMsg}</p>
+                    <p className="text-xs text-secondary font-bold mt-4 whitespace-nowrap">{savedMsg}</p>
                   )}
 
                   <div className="mt-8 pt-8 border-t border-outline-variant/15">
