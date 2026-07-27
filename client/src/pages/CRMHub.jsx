@@ -6,6 +6,8 @@ import Icon from '../components/shared/Icon';
 import ListPagination from '../components/shared/ListPagination';
 import DateText from '../components/shared/DateText';
 import { useGmailSync } from '../context/GmailSyncContext';
+import { useIsMdUp } from '../hooks/useMediaQuery';
+import { formatDate } from '../utils/format';
 
 const HIGHLIGHT_STAGES = [
   { key: 'Sphere', label: 'Sphere' },
@@ -33,8 +35,45 @@ function propertyLine(c) {
 const selectClass =
   'px-3 py-2 border border-outline-variant/25 rounded-lg text-sm bg-white min-w-0 focus:outline-none focus:ring-2 focus:ring-secondary/30';
 
+function ContactMobileCard({ contact, onOpen }) {
+  const assigned = contact.assigned_to_name || contact.assigned_user_name;
+  const prop = propertyLine(contact);
+  const meta = [
+    prop !== '—' ? prop : null,
+    contact.last_contacted ? `Last: ${formatDate(contact.last_contacted)}` : null,
+    assigned || null,
+  ].filter(Boolean);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full text-left bg-white px-4 py-3 active:bg-primary-container/5"
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <p className="min-w-0 flex-1 font-semibold text-sm text-primary truncate">{contact.name}</p>
+        <Icon name="chevron_right" className="text-outline shrink-0 !text-[20px]" />
+      </div>
+      <p className="text-xs text-on-surface-variant truncate mt-0.5">
+        {contact.email || contact.phone || '—'}
+      </p>
+      <div className="mt-2 flex items-center gap-2 min-w-0">
+        <span
+          className={`shrink-0 inline-flex max-w-[45%] px-2 py-0.5 rounded-full text-[10px] font-semibold border truncate ${stageBadgeClass(contact.stage)}`}
+        >
+          {contact.stage || '—'}
+        </span>
+        <span className="min-w-0 flex-1 text-right text-[11px] text-on-surface-variant truncate">
+          {meta.join(' · ') || '—'}
+        </span>
+      </div>
+    </button>
+  );
+}
+
 export default function CRMHub() {
   const navigate = useNavigate();
+  const isMdUp = useIsMdUp();
   const [searchParams, setSearchParams] = useSearchParams();
   const { fetchStatus } = useGmailSync();
 
@@ -106,15 +145,14 @@ export default function CRMHub() {
   }
 
   return (
-    <DashboardLayout title="CRM Hub" headerRight={<CrmHubTabs />} className="p-6 lg:p-8">
-      <div className="w-full space-y-5">
-        {/* Stage highlight strip — horizontal scroll on narrow, flex wrap on wide */}
-        <div className="flex gap-3 overflow-x-auto pb-1 custom-scrollbar">
-          <div className="shrink-0 min-w-[8.5rem] flex-1 basis-[8.5rem] max-w-[12rem] rounded-xl border border-outline-variant/15 bg-gradient-to-br from-primary-container/10 to-white px-4 py-3.5">
-            <p className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest mb-1">
+    <DashboardLayout title="CRM Hub" headerRight={<CrmHubTabs />} className="p-4 md:p-6 lg:p-8">
+      <div className="w-full space-y-4 md:space-y-5">
+        <div className="flex gap-2.5 md:gap-3 overflow-x-auto pb-1 hide-scrollbar md:custom-scrollbar">
+          <div className="shrink-0 min-w-[7.5rem] md:min-w-[8.5rem] flex-1 basis-[7.5rem] max-w-[12rem] rounded-xl border border-outline-variant/15 bg-gradient-to-br from-primary-container/10 to-white px-3 md:px-4 py-3 md:py-3.5">
+            <p className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest mb-1 truncate">
               Total Contacts
             </p>
-            <p className="text-2xl font-bold text-primary-container tabular-nums">
+            <p className="text-xl md:text-2xl font-bold text-primary-container tabular-nums">
               {data.stats?.total?.toLocaleString() ?? '—'}
             </p>
           </div>
@@ -128,7 +166,7 @@ export default function CRMHub() {
                   setStage(active ? '' : s.key);
                   setPage(1);
                 }}
-                className={`shrink-0 min-w-[8.5rem] flex-1 basis-[8.5rem] max-w-[12rem] rounded-xl border px-4 py-3.5 text-left transition-all ${
+                className={`shrink-0 min-w-[7.5rem] md:min-w-[8.5rem] flex-1 basis-[7.5rem] max-w-[12rem] rounded-xl border px-3 md:px-4 py-3 md:py-3.5 text-left transition-all ${
                   active
                     ? 'border-secondary bg-secondary/5 ring-2 ring-secondary/25'
                     : 'border-outline-variant/15 bg-white hover:border-secondary/40'
@@ -137,7 +175,7 @@ export default function CRMHub() {
                 <p className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest mb-1 truncate">
                   {s.label}
                 </p>
-                <p className="text-2xl font-bold text-primary-container tabular-nums">
+                <p className="text-xl md:text-2xl font-bold text-primary-container tabular-nums">
                   {highlights[s.key]?.toLocaleString() ?? 0}
                 </p>
               </button>
@@ -145,29 +183,28 @@ export default function CRMHub() {
           })}
         </div>
 
-        {/* Toolbar */}
         <div className="rounded-xl border border-outline-variant/15 bg-white p-3 sm:p-4 space-y-3 shadow-sm">
-          <div className="flex flex-wrap gap-2 items-center">
-            <div className="relative flex-1 min-w-[14rem]">
-              <Icon
-                name="search"
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-[18px]"
-              />
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search name, email, phone, tags, address, notes…"
-                className="w-full pl-9 pr-3 py-2 border border-outline-variant/25 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-secondary/30"
-              />
-            </div>
+          <div className="relative w-full">
+            <Icon
+              name="search"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-[18px]"
+            />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={isMdUp ? 'Search name, email, phone, tags, address, notes…' : 'Search contacts…'}
+              className="w-full pl-9 pr-3 py-2 border border-outline-variant/25 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-secondary/30"
+            />
+          </div>
+          <div className="flex gap-2 items-center overflow-x-auto hide-scrollbar pb-0.5">
             <select
               value={stage}
               onChange={(e) => {
                 setStage(e.target.value);
                 setPage(1);
               }}
-              className={`${selectClass} w-[10rem]`}
+              className={`${selectClass} w-[9rem] md:w-[10rem] shrink-0`}
             >
               <option value="">All stages</option>
               {filterOptions.stages?.map((s) => (
@@ -182,7 +219,7 @@ export default function CRMHub() {
                 setLeadSource(e.target.value);
                 setPage(1);
               }}
-              className={`${selectClass} w-[9rem]`}
+              className={`${selectClass} w-[8.5rem] md:w-[9rem] shrink-0`}
             >
               <option value="">Lead source</option>
               {filterOptions.leadSources?.map((s) => (
@@ -197,7 +234,7 @@ export default function CRMHub() {
                 setAssignedTo(e.target.value);
                 setPage(1);
               }}
-              className={`${selectClass} w-[9rem]`}
+              className={`${selectClass} w-[8.5rem] md:w-[9rem] shrink-0`}
             >
               <option value="">Assigned</option>
               {filterOptions.assigned?.map((s) => (
@@ -212,7 +249,7 @@ export default function CRMHub() {
                 setIsContacted(e.target.value);
                 setPage(1);
               }}
-              className={`${selectClass} w-[8.5rem]`}
+              className={`${selectClass} w-[8rem] md:w-[8.5rem] shrink-0`}
             >
               <option value="">Contacted</option>
               <option value="1">Yes</option>
@@ -226,7 +263,7 @@ export default function CRMHub() {
                 setPage(1);
               }}
               placeholder="Tag…"
-              className={`${selectClass} w-[7rem]`}
+              className={`${selectClass} w-[6.5rem] md:w-[7rem] shrink-0`}
             />
           </div>
           <div className="flex items-center justify-between text-xs text-on-surface-variant">
@@ -246,86 +283,103 @@ export default function CRMHub() {
           </div>
         </div>
 
-        {/* Contact list */}
         <div className="rounded-xl border border-outline-variant/15 bg-white overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse table-fixed min-w-[720px]">
-              <colgroup>
-                <col className="w-[22%]" />
-                <col className="w-[16%]" />
-                <col className="w-[12%]" />
-                <col className="w-[14%]" />
-                <col className="w-[20%]" />
-                <col className="w-[12%]" />
-                <col className="w-10" />
-              </colgroup>
-              <thead className="bg-surface-container-low border-b border-outline-variant/10">
-                <tr>
-                  {['Client', 'Stage', 'Last Contact', 'Assigned To', 'Property', 'Tags', ''].map((h) => (
-                    <th
-                      key={h || 'chevron'}
-                      className="px-4 py-3 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/5">
-                {loading ? (
+          {!isMdUp ? (
+            <div className="divide-y divide-outline-variant/10">
+              {loading ? (
+                <p className="px-4 py-14 text-center text-on-surface-variant text-sm">Loading contacts…</p>
+              ) : data.contacts.length === 0 ? (
+                <p className="px-4 py-14 text-center text-on-surface-variant text-sm">No contacts match your search.</p>
+              ) : (
+                data.contacts.map((c) => (
+                  <ContactMobileCard
+                    key={c.id}
+                    contact={c}
+                    onOpen={() => navigate(`/crm/${c.id}`)}
+                  />
+                ))
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse table-fixed min-w-[720px]">
+                <colgroup>
+                  <col className="w-[22%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-10" />
+                </colgroup>
+                <thead className="bg-surface-container-low border-b border-outline-variant/10">
                   <tr>
-                    <td colSpan={7} className="px-4 py-14 text-center text-on-surface-variant">
-                      Loading contacts…
-                    </td>
+                    {['Client', 'Stage', 'Last Contact', 'Assigned To', 'Property', 'Tags', ''].map((h) => (
+                      <th
+                        key={h || 'chevron'}
+                        className="px-4 py-3 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider"
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ) : data.contacts.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-14 text-center text-on-surface-variant">
-                      No contacts match your search.
-                    </td>
-                  </tr>
-                ) : (
-                  data.contacts.map((c) => (
-                    <tr
-                      key={c.id}
-                      onClick={() => navigate(`/crm/${c.id}`)}
-                      className="hover:bg-primary-container/5 transition-colors cursor-pointer group"
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-sm text-primary truncate">{c.name}</p>
-                        <p className="text-[11px] text-on-surface-variant truncate">
-                          {c.email || c.phone || '—'}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex max-w-full px-2 py-0.5 rounded-full text-[11px] font-semibold border truncate ${stageBadgeClass(c.stage)}`}
-                        >
-                          {c.stage || '—'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-[13px] text-on-surface-variant whitespace-nowrap">
-                        <DateText value={c.last_contacted} />
-                      </td>
-                      <td className="px-4 py-3 text-[13px] truncate">
-                        {c.assigned_to_name || c.assigned_user_name || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-[13px] font-medium truncate">{propertyLine(c)}</td>
-                      <td className="px-4 py-3 text-[11px] text-on-surface-variant truncate">
-                        {c.tags || '—'}
-                      </td>
-                      <td className="px-2 py-3 text-right">
-                        <Icon
-                          name="chevron_right"
-                          className="text-outline group-hover:text-primary transition-colors !text-[20px]"
-                        />
+                </thead>
+                <tbody className="divide-y divide-outline-variant/5">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-14 text-center text-on-surface-variant">
+                        Loading contacts…
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : data.contacts.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-14 text-center text-on-surface-variant">
+                        No contacts match your search.
+                      </td>
+                    </tr>
+                  ) : (
+                    data.contacts.map((c) => (
+                      <tr
+                        key={c.id}
+                        onClick={() => navigate(`/crm/${c.id}`)}
+                        className="hover:bg-primary-container/5 transition-colors cursor-pointer group"
+                      >
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-sm text-primary truncate">{c.name}</p>
+                          <p className="text-[11px] text-on-surface-variant truncate">
+                            {c.email || c.phone || '—'}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex max-w-full px-2 py-0.5 rounded-full text-[11px] font-semibold border truncate ${stageBadgeClass(c.stage)}`}
+                          >
+                            {c.stage || '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-[13px] text-on-surface-variant whitespace-nowrap">
+                          <DateText value={c.last_contacted} />
+                        </td>
+                        <td className="px-4 py-3 text-[13px] truncate">
+                          {c.assigned_to_name || c.assigned_user_name || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-[13px] font-medium truncate">{propertyLine(c)}</td>
+                        <td className="px-4 py-3 text-[11px] text-on-surface-variant truncate">
+                          {c.tags || '—'}
+                        </td>
+                        <td className="px-2 py-3 text-right">
+                          <Icon
+                            name="chevron_right"
+                            className="text-outline group-hover:text-primary transition-colors !text-[20px]"
+                          />
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
           <ListPagination page={page} total={data.total ?? 0} onPageChange={setPage} />
         </div>
       </div>
