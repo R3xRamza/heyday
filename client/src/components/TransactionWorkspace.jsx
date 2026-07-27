@@ -175,11 +175,18 @@ export default function TransactionWorkspace({
 
   useEffect(() => {
     const representing = normalizeRepresenting(transaction.representing);
-    setForm({
-      ...transaction,
-      representing,
-      sale_type: normalizeSaleType(transaction.sale_type, representing),
-      listing_visibility: normalizeListingVisibility(transaction.listing_visibility),
+    setForm((prev) => {
+      const serverClose = transaction.close_date || '';
+      const localClose = prev.close_date || '';
+      // Keep Closing date typed after Pending party gate until it is saved (or cleared).
+      const close_date = localClose && localClose !== serverClose ? localClose : serverClose;
+      return {
+        ...transaction,
+        representing,
+        sale_type: normalizeSaleType(transaction.sale_type, representing),
+        listing_visibility: normalizeListingVisibility(transaction.listing_visibility),
+        close_date,
+      };
     });
   }, [transaction]);
 
