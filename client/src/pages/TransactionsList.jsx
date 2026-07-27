@@ -144,10 +144,10 @@ function emptyFilterMessage(filter) {
 
 function StatCard({ label, value, sub }) {
   return (
-    <div className="bg-white border border-outline-variant/20 p-4 shadow-executive rounded-lg">
-      <p className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">{label}</p>
-      <h2 className="text-xl font-bold text-primary leading-tight">{value}</h2>
-      <p className="text-xs text-on-surface-variant mt-1">{sub}</p>
+    <div className="bg-white border border-outline-variant/20 p-3 md:p-4 shadow-executive rounded-lg min-w-0">
+      <p className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5 truncate">{label}</p>
+      <h2 className="text-lg md:text-xl font-bold text-primary leading-tight tabular-nums truncate">{value}</h2>
+      <p className="text-[11px] md:text-xs text-on-surface-variant mt-1 truncate">{sub}</p>
     </div>
   );
 }
@@ -345,9 +345,9 @@ export default function TransactionsList() {
       headerRight={<AgentScopeToggle />}
       className="bg-surface"
     >
-      <div className="max-w-[1440px] mx-auto px-8 py-6">
-        <header className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <div className="relative flex-1 min-w-[12rem] max-w-md">
+      <div className="w-full px-4 md:px-6 lg:px-8 py-4 md:py-6">
+        <header className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4 mb-5 md:mb-6">
+          <div className="relative w-full sm:flex-1 sm:min-w-[12rem] sm:max-w-md">
             <Search
               size={16}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none"
@@ -372,23 +372,28 @@ export default function TransactionsList() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-4 shrink-0 ml-auto">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0 w-full sm:w-auto sm:ml-auto">
             <Link
               to="/checklists"
-              className="flex items-center gap-2 px-6 py-3 bg-surface-container-highest border border-outline-variant/30 text-primary text-xs font-semibold uppercase tracking-wider hover:bg-surface-container-high"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 sm:py-3 bg-surface-container-highest border border-outline-variant/30 text-primary text-[10px] sm:text-xs font-semibold uppercase tracking-wider hover:bg-surface-container-high"
             >
-              <ListChecks size={18} /> Edit Checklists
+              <ListChecks size={18} className="shrink-0" />
+              <span className="sm:hidden">Checklists</span>
+              <span className="hidden sm:inline">Edit Checklists</span>
             </Link>
             <button
+              type="button"
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-primary-container text-white text-xs font-semibold uppercase tracking-wider hover:brightness-110"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 sm:py-3 bg-primary-container text-white text-[10px] sm:text-xs font-semibold uppercase tracking-wider hover:brightness-110"
             >
-              <Plus size={18} /> New Transaction
+              <Plus size={18} className="shrink-0" />
+              <span className="sm:hidden">New</span>
+              <span className="hidden sm:inline">New Transaction</span>
             </button>
           </div>
         </header>
 
-        <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-10 transition-opacity ${refreshing ? 'opacity-70' : ''}`}>
+        <div className={`grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-4 mb-6 md:mb-10 transition-opacity ${refreshing ? 'opacity-70' : ''}`}>
           {KPI_CARDS.map((card) => (
             <StatCard
               key={card.key}
@@ -404,13 +409,13 @@ export default function TransactionsList() {
           />
         </div>
 
-        <nav className="flex items-center gap-2 mb-6 overflow-x-auto pb-2">
+        <nav className="flex items-center gap-1.5 md:gap-2 mb-4 md:mb-6 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 hide-scrollbar">
           {FILTERS.map((f) => (
             <button
               key={f.key}
               type="button"
               onClick={() => handleFilterChange(f.key)}
-              className={`px-6 py-2 text-xs font-semibold uppercase tracking-wider whitespace-nowrap transition-colors ${
+              className={`px-3 md:px-6 py-2 text-[10px] md:text-xs font-semibold uppercase tracking-wider whitespace-nowrap transition-colors rounded-md md:rounded-none ${
                 filter === f.key ? 'bg-primary text-white' : 'text-on-surface-variant hover:bg-surface-container-low'
               }`}
             >
@@ -421,7 +426,7 @@ export default function TransactionsList() {
 
         <div className="bg-white border border-outline-variant/20 shadow-executive overflow-hidden rounded-xl">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[40rem]">
               <thead>
                 <tr className="bg-surface-container-low border-b border-outline-variant/30">
                   {columns.map((col) => (

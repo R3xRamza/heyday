@@ -100,6 +100,22 @@ body {
   height: 540px;
 }
 
+@media (max-width: 767px) {
+  .marketing-calendar-grid .marketing-calendar-cell {
+    height: 72px;
+    padding: 4px;
+  }
+  .marketing-calendar-grid--month {
+    grid-auto-rows: 72px;
+  }
+  .marketing-calendar-grid .marketing-calendar-cell--week {
+    height: 88px;
+  }
+  .marketing-calendar-grid .marketing-day-events-desktop {
+    display: none;
+  }
+}
+
 /* Native selects: reserve space for chevron so label text never overlaps */
 select {
   appearance: none;

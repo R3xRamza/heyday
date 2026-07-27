@@ -30,6 +30,7 @@ import {
 import { useTransactionsListReturn } from '../hooks/useTransactionsListReturn';
 import { useTransactionWorkspaceView } from '../hooks/useTransactionWorkspaceView';
 import { validateParties, isTraditionalSale } from '../data/transactionParties';
+import { useIsMdUp } from '../hooks/useMediaQuery';
 
 const ASSET_VIEWS = [
   { key: 'details', label: 'Transaction details', icon: 'info' },
@@ -155,6 +156,7 @@ export default function TransactionWorkspace({
 }) {
   const { returnTo } = useTransactionsListReturn();
   const { view, setView } = useTransactionWorkspaceView();
+  const isMdUp = useIsMdUp();
   const [activeChecklistId, setActiveChecklistId] = useState(null);
   const [form, setForm] = useState({ ...transaction });
   const [selectedTask, setSelectedTask] = useState(null);
@@ -500,8 +502,70 @@ export default function TransactionWorkspace({
   );
 
   return (
-    <div className="flex flex-1 min-h-0 overflow-hidden bg-surface">
-      <aside className="w-56 shrink-0 bg-surface-container-lowest border-r border-outline-variant/10 flex flex-col overflow-y-auto custom-scrollbar">
+    <div className="flex flex-1 min-h-0 overflow-hidden bg-surface flex-col md:flex-row">
+      {/* Mobile: horizontal asset / checklist chrome */}
+      {!isMdUp && (
+        <div className="shrink-0 border-b border-outline-variant/15 bg-surface-container-lowest">
+          <div className="px-3 pt-2.5 pb-1.5 flex items-center justify-between gap-2">
+            <Link to={returnTo} className="text-xs font-bold text-secondary hover:underline flex items-center gap-1 shrink-0">
+              <Icon name="arrow_back" className="!text-[14px]" /> BACK
+            </Link>
+            <span className="text-[9px] text-on-surface-variant/50 tabular-nums shrink-0">TR-{transaction.id}</span>
+          </div>
+          <div className="flex gap-1 overflow-x-auto px-2 pb-2 hide-scrollbar">
+            {ASSET_VIEWS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setView(item.key)}
+                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap ${
+                  view === item.key
+                    ? 'bg-primary-container text-white'
+                    : 'bg-surface-container-low text-on-surface-variant'
+                }`}
+              >
+                <Icon name={item.icon} className="!text-[14px]" />
+                {item.label.replace('Transaction details', 'Details')}
+              </button>
+            ))}
+          </div>
+          {view === 'checklist' && (
+            <div className="flex gap-1.5 overflow-x-auto px-2 pb-2 hide-scrollbar items-center">
+              {sidebarChecklists.map((cl) => (
+                <button
+                  key={cl.id}
+                  type="button"
+                  onClick={() => setActiveChecklistId(cl.id)}
+                  className={`shrink-0 max-w-[12rem] truncate px-3 py-1.5 text-[11px] font-semibold rounded-full ${
+                    Number(activeChecklistId) === Number(cl.id)
+                      ? 'bg-feather text-lemon'
+                      : 'bg-surface-container-low text-primary'
+                  }`}
+                >
+                  {cl.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setChecklistActionError('');
+                  setSelectedTemplateIds([]);
+                  setShowAddChecklist(true);
+                }}
+                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-secondary rounded-full border border-secondary/30"
+                aria-label="Add checklist"
+              >
+                <Plus size={12} /> Add
+              </button>
+            </div>
+          )}
+          {checklistActionError && !isMdUp && (
+            <p className="text-[10px] text-error px-3 pb-2" role="alert">{checklistActionError}</p>
+          )}
+        </div>
+      )}
+
+      <aside className="hidden md:flex w-56 shrink-0 bg-surface-container-lowest border-r border-outline-variant/10 flex-col overflow-y-auto custom-scrollbar">
         <div className="p-4 border-b border-outline-variant/10">
           <Link to={returnTo} className="text-xs font-bold text-secondary hover:underline flex items-center gap-1 mb-4">
             <Icon name="arrow_back" className="!text-[14px]" /> BACK
@@ -595,13 +659,13 @@ export default function TransactionWorkspace({
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {view === 'details' && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8">
             {dashboardHeader}
 
             <div className="grid grid-cols-12 gap-6 items-start">
               <div className="col-span-12 lg:col-span-5 space-y-5">
                 <div className="rounded-xl overflow-hidden shadow-executive border border-secondary/20 bg-gradient-to-br from-primary-container via-primary-container to-secondary/90 text-white">
-                  <div className="p-6">
+                  <div className="p-4 md:p-6">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-secondary/90 mb-1">
                       {representingDisplay}
                     </p>
@@ -619,7 +683,7 @@ export default function TransactionWorkspace({
                   </div>
                 </div>
 
-                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive border-l-4 border-l-secondary">
+                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-4 md:p-6 shadow-executive border-l-4 border-l-secondary">
                   <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-5">
                     Critical Dates Timeline
                   </h3>
@@ -667,7 +731,7 @@ export default function TransactionWorkspace({
               </div>
 
               <div className="col-span-12 lg:col-span-7">
-                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive h-full">
+                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-4 md:p-6 shadow-executive h-full">
                   <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-6">
                     Transaction Details
                   </h3>
@@ -713,8 +777,8 @@ export default function TransactionWorkspace({
                 </div>
               </div>
 
-              <div className="col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive">
+              <div className="col-span-12 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                <div className="p-4 md:p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-tertiary-container/10 text-tertiary rounded-full flex items-center justify-center">
                       <Icon name="description" />
@@ -725,7 +789,7 @@ export default function TransactionWorkspace({
                     </div>
                   </div>
                 </div>
-                <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive">
+                <div className="p-4 md:p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-secondary/10 text-secondary rounded-full flex items-center justify-center">
                       <Icon name="speed" />
@@ -742,11 +806,11 @@ export default function TransactionWorkspace({
         )}
 
         {view === 'checklist' && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-            <div className="grid grid-cols-12 gap-6 items-start">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6">
+            <div className="grid grid-cols-12 gap-4 md:gap-6 items-start">
               <div className="col-span-12 lg:col-span-8">
-                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive flex flex-col min-h-[32rem] max-h-[calc(100vh-12.5rem)]">
-                  <div className="px-5 py-4 border-b border-outline-variant/10 flex justify-between items-center shrink-0 gap-4">
+                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive flex flex-col min-h-[20rem] md:min-h-[32rem] max-h-[calc(100dvh-16rem)] md:max-h-[calc(100vh-12.5rem)]">
+                  <div className="px-3 md:px-5 py-3 md:py-4 border-b border-outline-variant/10 flex justify-between items-center shrink-0 gap-3 md:gap-4">
                     <div className="min-w-0">
                       <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest truncate">
                         Checklist: {activeChecklistName}
@@ -892,11 +956,11 @@ export default function TransactionWorkspace({
         )}
 
         {view === 'activity' && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-6">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6">
             {dashboardHeader}
-            <div className="grid grid-cols-12 gap-6">
+            <div className="grid grid-cols-12 gap-4 md:gap-6">
               <div className="col-span-12 lg:col-span-8">
-                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive">
+                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-4 md:p-6 shadow-executive">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest">Transaction Activity</h3>
                   </div>
@@ -924,7 +988,7 @@ export default function TransactionWorkspace({
                 </div>
               </div>
               <aside className="col-span-12 lg:col-span-4">
-                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-6 shadow-executive">
+                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl p-4 md:p-6 shadow-executive">
                   <form onSubmit={submitComment}>
                     <label className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">Comments</label>
                     <textarea
@@ -988,7 +1052,7 @@ export default function TransactionWorkspace({
         )}
 
         {view === 'commission' && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-6">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6">
             {dashboardHeader}
             <TransactionCommission
               transactionId={transaction.id}

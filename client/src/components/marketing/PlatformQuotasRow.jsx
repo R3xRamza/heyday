@@ -263,8 +263,8 @@ export default function PlatformQuotasRow({ quotaPosts, goals, onSaveGoal }) {
         />
         <span className="text-xs font-semibold text-feather shrink-0">Weekly Goals</span>
         {collapsed && (
-          <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+          <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto hide-scrollbar">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0 ${
               marketingStatus.goalMet
                 ? 'bg-secondary/10 text-secondary'
                 : 'bg-feather/10 text-feather'
@@ -275,7 +275,7 @@ export default function PlatformQuotasRow({ quotaPosts, goals, onSaveGoal }) {
             {summaryItems.map(({ platformKey, count, target }) => (
               <span
                 key={platformKey}
-                className="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container-low text-[11px] font-medium text-on-surface-variant"
+                className="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container-low text-[11px] font-medium text-on-surface-variant shrink-0"
               >
                 {shortLabel(platformKey)} {count}/{target}
               </span>

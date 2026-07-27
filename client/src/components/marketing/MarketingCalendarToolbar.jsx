@@ -262,8 +262,8 @@ export default function MarketingCalendarToolbar({
   onOpenMonthBirthdays,
 }) {
   return (
-    <div className="bg-white border border-outline-variant/15 rounded-xl px-3 py-1.5 mb-2 shrink-0 flex items-center justify-between gap-3 h-11 overflow-visible">
-      <div className="flex items-center gap-1 shrink-0">
+    <div className="bg-white border border-outline-variant/15 rounded-xl px-2.5 md:px-3 py-2 mb-2 shrink-0 flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3 md:h-11 md:py-1.5 overflow-visible">
+      <div className="flex items-center gap-1 shrink-0 overflow-x-auto hide-scrollbar">
         {CATEGORY_PILLS.map(({ key, label }) => {
           const active = Boolean(categories[key]);
           return (
@@ -284,7 +284,7 @@ export default function MarketingCalendarToolbar({
         })}
       </div>
 
-      <div className="flex items-center gap-0.5 shrink-0">
+      <div className="flex items-center justify-center gap-0.5 shrink-0 order-first md:order-none">
         <button
           type="button"
           onClick={onToday}
@@ -300,7 +300,7 @@ export default function MarketingCalendarToolbar({
         >
           <Icon name="chevron_left" className="!text-[18px]" />
         </button>
-        <span className="min-w-[110px] text-center text-xs font-semibold text-feather px-1 whitespace-nowrap">
+        <span className="min-w-0 max-w-[10rem] md:min-w-[110px] md:max-w-none text-center text-xs font-semibold text-feather px-1 truncate whitespace-nowrap">
           {periodLabel}
         </span>
         <button
@@ -313,7 +313,7 @@ export default function MarketingCalendarToolbar({
         </button>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-2 shrink-0 justify-end">
         {categories.social && platforms?.length > 0 && (
           <PlatformFilterPopover
             platforms={platforms}

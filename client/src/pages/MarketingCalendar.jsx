@@ -6,6 +6,7 @@ import PlatformQuotasRow from '../components/marketing/PlatformQuotasRow';
 import { sortBarPlatforms } from '../components/marketing/MarketingPlatformBar';
 import MarketingMonthView from '../components/marketing/MarketingMonthView';
 import MarketingWeekView from '../components/marketing/MarketingWeekView';
+import MarketingSelectedDayPanel from '../components/marketing/MarketingSelectedDayPanel';
 import MarketingPostModal from '../components/marketing/MarketingPostModal';
 import MarketingTaskModal from '../components/marketing/MarketingTaskModal';
 import MonthBirthdaysModal from '../components/marketing/MonthBirthdaysModal';
@@ -677,7 +678,7 @@ export default function MarketingCalendar() {
   }
 
   return (
-    <DashboardLayout title="Marketing Calendar" className="px-6 md:px-8 py-3 bg-off-white w-full max-w-none">
+    <DashboardLayout title="Marketing Calendar" className="px-3 md:px-8 py-3 bg-off-white w-full max-w-none pb-20 md:pb-3">
       <div className="flex flex-col w-full select-none [&_input]:select-text [&_textarea]:select-text">
         <MarketingCalendarHeader
           viewMode={viewMode}
@@ -739,6 +740,15 @@ export default function MarketingCalendar() {
               onTaskClick={openTaskModal}
               onDropPost={reschedulePost}
               onDropTask={rescheduleTask}
+              onNewPostForDate={openNewPostForDate}
+            />
+          )}
+          {!initialLoading && (
+            <MarketingSelectedDayPanel
+              dateStr={selectedDate}
+              events={eventsByDate[selectedDate] || []}
+              onEditPost={openEditPost}
+              onTaskClick={openTaskModal}
               onNewPostForDate={openNewPostForDate}
             />
           )}

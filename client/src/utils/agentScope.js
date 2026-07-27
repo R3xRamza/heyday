@@ -1,12 +1,12 @@
 export const AGENT_SCOPE_STORAGE_KEY = 'heyday-agent-scope-v1';
 
-/** Default scope is Meredith. Toggle order starts with All. */
+/** Default scope is Meredith. Toggle order: All, Meredith, Tessa, Margaret, Adam. */
 export const VISIBLE_SCOPE_OPTIONS = [
-  { value: 'all', code: 'A', label: 'All' },
-  { value: 'meredith', code: 'M', label: 'Meredith' },
-  { value: 'margaret', code: 'G', label: 'Margaret' },
-  { value: 'adam', code: 'D', label: 'Adam' },
-  { value: 'tessa', code: 'T', label: 'Tessa' },
+  { value: 'all', code: 'A', label: 'All', initials: 'All' },
+  { value: 'meredith', code: 'M', label: 'Meredith', initials: 'MA' },
+  { value: 'tessa', code: 'T', label: 'Tessa', initials: 'TO' },
+  { value: 'margaret', code: 'G', label: 'Margaret', initials: 'MM' },
+  { value: 'adam', code: 'D', label: 'Adam', initials: 'AW' },
 ];
 
 const SCOPE_CODES = {
@@ -34,7 +34,13 @@ export function scopeBadgeLabel(scope) {
   const normalized = normalizeScope(scope);
   // Meredith is the default — no TopNav badge when selected.
   if (normalized === 'meredith') return null;
-  return VISIBLE_SCOPE_OPTIONS.find((o) => o.value === normalized)?.label ?? null;
+  const opt = VISIBLE_SCOPE_OPTIONS.find((o) => o.value === normalized);
+  return opt?.label ?? null;
+}
+
+export function scopeInitials(scope) {
+  const normalized = normalizeScope(scope);
+  return VISIBLE_SCOPE_OPTIONS.find((o) => o.value === normalized)?.initials ?? 'MA';
 }
 
 export function appendAgentScope(input, scope) {
