@@ -5,6 +5,7 @@ import VendorLikeButton from '../components/crm/VendorLikeButton';
 import Icon from '../components/shared/Icon';
 import ListPagination from '../components/shared/ListPagination';
 import DateText from '../components/shared/DateText';
+import { useIsMdUp } from '../hooks/useMediaQuery';
 
 const EMPTY_FORM = {
   name: '',
@@ -186,6 +187,56 @@ function formFromVendor(vendor) {
     website: vendor.website || '',
     notes: vendor.notes || '',
   };
+}
+
+function VendorMobileCard({ vendor, selected, onOpen, onLike, onDislike }) {
+  return (
+    <div
+      className={`${selected ? 'bg-secondary/5' : 'bg-white'}`}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        className="w-full text-left px-4 pt-3 pb-2 active:bg-primary-container/5"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-sm text-primary truncate">{vendor.name}</p>
+            {vendor.company ? (
+              <p className="text-[11px] text-on-surface-variant truncate">{vendor.company}</p>
+            ) : null}
+          </div>
+          <Icon name="chevron_right" className="text-outline shrink-0 !text-[20px]" />
+        </div>
+        <div className="mt-2 flex items-center gap-2 min-w-0">
+          {vendor.category ? (
+            <span className="shrink-0 inline-flex max-w-[40%] px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-primary-container/10 text-primary-container border-primary-container/25 truncate">
+              {vendor.category}
+            </span>
+          ) : (
+            <span className="shrink-0 text-[11px] text-on-surface-variant/50">No category</span>
+          )}
+          <span className="min-w-0 flex-1 text-right text-[11px] text-on-surface-variant truncate">
+            {vendor.phone || vendor.email || '—'}
+          </span>
+        </div>
+      </button>
+      <div className="flex items-center gap-2 px-4 pb-3">
+        <VendorLikeButton
+          count={vendor.like_count ?? 0}
+          active={!!vendor.liked_by_me}
+          kind="like"
+          onToggle={onLike}
+        />
+        <VendorLikeButton
+          count={vendor.dislike_count ?? 0}
+          active={!!vendor.disliked_by_me}
+          kind="dislike"
+          onToggle={onDislike}
+        />
+      </div>
+    </div>
+  );
 }
 
 function VendorDrawer({
@@ -446,6 +497,7 @@ function VendorDrawer({
 }
 
 export default function VendorsHub() {
+  const isMdUp = useIsMdUp();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState('');
@@ -737,12 +789,12 @@ export default function VendorsHub() {
     <DashboardLayout
       title="CRM Hub"
       headerRight={<CrmHubTabs />}
-      className="p-6 lg:p-8"
+      className="p-4 md:p-6 lg:p-8"
     >
-      <div className="w-full space-y-5">
+      <div className="w-full space-y-4 md:space-y-5">
         <div className="rounded-xl border border-outline-variant/15 bg-white p-3 sm:p-4 space-y-3 shadow-sm">
-          <div className="flex flex-wrap gap-2 items-center">
-            <div className="relative flex-1 min-w-[14rem]">
+          <div className="flex gap-2 items-center">
+            <div className="relative flex-1 min-w-0">
               <Icon
                 name="search"
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant !text-[18px]"
@@ -751,17 +803,27 @@ export default function VendorsHub() {
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search name, company, category, notes, phone, email…"
+                placeholder={isMdUp ? 'Search name, company, category, notes, phone, email…' : 'Search vendors…'}
                 className="w-full pl-9 pr-3 py-2 border border-outline-variant/25 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-secondary/30"
               />
             </div>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90"
+            >
+              <Icon name="add" className="!text-[18px]" />
+              <span className="hidden sm:inline">Add vendor</span>
+            </button>
+          </div>
+          <div className="flex gap-2 items-center overflow-x-auto hide-scrollbar pb-0.5">
             <input
               type="text"
               list="vendor-filter-categories"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              placeholder="Category contains…"
-              className={`${selectClass} w-[14rem]`}
+              placeholder="Category…"
+              className={`${selectClass} w-[10rem] md:w-[14rem] shrink-0`}
             />
             <datalist id="vendor-filter-categories">
               {categories.map((c) => (
@@ -774,7 +836,7 @@ export default function VendorsHub() {
                 setSort(e.target.value);
                 setPage(1);
               }}
-              className={`${selectClass} w-[9rem]`}
+              className={`${selectClass} w-[9rem] shrink-0`}
             >
               <option value="likes">Sort: Likes</option>
               <option value="dislikes">Sort: Dislikes</option>
@@ -782,14 +844,6 @@ export default function VendorsHub() {
               <option value="name">Sort: Name</option>
               <option value="updated_at">Sort: Updated</option>
             </select>
-            <button
-              type="button"
-              onClick={openCreate}
-              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90"
-            >
-              <Icon name="add" className="!text-[18px]" />
-              Add vendor
-            </button>
           </div>
           <div className="flex items-center justify-between text-xs text-on-surface-variant">
             <span>
@@ -813,112 +867,147 @@ export default function VendorsHub() {
         </div>
 
         <div className="rounded-xl border border-outline-variant/15 bg-white overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse table-fixed min-w-[860px]">
-              <colgroup>
-                <col className="w-[20%]" />
-                <col className="w-[14%]" />
-                <col className="w-[9%]" />
-                <col className="w-[9%]" />
-                <col className="w-[12%]" />
-                <col className="w-[14%]" />
-                <col className="w-[16%]" />
-                <col className="w-10" />
-              </colgroup>
-              <thead className="bg-surface-container-low border-b border-outline-variant/10">
-                <tr>
-                  {['Vendor', 'Category', 'Likes', 'Dislikes', 'Phone', 'Email', 'Notes', ''].map((h) => (
-                    <th
-                      key={h || 'chevron'}
-                      className="px-4 py-3 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/5">
-                {loading ? (
+          {!isMdUp ? (
+            <div className="divide-y divide-outline-variant/10">
+              {loading ? (
+                <p className="px-4 py-14 text-center text-on-surface-variant text-sm">Loading vendors…</p>
+              ) : data.vendors.length === 0 ? (
+                <div className="px-4 py-14 text-center">
+                  <Icon name="storefront" className="!text-[36px] text-on-surface-variant/40 mb-2" />
+                  <p className="font-semibold text-primary mb-1">No vendors match</p>
+                  <p className="text-sm text-on-surface-variant mb-3">
+                    Try clearing filters or add a new vendor.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openCreate}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90"
+                  >
+                    <Icon name="add" className="!text-[18px]" />
+                    Add vendor
+                  </button>
+                </div>
+              ) : (
+                data.vendors.map((v) => (
+                  <VendorMobileCard
+                    key={v.id}
+                    vendor={v}
+                    selected={selectedId === v.id}
+                    onOpen={() => openEdit(v)}
+                    onLike={() => addLikeFromList(v)}
+                    onDislike={() => addDislikeFromList(v)}
+                  />
+                ))
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse table-fixed min-w-[860px]">
+                <colgroup>
+                  <col className="w-[20%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-10" />
+                </colgroup>
+                <thead className="bg-surface-container-low border-b border-outline-variant/10">
                   <tr>
-                    <td colSpan={8} className="px-4 py-14 text-center text-on-surface-variant">
-                      Loading vendors…
-                    </td>
-                  </tr>
-                ) : data.vendors.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-14 text-center">
-                      <Icon name="storefront" className="!text-[36px] text-on-surface-variant/40 mb-2" />
-                      <p className="font-semibold text-primary mb-1">No vendors match</p>
-                      <p className="text-sm text-on-surface-variant mb-3">
-                        Try clearing filters or add a new vendor.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={openCreate}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90"
+                    {['Vendor', 'Category', 'Likes', 'Dislikes', 'Phone', 'Email', 'Notes', ''].map((h) => (
+                      <th
+                        key={h || 'chevron'}
+                        className="px-4 py-3 text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider"
                       >
-                        <Icon name="add" className="!text-[18px]" />
-                        Add vendor
-                      </button>
-                    </td>
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ) : (
-                  data.vendors.map((v) => (
-                    <tr
-                      key={v.id}
-                      onClick={() => openEdit(v)}
-                      className={`transition-colors cursor-pointer group ${
-                        selectedId === v.id
-                          ? 'bg-secondary/5'
-                          : 'hover:bg-primary-container/5'
-                      }`}
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-sm text-primary truncate">{v.name}</p>
-                        {v.company && (
-                          <p className="text-[11px] text-on-surface-variant truncate">{v.company}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <CategoryChip category={v.category} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <VendorLikeButton
-                          count={v.like_count ?? 0}
-                          active={!!v.liked_by_me}
-                          kind="like"
-                          onToggle={() => addLikeFromList(v)}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <VendorLikeButton
-                          count={v.dislike_count ?? 0}
-                          active={!!v.disliked_by_me}
-                          kind="dislike"
-                          onToggle={() => addDislikeFromList(v)}
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-[13px] text-on-surface-variant truncate">
-                        {v.phone || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-[13px] text-on-surface-variant truncate">
-                        {v.email || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-[12px] text-on-surface-variant/80 truncate">
-                        {v.notes || '—'}
-                      </td>
-                      <td className="px-2 py-3 text-right">
-                        <Icon
-                          name="chevron_right"
-                          className="text-outline group-hover:text-primary transition-colors !text-[20px]"
-                        />
+                </thead>
+                <tbody className="divide-y divide-outline-variant/5">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-14 text-center text-on-surface-variant">
+                        Loading vendors…
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : data.vendors.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-14 text-center">
+                        <Icon name="storefront" className="!text-[36px] text-on-surface-variant/40 mb-2" />
+                        <p className="font-semibold text-primary mb-1">No vendors match</p>
+                        <p className="text-sm text-on-surface-variant mb-3">
+                          Try clearing filters or add a new vendor.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={openCreate}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90"
+                        >
+                          <Icon name="add" className="!text-[18px]" />
+                          Add vendor
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    data.vendors.map((v) => (
+                      <tr
+                        key={v.id}
+                        onClick={() => openEdit(v)}
+                        className={`transition-colors cursor-pointer group ${
+                          selectedId === v.id
+                            ? 'bg-secondary/5'
+                            : 'hover:bg-primary-container/5'
+                        }`}
+                      >
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-sm text-primary truncate">{v.name}</p>
+                          {v.company && (
+                            <p className="text-[11px] text-on-surface-variant truncate">{v.company}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <CategoryChip category={v.category} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <VendorLikeButton
+                            count={v.like_count ?? 0}
+                            active={!!v.liked_by_me}
+                            kind="like"
+                            onToggle={() => addLikeFromList(v)}
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <VendorLikeButton
+                            count={v.dislike_count ?? 0}
+                            active={!!v.disliked_by_me}
+                            kind="dislike"
+                            onToggle={() => addDislikeFromList(v)}
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-[13px] text-on-surface-variant truncate">
+                          {v.phone || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-[13px] text-on-surface-variant truncate">
+                          {v.email || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-[12px] text-on-surface-variant/80 truncate">
+                          {v.notes || '—'}
+                        </td>
+                        <td className="px-2 py-3 text-right">
+                          <Icon
+                            name="chevron_right"
+                            className="text-outline group-hover:text-primary transition-colors !text-[20px]"
+                          />
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
           <ListPagination page={page} total={data.total ?? 0} onPageChange={setPage} />
         </div>
       </div>

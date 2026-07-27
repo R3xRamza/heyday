@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 
 const tabClass = ({ isActive }) =>
-  `min-w-[6.5rem] px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide text-center transition-colors ${
+  `min-w-0 px-2.5 md:min-w-[6.5rem] md:px-4 py-1.5 rounded-full text-[10px] md:text-xs font-semibold uppercase tracking-wide text-center transition-colors ${
     isActive
       ? 'bg-primary text-white'
       : 'text-on-surface-variant hover:bg-surface-container-high'
@@ -9,7 +9,7 @@ const tabClass = ({ isActive }) =>
 
 export default function CrmHubTabs() {
   return (
-    <div className="inline-flex rounded-full bg-surface-container-low p-1 border border-outline-variant/20 shrink-0">
+    <div className="inline-flex rounded-full bg-surface-container-low p-0.5 md:p-1 border border-outline-variant/20 shrink-0">
       <NavLink to="/crm" end className={tabClass}>
         Contacts
       </NavLink>
