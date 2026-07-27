@@ -315,7 +315,7 @@ export default function TransactionWorkspace({
   }
 
   /** Block moves to Pending until closing date + required parties are filled. */
-  function pendingGateError(updates) {
+  function pendingGateError(updates, partiesForGate = partiesProp) {
     const nextClose = 'close_date' in updates ? updates.close_date : (form.close_date || transaction.close_date);
     const nextStage = 'stage' in updates ? updates.stage : (form.stage || transaction.stage);
     const closeDateChanging = 'close_date' in updates
@@ -335,7 +335,7 @@ export default function TransactionWorkspace({
     const saleType = updates.sale_type ?? form.sale_type;
     const representing = updates.representing ?? form.representing;
     const intent = isTraditionalSale(saleType, representing) ? 'pending' : 'active';
-    const partyCheck = validateParties(partiesProp, saleType, representing, intent);
+    const partyCheck = validateParties(partiesForGate, saleType, representing, intent);
     if (!partyCheck.ok) return partyCheck.message;
     return null;
   }
@@ -352,12 +352,12 @@ export default function TransactionWorkspace({
     return Boolean(closeDateToPreserve(updates));
   }
 
-  async function saveTransaction(updates) {
+  async function saveTransaction(updates, { partiesForGate } = {}) {
     setSavingTx(true);
     setSavedMsg('');
     setPartiesError('');
 
-    const gateError = pendingGateError(updates);
+    const gateError = pendingGateError(updates, partiesForGate ?? partiesProp);
     if (gateError) {
       setSavingTx(false);
       setPartiesError(gateError);
@@ -366,7 +366,7 @@ export default function TransactionWorkspace({
           ? closeDateToPreserve(updates)
           : null,
       });
-      return;
+      return { ok: false, error: gateError };
     }
 
     const payload = { ...form, ...updates };
@@ -381,7 +381,7 @@ export default function TransactionWorkspace({
           ? closeDateToPreserve(updates)
           : null,
       });
-      return;
+      return result;
     }
     if (result?.tasksRecalculated) {
       setSavedMsg(`Saved · ${result.tasksRecalculated} task due dates updated`);
@@ -389,6 +389,30 @@ export default function TransactionWorkspace({
       setSavedMsg('Saved');
     }
     setTimeout(() => setSavedMsg(''), 4000);
+    return { ok: true, ...result };
+  }
+
+  /** If Closing date is waiting on parties, persist it once parties pass the Pending gate. */
+  async function tryAutoPendingAfterPartiesSaved(savedParties, savedTransaction) {
+    if (!savedTransaction || savedTransaction.stage === 'closed' || savedTransaction.stage === 'pending') {
+      return;
+    }
+    const closeDraft = (form.close_date || savedTransaction.close_date || '').trim();
+    if (!closeDraft) return;
+
+    const saleType = form.sale_type ?? savedTransaction.sale_type;
+    const representing = form.representing ?? savedTransaction.representing;
+    const intent = isTraditionalSale(saleType, representing) ? 'pending' : 'active';
+    const partyCheck = validateParties(savedParties, saleType, representing, intent);
+    if (!partyCheck.ok) {
+      setPartiesError(partyCheck.message);
+      return;
+    }
+
+    await saveTransaction(
+      { close_date: closeDraft },
+      { partiesForGate: savedParties },
+    );
   }
 
   const agentName = (() => {
@@ -808,6 +832,8 @@ export default function TransactionWorkspace({
                             client_name: result.transaction.client_name ?? prev.client_name,
                             owner_name: result.transaction.owner_name ?? prev.owner_name,
                           }));
+                          const partiesSaved = result.parties?.length ? result.parties : payload;
+                          await tryAutoPendingAfterPartiesSaved(partiesSaved, result.transaction);
                         }
                         return result;
                       }}
