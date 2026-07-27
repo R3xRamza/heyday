@@ -688,7 +688,7 @@ export default function TransactionWorkspace({
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {view === 'details' && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain custom-scrollbar p-4 md:p-8 space-y-6 md:space-y-8">
             {dashboardHeader}
 
             <div className="grid grid-cols-12 gap-6 items-start">
@@ -841,10 +841,10 @@ export default function TransactionWorkspace({
         )}
 
         {view === 'checklist' && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain custom-scrollbar p-4 md:p-6">
             <div className="grid grid-cols-12 gap-4 md:gap-6 items-start">
               <div className="col-span-12 lg:col-span-8">
-                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive flex flex-col min-h-[20rem] md:min-h-[32rem] max-h-[calc(100dvh-16rem)] md:max-h-[calc(100vh-12.5rem)]">
+                <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-xl shadow-executive flex flex-col md:min-h-[32rem] md:max-h-[calc(100vh-12.5rem)]">
                   <div className="px-3 md:px-5 py-3 md:py-4 border-b border-outline-variant/10 flex justify-between items-center shrink-0 gap-3 md:gap-4">
                     <div className="min-w-0">
                       <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest truncate">
@@ -861,7 +861,7 @@ export default function TransactionWorkspace({
                       Add task
                     </button>
                   </div>
-                  <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 custom-scrollbar min-h-0">
+                  <div className="md:flex-1 md:overflow-y-auto md:min-h-0 px-4 py-3 space-y-2 md:custom-scrollbar">
                     {checklistTasks.length === 0 ? (
                       <div className="text-center py-8">
                         <p className="text-sm text-on-surface-variant">No tasks on this checklist.</p>
@@ -991,7 +991,7 @@ export default function TransactionWorkspace({
         )}
 
         {view === 'activity' && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain custom-scrollbar p-4 md:p-8 space-y-6">
             {dashboardHeader}
             <div className="grid grid-cols-12 gap-4 md:gap-6">
               <div className="col-span-12 lg:col-span-8">
@@ -1087,7 +1087,7 @@ export default function TransactionWorkspace({
         )}
 
         {view === 'commission' && (
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain custom-scrollbar p-4 md:p-8 space-y-6">
             {dashboardHeader}
             <TransactionCommission
               transactionId={transaction.id}

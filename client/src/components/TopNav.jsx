@@ -9,13 +9,13 @@ import {
 } from '../constants/appHeader';
 import { AgentScopeBadge } from './AgentScopeToggle';
 
-export default function TopNav({ title, subtitle, headerRight, titleAddon }) {
+export default function TopNav({ title, subtitle, headerRight, titleAddon, pinned = false }) {
   const { user } = useAuth();
   const { isMobileNav } = useSidebar();
 
   return (
     <header
-      className={`sticky top-0 z-30 shrink-0 bg-white min-w-0 ${APP_HEADER_HEIGHT_CLASS} ${APP_HEADER_BORDER_CLASS} px-4 md:px-8 flex items-center gap-2 md:gap-4`}
+      className={`${pinned ? 'relative' : 'sticky top-0'} z-30 shrink-0 bg-white min-w-0 ${APP_HEADER_HEIGHT_CLASS} ${APP_HEADER_BORDER_CLASS} px-4 md:px-8 flex items-center gap-2 md:gap-4`}
     >
       {title ? (
         <div className="min-w-0 flex-1 md:flex-none md:max-w-[min(100%,36rem)] shrink">

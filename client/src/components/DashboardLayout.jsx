@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import Sidebar from './Sidebar';
 import TopNav from './TopNav';
 import MobileBottomNav from './MobileBottomNav';
@@ -15,21 +16,48 @@ export default function DashboardLayout({
 }) {
   const { sidebarWidth, isMobileNav } = useSidebar();
 
+  // Prevent document/body scroll fighting the inner pane (esp. transaction workspace on phone).
+  useEffect(() => {
+    if (!fillViewport) return undefined;
+    const html = document.documentElement;
+    const { body } = document;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+    };
+  }, [fillViewport]);
+
+  const bottomPad = isMobileNav
+    ? `calc(${MOBILE_BOTTOM_NAV_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px))`
+    : undefined;
+
   return (
-    <div className="min-h-screen bg-surface overflow-x-hidden">
+    <div
+      className={`bg-surface overflow-x-hidden ${
+        fillViewport ? 'h-[100dvh] max-h-[100dvh] overflow-hidden' : 'min-h-screen'
+      }`}
+    >
       <Sidebar />
       <div
         className={`flex flex-col transition-[margin] duration-200 ease-in-out min-w-0 ${
-          fillViewport ? 'h-screen overflow-hidden' : 'min-h-screen'
+          fillViewport ? 'h-full max-h-full overflow-hidden' : 'min-h-screen'
         }`}
         style={{
           marginLeft: sidebarWidth,
-          paddingBottom: isMobileNav
-            ? `calc(${MOBILE_BOTTOM_NAV_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px))`
-            : undefined,
+          paddingBottom: bottomPad,
         }}
       >
-        <TopNav title={title} subtitle={subtitle} headerRight={headerRight} titleAddon={titleAddon} />
+        <TopNav
+          title={title}
+          subtitle={subtitle}
+          headerRight={headerRight}
+          titleAddon={titleAddon}
+          pinned={Boolean(fillViewport)}
+        />
         <main
           className={`flex-1 min-h-0 min-w-0 custom-scrollbar flex flex-col ${
             fillViewport ? 'overflow-hidden' : 'overflow-y-auto'
