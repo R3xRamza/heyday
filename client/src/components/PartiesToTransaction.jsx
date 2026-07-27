@@ -152,7 +152,9 @@ export default function PartiesToTransaction({
       </div>
 
       {displayError && (
-        <p className="text-xs text-error mb-2" role="alert">{displayError}</p>
+        <p className="text-sm text-error font-medium bg-error/10 border border-error/20 rounded-lg px-3 py-2 mb-3" role="alert">
+          {displayError}
+        </p>
       )}
 
       <ul className="divide-y divide-outline-variant/15">

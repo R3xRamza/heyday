@@ -82,7 +82,7 @@ function stageBadge(stage) {
   return transactionStageLabel(stage).toUpperCase();
 }
 
-function EditableField({ field, form, transaction, onChange, onBlur }) {
+function EditableField({ field, form, transaction, onChange, onBlur, error = '' }) {
   const key = field.key;
   if (field.type === 'readonly-date') {
     return (
@@ -99,7 +99,10 @@ function EditableField({ field, form, transaction, onChange, onBlur }) {
         <select
           value={form[key] || ''}
           onChange={(e) => onChange(key, e.target.value)}
-          className="w-full text-sm font-semibold text-primary bg-surface-container-low border border-outline-variant/20 rounded-lg px-3 py-2 focus:ring-2 focus:ring-secondary/30 outline-none"
+          className={`w-full text-sm font-semibold text-primary bg-surface-container-low border rounded-lg px-3 py-2 focus:ring-2 focus:ring-secondary/30 outline-none ${
+            error ? 'border-error/50' : 'border-outline-variant/20'
+          }`}
+          aria-invalid={Boolean(error)}
         >
           {field.options.map((o) => {
             const val = typeof o === 'object' ? o.value : o;
@@ -107,6 +110,9 @@ function EditableField({ field, form, transaction, onChange, onBlur }) {
             return <option key={val} value={val}>{label}</option>;
           })}
         </select>
+        {error?.trim() && (
+          <p className="text-xs text-error font-medium" role="alert">{error}</p>
+        )}
       </div>
     );
   }
@@ -285,28 +291,55 @@ export default function TransactionWorkspace({
     onRefreshActivities?.();
   }
 
+  function revertUpdates(updates) {
+    setForm((prev) => ({
+      ...prev,
+      ...Object.fromEntries(Object.keys(updates).map((k) => [k, transaction[k] ?? ''])),
+      representing: normalizeRepresenting(transaction.representing),
+      sale_type: normalizeSaleType(transaction.sale_type, transaction.representing),
+      listing_visibility: normalizeListingVisibility(transaction.listing_visibility),
+      close_date: transaction.close_date || '',
+      stage: transaction.stage || 'active',
+    }));
+  }
+
+  /** Block moves to Pending until closing date + required parties are filled. */
+  function pendingGateError(updates) {
+    const nextClose = 'close_date' in updates ? updates.close_date : (form.close_date || transaction.close_date);
+    const nextStage = 'stage' in updates ? updates.stage : (form.stage || transaction.stage);
+    const closeDateChanging = 'close_date' in updates
+      && String(updates.close_date || '') !== String(transaction.close_date || '');
+    const stageChangingToPending = 'stage' in updates
+      && updates.stage === 'pending'
+      && transaction.stage !== 'pending';
+
+    const becomesPending = stageChangingToPending
+      || (closeDateChanging && Boolean(nextClose) && nextStage !== 'closed');
+    if (!becomesPending) return null;
+
+    if (!nextClose) {
+      return 'Add a Closing date before moving this transaction to Pending.';
+    }
+
+    const saleType = updates.sale_type ?? form.sale_type;
+    const representing = updates.representing ?? form.representing;
+    const intent = isTraditionalSale(saleType, representing) ? 'pending' : 'active';
+    const partyCheck = validateParties(partiesProp, saleType, representing, intent);
+    if (!partyCheck.ok) return partyCheck.message;
+    return null;
+  }
+
   async function saveTransaction(updates) {
     setSavingTx(true);
     setSavedMsg('');
     setPartiesError('');
 
-    const nextClose = 'close_date' in updates ? updates.close_date : form.close_date;
-    const closeDateChanging = 'close_date' in updates
-      && String(updates.close_date || '') !== String(transaction.close_date || '');
-    if (closeDateChanging && nextClose) {
-      const saleType = updates.sale_type ?? form.sale_type;
-      const representing = updates.representing ?? form.representing;
-      const intent = isTraditionalSale(saleType, representing) ? 'pending' : 'active';
-      const partyCheck = validateParties(partiesProp, saleType, representing, intent);
-      if (!partyCheck.ok) {
-        setSavingTx(false);
-        setPartiesError(partyCheck.message);
-        setForm((prev) => ({
-          ...prev,
-          close_date: transaction.close_date || '',
-        }));
-        return;
-      }
+    const gateError = pendingGateError(updates);
+    if (gateError) {
+      setSavingTx(false);
+      setPartiesError(gateError);
+      revertUpdates(updates);
+      return;
     }
 
     const payload = { ...form, ...updates };
@@ -316,13 +349,7 @@ export default function TransactionWorkspace({
       setSavedMsg('');
       setPartiesError(result.error || 'Could not save.');
       // Revert form field if close_date / party gate failed
-      setForm((prev) => ({
-        ...prev,
-        ...Object.fromEntries(Object.keys(updates).map((k) => [k, transaction[k]])),
-        representing: normalizeRepresenting(transaction.representing),
-        sale_type: normalizeSaleType(transaction.sale_type, transaction.representing),
-        listing_visibility: normalizeListingVisibility(transaction.listing_visibility),
-      }));
+      revertUpdates(updates);
       return;
     }
     if (result?.tasksRecalculated) {
@@ -452,7 +479,7 @@ export default function TransactionWorkspace({
         </div>
         {savedMsg && <p className="text-xs text-secondary mt-1 font-semibold">{savedMsg}</p>}
         {partiesError && (
-          <p className="text-xs text-error mt-1 font-semibold max-w-xl" role="alert">
+          <p className="mt-2 text-sm text-error font-medium bg-error/10 border border-error/20 rounded-lg px-3 py-2 max-w-xl" role="alert">
             {partiesError}
           </p>
         )}
@@ -595,6 +622,11 @@ export default function TransactionWorkspace({
                   <h3 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-5">
                     Critical Dates Timeline
                   </h3>
+                  {partiesError && (
+                    <p className="mb-4 text-sm text-error font-medium bg-error/10 border border-error/20 rounded-lg px-3 py-2" role="alert">
+                      {partiesError}
+                    </p>
+                  )}
                   <ul className="space-y-5">
                     {timelineDates.map((item, index) => {
                       const hasDate = Boolean(form[item.key]);
@@ -639,6 +671,11 @@ export default function TransactionWorkspace({
                     Transaction Details
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    {partiesError && (
+                      <div className="sm:col-span-2 text-sm text-error font-medium bg-error/10 border border-error/20 rounded-lg px-3 py-2" role="alert">
+                        {partiesError}
+                      </div>
+                    )}
                     {visibleExtraFields.map((field) => (
                       <div key={field.key} className={field.key === 'created_at' ? 'sm:col-span-2' : undefined}>
                         <EditableField
@@ -647,6 +684,7 @@ export default function TransactionWorkspace({
                           transaction={transaction}
                           onChange={field.type === 'select' ? handleSelectChange : handleFieldChange}
                           onBlur={handleFieldBlur}
+                          error={field.key === 'stage' && partiesError ? ' ' : ''}
                         />
                       </div>
                     ))}

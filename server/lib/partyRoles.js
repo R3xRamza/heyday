@@ -134,12 +134,12 @@ export function validateParties(parties, saleType, representing, intent) {
     return {
       ok: false,
       missing,
-      message: `Can't move this transaction to pending until these party fields are filled: ${missing.join(', ')}.`,
+      message: `Fill in these party fields before moving to Pending: ${missing.join(', ')}.`,
     };
   }
   return {
     ok: false,
     missing,
-    message: `Can't activate this transaction until these party fields are filled: ${missing.join(', ')}.`,
+    message: `Fill in these party fields before activating: ${missing.join(', ')}.`,
   };
 }
