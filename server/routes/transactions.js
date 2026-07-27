@@ -671,9 +671,16 @@ router.put('/:id', (req, res) => {
     }
   }
 
+  const nextStageExplicit = 'stage' in req.body ? req.body.stage : null;
+  const stageChangingToPending = nextStageExplicit === 'pending' && before.stage !== 'pending';
   const closeDateChanging = 'close_date' in req.body
     && String(req.body.close_date || '') !== String(before.close_date || '');
-  if (closeDateChanging && nextCloseDate && derivedStage === 'pending') {
+  if (stageChangingToPending || (closeDateChanging && nextCloseDate && derivedStage === 'pending')) {
+    if (!nextCloseDate) {
+      return res.status(400).json({
+        error: 'Add a Closing date before moving this transaction to Pending.',
+      });
+    }
     const intent = isTraditionalSale(nextSaleType, nextRepresenting) ? 'pending' : 'active';
     const partyCheck = assertPartiesForIntent(db, before.id, intent);
     if (!partyCheck.ok) {
