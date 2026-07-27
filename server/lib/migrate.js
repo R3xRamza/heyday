@@ -155,6 +155,18 @@ export function runMigrations(db) {
   migrateRevenueSplitTemplates(db);
   migrateOpportunitiesTables(db);
   normalizeBuyerOpportunityRows(db);
+  migrateUserUiPrefsTable(db);
+}
+
+function migrateUserUiPrefsTable(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_ui_prefs (
+      user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      opportunities_buyers_json TEXT,
+      opportunities_sellers_json TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 }
 
 function migrateVendorLikesTable(db) {
