@@ -1,9 +1,13 @@
 import {
   COMMISSION_SETTINGS,
+  DEFAULT_FEE_LINES,
+  normalizeCommissionSettings,
   round2,
 } from './commissionPlans.js';
 
-export const TEMPLATE_AGENT_KEYS = ['meredith', 'tessa', 'margaret', 'adam'];
+export const SEEDED_AGENT_KEYS = ['meredith', 'tessa', 'margaret', 'adam'];
+
+export const TEMPLATE_AGENT_KEYS = SEEDED_AGENT_KEYS; // back-compat export
 
 export const TEMPLATE_AGENT_LABELS = {
   meredith: 'Meredith',
@@ -19,52 +23,32 @@ const EMAIL_TO_KEY = {
   'adam@theheydaygroup.com': 'adam',
 };
 
-/** Same eXp fees as Meredith, no team splits — seed for non-Meredith agents. */
-export function defaultTemplateSettings(agentKey) {
-  if (agentKey === 'meredith') {
-    return { ...COMMISSION_SETTINGS };
+function addColumnIfMissing(db, table, column, definition) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
-  return {
-    ...COMMISSION_SETTINGS,
-    tessaRate: 0,
-    margaretRate: 0,
+}
+
+/** Same eXp fees as Meredith; empty team splits for non-Meredith. */
+export function defaultTemplateSettings(agentKey) {
+  const base = {
+    capAmount: COMMISSION_SETTINGS.capAmount,
+    splitRate: COMMISSION_SETTINGS.splitRate,
+    feeLines: DEFAULT_FEE_LINES.map((f) => ({ ...f })),
+    teamSplits: [],
   };
+  if (agentKey === 'meredith') {
+    return normalizeCommissionSettings({
+      ...base,
+      teamSplits: COMMISSION_SETTINGS.teamSplits.map((s) => ({ ...s })),
+    });
+  }
+  return normalizeCommissionSettings(base);
 }
 
 export function normalizeTemplateSettings(raw = {}) {
-  const base = COMMISSION_SETTINGS;
-  const n = (v, fallback) => {
-    const x = Number(v);
-    return Number.isFinite(x) && x >= 0 ? x : fallback;
-  };
-  const rate = (v, fallback) => {
-    const x = Number(v);
-    if (!Number.isFinite(x) || x < 0) return fallback;
-    // Accept either 0.04 or 4 (percent) for team / split rates under 1 vs over 1
-    return x;
-  };
-
-  let splitRate = rate(raw.splitRate, base.splitRate);
-  if (splitRate > 1) splitRate = splitRate / 100;
-
-  let tessaRate = rate(raw.tessaRate, base.tessaRate);
-  if (tessaRate > 1) tessaRate = tessaRate / 100;
-
-  let margaretRate = rate(raw.margaretRate, base.margaretRate);
-  if (margaretRate > 1) margaretRate = margaretRate / 100;
-
-  return {
-    capAmount: round2(n(raw.capAmount, base.capAmount)),
-    splitRate: Math.min(1, splitRate),
-    brokerReviewFee: round2(n(raw.brokerReviewFee, base.brokerReviewFee)),
-    riskManagementFee: round2(n(raw.riskManagementFee, base.riskManagementFee)),
-    riskManagementAnnualCap: round2(n(raw.riskManagementAnnualCap, base.riskManagementAnnualCap)),
-    cappedTransactionFee: round2(n(raw.cappedTransactionFee, base.cappedTransactionFee)),
-    cappedTransactionFeeReduced: round2(n(raw.cappedTransactionFeeReduced, base.cappedTransactionFeeReduced)),
-    cappedFeesStepDownAt: round2(n(raw.cappedFeesStepDownAt, base.cappedFeesStepDownAt)),
-    tessaRate: Math.min(1, tessaRate),
-    margaretRate: Math.min(1, margaretRate),
-  };
+  return normalizeCommissionSettings(raw);
 }
 
 export function agentKeyFromEmail(email) {
@@ -74,8 +58,23 @@ export function agentKeyFromEmail(email) {
 
 export function agentKeyFromUserId(db, userId) {
   if (userId == null || userId === '') return null;
-  const row = db.prepare('SELECT email FROM users WHERE id = ?').get(Number(userId));
-  return agentKeyFromEmail(row?.email);
+  const id = Number(userId);
+  const row = db.prepare('SELECT email FROM users WHERE id = ?').get(id);
+  const fromEmail = agentKeyFromEmail(row?.email);
+  if (fromEmail) return fromEmail;
+  const byUser = db.prepare(
+    'SELECT agent_key FROM revenue_split_templates WHERE user_id = ?',
+  ).get(id);
+  return byUser?.agent_key || null;
+}
+
+export function slugifyAgentKey(label) {
+  const base = String(label || 'agent')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 40) || 'agent';
+  return base;
 }
 
 export function migrateRevenueSplitTemplates(db) {
@@ -87,31 +86,65 @@ export function migrateRevenueSplitTemplates(db) {
       updated_by INTEGER
     );
   `);
+  addColumnIfMissing(db, 'revenue_split_templates', 'label', 'TEXT');
+  addColumnIfMissing(db, 'revenue_split_templates', 'user_id', 'INTEGER');
+  addColumnIfMissing(db, 'revenue_split_templates', 'seeded', 'INTEGER NOT NULL DEFAULT 0');
 
   const insert = db.prepare(`
-    INSERT OR IGNORE INTO revenue_split_templates (agent_key, settings_json)
-    VALUES (?, ?)
+    INSERT OR IGNORE INTO revenue_split_templates (agent_key, settings_json, label, seeded)
+    VALUES (?, ?, ?, 1)
   `);
-  for (const key of TEMPLATE_AGENT_KEYS) {
-    insert.run(key, JSON.stringify(defaultTemplateSettings(key)));
+  for (const key of SEEDED_AGENT_KEYS) {
+    insert.run(key, JSON.stringify(defaultTemplateSettings(key)), TEMPLATE_AGENT_LABELS[key]);
+  }
+
+  // Mark seeded + labels
+  for (const key of SEEDED_AGENT_KEYS) {
+    db.prepare(`
+      UPDATE revenue_split_templates
+      SET seeded = 1, label = COALESCE(NULLIF(label, ''), ?)
+      WHERE agent_key = ?
+    `).run(TEMPLATE_AGENT_LABELS[key], key);
+  }
+
+  // Normalize legacy JSON shapes in place
+  const rows = db.prepare('SELECT agent_key, settings_json FROM revenue_split_templates').all();
+  const update = db.prepare(`
+    UPDATE revenue_split_templates SET settings_json = ? WHERE agent_key = ?
+  `);
+  for (const row of rows) {
+    try {
+      const parsed = JSON.parse(row.settings_json);
+      const normalized = normalizeTemplateSettings(parsed);
+      update.run(JSON.stringify(normalized), row.agent_key);
+    } catch {
+      // leave as-is
+    }
   }
 }
 
-export function getTemplateSettings(db, agentKey) {
-  const key = TEMPLATE_AGENT_KEYS.includes(agentKey) ? agentKey : null;
-  if (!key) return normalizeTemplateSettings(defaultTemplateSettings('tessa'));
+function templateLabel(row) {
+  if (row.label && String(row.label).trim()) return String(row.label).trim();
+  return TEMPLATE_AGENT_LABELS[row.agent_key] || row.agent_key;
+}
 
+export function getTemplateSettings(db, agentKey) {
+  if (!agentKey) return normalizeTemplateSettings(defaultTemplateSettings('tessa'));
   const row = db.prepare(
     'SELECT settings_json FROM revenue_split_templates WHERE agent_key = ?',
-  ).get(key);
-
+  ).get(agentKey);
   if (!row?.settings_json) {
-    return normalizeTemplateSettings(defaultTemplateSettings(key));
+    if (SEEDED_AGENT_KEYS.includes(agentKey)) {
+      return normalizeTemplateSettings(defaultTemplateSettings(agentKey));
+    }
+    return normalizeTemplateSettings(defaultTemplateSettings('tessa'));
   }
   try {
     return normalizeTemplateSettings(JSON.parse(row.settings_json));
   } catch {
-    return normalizeTemplateSettings(defaultTemplateSettings(key));
+    return normalizeTemplateSettings(defaultTemplateSettings(
+      SEEDED_AGENT_KEYS.includes(agentKey) ? agentKey : 'tessa',
+    ));
   }
 }
 
@@ -121,26 +154,141 @@ export function getTemplateSettingsForAgentId(db, agentId) {
   return getTemplateSettings(db, key);
 }
 
+export function getTemplateMeta(db, agentKey) {
+  const row = db.prepare(`
+    SELECT agent_key, label, user_id, seeded FROM revenue_split_templates WHERE agent_key = ?
+  `).get(agentKey);
+  if (!row) {
+    return {
+      agent_key: agentKey,
+      label: TEMPLATE_AGENT_LABELS[agentKey] || agentKey,
+      user_id: null,
+      seeded: SEEDED_AGENT_KEYS.includes(agentKey),
+    };
+  }
+  return {
+    agent_key: row.agent_key,
+    label: templateLabel(row),
+    user_id: row.user_id,
+    seeded: Boolean(row.seeded) || SEEDED_AGENT_KEYS.includes(row.agent_key),
+  };
+}
+
 export function listTemplates(db) {
-  return TEMPLATE_AGENT_KEYS.map((agent_key) => ({
-    agent_key,
-    label: TEMPLATE_AGENT_LABELS[agent_key],
-    settings: getTemplateSettings(db, agent_key),
-  }));
+  const rows = db.prepare(`
+    SELECT agent_key, label, user_id, seeded, settings_json
+    FROM revenue_split_templates
+    ORDER BY
+      CASE agent_key
+        WHEN 'meredith' THEN 0
+        WHEN 'tessa' THEN 1
+        WHEN 'margaret' THEN 2
+        WHEN 'adam' THEN 3
+        ELSE 4
+      END,
+      label COLLATE NOCASE ASC,
+      agent_key ASC
+  `).all();
+
+  return rows.map((row) => {
+    let settings;
+    try {
+      settings = normalizeTemplateSettings(JSON.parse(row.settings_json));
+    } catch {
+      settings = normalizeTemplateSettings(defaultTemplateSettings(row.agent_key));
+    }
+    return {
+      agent_key: row.agent_key,
+      label: templateLabel(row),
+      user_id: row.user_id,
+      seeded: Boolean(row.seeded) || SEEDED_AGENT_KEYS.includes(row.agent_key),
+      settings,
+    };
+  });
 }
 
 export function saveTemplateSettings(db, agentKey, rawSettings, updatedBy = null) {
-  if (!TEMPLATE_AGENT_KEYS.includes(agentKey)) {
-    throw new Error('Invalid agent_key');
+  const existing = db.prepare(
+    'SELECT agent_key FROM revenue_split_templates WHERE agent_key = ?',
+  ).get(agentKey);
+  if (!existing) {
+    throw new Error('Unknown agent_key');
   }
   const settings = normalizeTemplateSettings(rawSettings);
+  const teamSum = settings.teamSplits.reduce((s, t) => s + t.rate, 0);
+  if (teamSum > 1.0001) {
+    throw new Error('Team split rates cannot total more than 100%');
+  }
   db.prepare(`
-    INSERT INTO revenue_split_templates (agent_key, settings_json, updated_at, updated_by)
-    VALUES (?, ?, CURRENT_TIMESTAMP, ?)
-    ON CONFLICT(agent_key) DO UPDATE SET
-      settings_json = excluded.settings_json,
-      updated_at = CURRENT_TIMESTAMP,
-      updated_by = excluded.updated_by
-  `).run(agentKey, JSON.stringify(settings), updatedBy);
+    UPDATE revenue_split_templates
+    SET settings_json = ?, updated_at = CURRENT_TIMESTAMP, updated_by = ?
+    WHERE agent_key = ?
+  `).run(JSON.stringify(settings), updatedBy, agentKey);
   return settings;
 }
+
+export function createAgentTemplate(db, { userId = null, label = null, agentKey = null } = {}, updatedBy = null) {
+  let key = agentKey ? slugifyAgentKey(agentKey) : null;
+  let resolvedLabel = label ? String(label).trim() : null;
+  let resolvedUserId = userId != null && userId !== '' ? Number(userId) : null;
+
+  if (resolvedUserId) {
+    const user = db.prepare('SELECT id, name, email FROM users WHERE id = ?').get(resolvedUserId);
+    if (!user) throw new Error('Invalid user_id');
+    const existingKey = agentKeyFromUserId(db, resolvedUserId);
+    if (existingKey) throw new Error('That team member already has a template');
+    resolvedLabel = resolvedLabel || user.name || user.email;
+    key = key || slugifyAgentKey(resolvedLabel);
+  }
+
+  if (!key) {
+    if (!resolvedLabel) throw new Error('label or user_id is required');
+    key = slugifyAgentKey(resolvedLabel);
+  }
+  if (!resolvedLabel) resolvedLabel = key;
+
+  // Ensure unique key
+  let unique = key;
+  let n = 2;
+  while (db.prepare('SELECT 1 FROM revenue_split_templates WHERE agent_key = ?').get(unique)) {
+    unique = `${key}_${n}`;
+    n += 1;
+  }
+
+  const settings = defaultTemplateSettings(
+    SEEDED_AGENT_KEYS.includes(unique) ? unique : 'tessa',
+  );
+
+  db.prepare(`
+    INSERT INTO revenue_split_templates (agent_key, settings_json, label, user_id, seeded, updated_by)
+    VALUES (?, ?, ?, ?, 0, ?)
+  `).run(unique, JSON.stringify(settings), resolvedLabel, resolvedUserId, updatedBy);
+
+  return {
+    agent_key: unique,
+    label: resolvedLabel,
+    user_id: resolvedUserId,
+    seeded: false,
+    settings,
+  };
+}
+
+export function deleteAgentTemplate(db, agentKey) {
+  const row = db.prepare(
+    'SELECT agent_key, seeded FROM revenue_split_templates WHERE agent_key = ?',
+  ).get(agentKey);
+  if (!row) throw new Error('Not found');
+  if (row.seeded || SEEDED_AGENT_KEYS.includes(row.agent_key)) {
+    throw new Error('Seeded templates cannot be deleted');
+  }
+  db.prepare('DELETE FROM revenue_split_templates WHERE agent_key = ?').run(agentKey);
+  return { ok: true };
+}
+
+export function teamSplitRatesSumOk(settings) {
+  const s = normalizeTemplateSettings(settings);
+  const sum = s.teamSplits.reduce((acc, t) => acc + t.rate, 0);
+  return sum <= 1.0001;
+}
+
+export { round2 };
