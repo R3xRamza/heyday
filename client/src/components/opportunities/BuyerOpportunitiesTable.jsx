@@ -44,7 +44,7 @@ export default function BuyerOpportunitiesTable({ rows, onEdit, onPatch }) {
             <th className={`${TH} w-12`} aria-label="Rep & Dropbox" />
             <th className={TH}>Buyers</th>
             <th className={TH}>Status</th>
-            <th className={TH}>Price</th>
+            <th className={TH}>Budget</th>
             <th className={TH}>Location</th>
             <th className={TH}>Timing</th>
             <th className={TH}>Notes</th>
