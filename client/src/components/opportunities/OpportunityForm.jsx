@@ -86,7 +86,6 @@ export default function OpportunityForm({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [showMore, setShowMore] = useState(false);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -306,46 +305,36 @@ export default function OpportunityForm({
                 />
               </Field>
 
-              <button
-                type="button"
-                onClick={() => setShowMore((v) => !v)}
-                className="text-xs font-semibold uppercase tracking-wider text-secondary hover:underline"
-              >
-                {showMore ? 'Hide details' : 'More details (rep, lender, showings…)'}
-              </button>
-
-              {showMore && (
-                <div className="space-y-4 pt-1 border-t border-outline-variant/15">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Field label="Buyer Rep signed?">
-                      <input
-                        className={INPUT}
-                        value={form.buyer_rep_signed || ''}
-                        onChange={(e) => set('buyer_rep_signed', e.target.value)}
-                        placeholder="Y- 9/30/2026"
-                      />
-                    </Field>
-                    <Field label="Buyer Rep in Dropbox?">
-                      <input
-                        className={INPUT}
-                        value={form.buyer_rep_dropbox || ''}
-                        onChange={(e) => set('buyer_rep_dropbox', e.target.value)}
-                        placeholder="Y / N"
-                      />
-                    </Field>
-                  </div>
-                  <Field label="Lender / Lender Intro">
-                    <input className={INPUT} value={form.lender || ''} onChange={(e) => set('lender', e.target.value)} />
-                  </Field>
-                  <Field label="Showings">
+              <div className="space-y-4 pt-1 border-t border-outline-variant/15">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Field label="Buyer Rep signed?">
                     <input
                       className={INPUT}
-                      value={form.showings || ''}
-                      onChange={(e) => set('showings', e.target.value)}
+                      value={form.buyer_rep_signed || ''}
+                      onChange={(e) => set('buyer_rep_signed', e.target.value)}
+                      placeholder="Y- 9/30/2026"
+                    />
+                  </Field>
+                  <Field label="Buyer Rep in Dropbox?">
+                    <input
+                      className={INPUT}
+                      value={form.buyer_rep_dropbox || ''}
+                      onChange={(e) => set('buyer_rep_dropbox', e.target.value)}
+                      placeholder="Y / N"
                     />
                   </Field>
                 </div>
-              )}
+                <Field label="Lender / Lender Intro">
+                  <input className={INPUT} value={form.lender || ''} onChange={(e) => set('lender', e.target.value)} />
+                </Field>
+                <Field label="Showings">
+                  <input
+                    className={INPUT}
+                    value={form.showings || ''}
+                    onChange={(e) => set('showings', e.target.value)}
+                  />
+                </Field>
+              </div>
             </>
           ) : (
             <>
