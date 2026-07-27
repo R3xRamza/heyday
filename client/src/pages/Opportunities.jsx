@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Search, X } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import AgentScopeToggle from '../components/AgentScopeToggle';
@@ -8,12 +8,21 @@ import {
   BUYER_STATUSES,
   buyerStatusLabel,
 } from '../utils/buyerOpportunity';
+import {
+  cycleSort,
+  defaultOpportunityTablePrefs,
+  normalizeOpportunityTablePrefs,
+  reorderColumn,
+  setColumnWidth,
+  sortOpportunityRows,
+} from '../utils/opportunityTablePrefs';
 import BuyerOpportunitiesTable from '../components/opportunities/BuyerOpportunitiesTable';
 import SellerOpportunitiesTable from '../components/opportunities/SellerOpportunitiesTable';
 import OpportunityBuyerCards from '../components/opportunities/OpportunityBuyerCards';
 import OpportunitySellerCards from '../components/opportunities/OpportunitySellerCards';
 import OpportunityForm from '../components/opportunities/OpportunityForm';
 import OpportunityKpis from '../components/opportunities/OpportunityKpis';
+import OpportunityTableColumnsMenu from '../components/opportunities/OpportunityTableColumnsMenu';
 
 const TAB_KEY = 'opportunities-tab-v1';
 
@@ -36,6 +45,15 @@ export default function Opportunities() {
   const [statusFilter, setStatusFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [buyerPrefs, setBuyerPrefs] = useState(() => defaultOpportunityTablePrefs('buyers'));
+  const [sellerPrefs, setSellerPrefs] = useState(() => defaultOpportunityTablePrefs('sellers'));
+  const [prefsReady, setPrefsReady] = useState(false);
+  const resizeTimer = useRef(null);
+  const prefsRef = useRef({ buyers: buyerPrefs, sellers: sellerPrefs });
+
+  useEffect(() => {
+    prefsRef.current = { buyers: buyerPrefs, sellers: sellerPrefs };
+  }, [buyerPrefs, sellerPrefs]);
 
   useEffect(() => {
     try {
@@ -44,6 +62,78 @@ export default function Opportunities() {
       // ignore
     }
   }, [tab]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/user-prefs/opportunities', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((json) => {
+        if (cancelled) return;
+        setBuyerPrefs(normalizeOpportunityTablePrefs('buyers', json.buyers));
+        setSellerPrefs(normalizeOpportunityTablePrefs('sellers', json.sellers));
+      })
+      .catch(() => {
+        // keep defaults
+      })
+      .finally(() => {
+        if (!cancelled) setPrefsReady(true);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const savePrefs = useCallback(async (patch) => {
+    const body = {};
+    if (patch.buyers) body.buyers = patch.buyers;
+    if (patch.sellers) body.sellers = patch.sellers;
+    try {
+      const res = await fetch('/api/user-prefs/opportunities', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.buyers) setBuyerPrefs(normalizeOpportunityTablePrefs('buyers', json.buyers));
+      if (json.sellers) setSellerPrefs(normalizeOpportunityTablePrefs('sellers', json.sellers));
+    } catch {
+      // ignore network errors; local state already updated
+    }
+  }, []);
+
+  const activePrefs = tab === 'buyers' ? buyerPrefs : sellerPrefs;
+
+  function applyPrefsLocal(next) {
+    if (tab === 'buyers') {
+      setBuyerPrefs(next);
+      prefsRef.current = { ...prefsRef.current, buyers: next };
+    } else {
+      setSellerPrefs(next);
+      prefsRef.current = { ...prefsRef.current, sellers: next };
+    }
+  }
+
+  function commitPrefs(next, { debounce = false } = {}) {
+    applyPrefsLocal(next);
+    const kind = tab;
+    if (debounce) {
+      if (resizeTimer.current) clearTimeout(resizeTimer.current);
+      resizeTimer.current = setTimeout(() => {
+        const latest = prefsRef.current;
+        savePrefs(kind === 'buyers' ? { buyers: latest.buyers } : { sellers: latest.sellers });
+      }, 400);
+      return;
+    }
+    if (resizeTimer.current) {
+      clearTimeout(resizeTimer.current);
+      resizeTimer.current = null;
+    }
+    savePrefs(kind === 'buyers' ? { buyers: next } : { sellers: next });
+  }
+
+  useEffect(() => () => {
+    if (resizeTimer.current) clearTimeout(resizeTimer.current);
+  }, []);
 
   const fetchRows = useCallback(async () => {
     setLoading(true);
@@ -83,7 +173,6 @@ export default function Opportunities() {
 
   const statusOptions = useMemo(() => {
     if (tab === 'buyers') {
-      // Always show the four canonical statuses for buyers
       return BUYER_STATUSES.map((s) => s.value);
     }
     const set = new Set();
@@ -93,6 +182,11 @@ export default function Opportunities() {
     }
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [tab, allForPills]);
+
+  const sortedRows = useMemo(
+    () => sortOpportunityRows(tab, rows, activePrefs.sortKey, activePrefs.sortDir),
+    [tab, rows, activePrefs.sortKey, activePrefs.sortDir],
+  );
 
   function switchTab(next) {
     setTab(next);
@@ -168,6 +262,26 @@ export default function Opportunities() {
     await fetchRows();
   }
 
+  function handleSort(columnId) {
+    commitPrefs(cycleSort(activePrefs, columnId, tab));
+  }
+
+  function handleReorder(fromId, toId) {
+    commitPrefs(reorderColumn(activePrefs, fromId, toId, tab));
+  }
+
+  function handleResize(columnId, widthPx) {
+    commitPrefs(setColumnWidth(activePrefs, columnId, widthPx, tab), { debounce: true });
+  }
+
+  function handleColumnsChange(next) {
+    commitPrefs(normalizeOpportunityTablePrefs(tab, next));
+  }
+
+  function handleResetColumns() {
+    commitPrefs(defaultOpportunityTablePrefs(tab));
+  }
+
   const tabBtn = (active) =>
     `flex-1 md:flex-none min-h-11 px-5 py-2.5 text-xs font-semibold uppercase tracking-wider transition-colors ${
       active
@@ -237,37 +351,47 @@ export default function Opportunities() {
 
         <OpportunityKpis items={allForPills} kind={tab === 'buyers' ? 'buyer' : 'seller'} />
 
-        {statusOptions.length > 0 && (
-          <nav className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
-            <button
-              type="button"
-              onClick={() => setStatusFilter('')}
-              className={`shrink-0 min-h-10 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap transition-colors ${
-                !statusFilter ? 'bg-primary text-white' : 'text-on-surface-variant hover:bg-surface-container-low'
-              }`}
-            >
-              All
-            </button>
-            {statusOptions.map((s) => {
-              const label = tab === 'buyers' ? buyerStatusLabel(s) : s;
-              return (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setStatusFilter(s)}
-                  className={`shrink-0 min-h-10 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap transition-colors max-w-[14rem] truncate ${
-                    statusFilter === s
-                      ? 'bg-primary text-white'
-                      : 'text-on-surface-variant hover:bg-surface-container-low'
-                  }`}
-                  title={label}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </nav>
-        )}
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          {statusOptions.length > 0 && (
+            <nav className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 flex-1 min-w-0">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('')}
+                className={`shrink-0 min-h-10 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap transition-colors ${
+                  !statusFilter ? 'bg-primary text-white' : 'text-on-surface-variant hover:bg-surface-container-low'
+                }`}
+              >
+                All
+              </button>
+              {statusOptions.map((s) => {
+                const label = tab === 'buyers' ? buyerStatusLabel(s) : s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setStatusFilter(s)}
+                    className={`shrink-0 min-h-10 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap transition-colors max-w-[14rem] truncate ${
+                      statusFilter === s
+                        ? 'bg-primary text-white'
+                        : 'text-on-surface-variant hover:bg-surface-container-low'
+                    }`}
+                    title={label}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </nav>
+          )}
+          {prefsReady && (
+            <OpportunityTableColumnsMenu
+              kind={tab}
+              prefs={activePrefs}
+              onChange={handleColumnsChange}
+              onReset={handleResetColumns}
+            />
+          )}
+        </div>
 
         {loading && rows.length === 0 ? (
           <p className="text-sm text-on-surface-variant py-12 text-center">Loading…</p>
@@ -287,13 +411,29 @@ export default function Opportunities() {
           </div>
         ) : tab === 'buyers' ? (
           <>
-            <OpportunityBuyerCards rows={rows} onEdit={openEdit} />
-            <BuyerOpportunitiesTable rows={rows} onEdit={openEdit} onPatch={handlePatchBuyer} />
+            <OpportunityBuyerCards rows={sortedRows} onEdit={openEdit} />
+            <BuyerOpportunitiesTable
+              rows={sortedRows}
+              onEdit={openEdit}
+              onPatch={handlePatchBuyer}
+              prefs={buyerPrefs}
+              onSort={handleSort}
+              onReorder={handleReorder}
+              onResize={handleResize}
+            />
           </>
         ) : (
           <>
-            <OpportunitySellerCards rows={rows} onEdit={openEdit} onDelete={handleDelete} />
-            <SellerOpportunitiesTable rows={rows} onEdit={openEdit} onDelete={handleDelete} />
+            <OpportunitySellerCards rows={sortedRows} onEdit={openEdit} onDelete={handleDelete} />
+            <SellerOpportunitiesTable
+              rows={sortedRows}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+              prefs={sellerPrefs}
+              onSort={handleSort}
+              onReorder={handleReorder}
+              onResize={handleResize}
+            />
           </>
         )}
       </div>
