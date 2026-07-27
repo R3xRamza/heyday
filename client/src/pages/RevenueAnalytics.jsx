@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, Fragment, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { SlidersHorizontal } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import Icon from '../components/shared/Icon';
 import ListPagination from '../components/shared/ListPagination';
@@ -8,7 +9,6 @@ import PriceInput from '../components/shared/PriceInput';
 import { formatCurrency, shortAddress } from '../utils/format';
 import { useAgentScope } from '../context/AgentScopeContext';
 import { appendAgentScope } from '../utils/agentScope';
-import SplitTemplatesPanel from '../components/revenue/SplitTemplatesPanel';
 
 const MONTH_LABELS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -335,12 +335,18 @@ export default function RevenueAnalytics() {
             <Icon name="payments" className="text-secondary !text-[20px]" />
             <h2 className="text-base font-bold text-primary">{titleLabel}</h2>
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
             {s?.anniversaryStart && s?.anniversaryEnd && (
               <span className="text-[11px] text-on-surface-variant hidden sm:inline">
                 Dec 1 anniversary · {s.anniversaryStart.slice(0, 7)} → {s.anniversaryEnd}
               </span>
             )}
+            <Link
+              to="/revenue/templates"
+              className="flex items-center gap-2 px-4 py-2 bg-surface-container-highest border border-outline-variant/30 text-primary text-xs font-semibold uppercase tracking-wider hover:bg-surface-container-high"
+            >
+              <SlidersHorizontal size={16} /> Edit Split Templates
+            </Link>
             <select
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
@@ -353,8 +359,6 @@ export default function RevenueAnalytics() {
             </select>
           </div>
         </div>
-
-        <SplitTemplatesPanel onSaved={fetchData} />
 
         {loading && !data ? (
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">

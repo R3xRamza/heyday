@@ -12,6 +12,7 @@ import UserTaskDashboard from './pages/UserTaskDashboard';
 import UserProjectDashboard from './pages/UserProjectDashboard';
 import MarketingCalendar from './pages/MarketingCalendar';
 import RevenueAnalytics from './pages/RevenueAnalytics';
+import RevenueSplitTemplates from './pages/RevenueSplitTemplates';
 import TransactionManager from './pages/TransactionManager';
 import TransactionsList from './pages/TransactionsList';
 import ChecklistEditor from './pages/ChecklistEditor';
@@ -49,7 +50,10 @@ export default function App() {
             <Route path=":userId" element={<ProtectedRoute><UserTaskDashboard category="transaction" /></ProtectedRoute>} />
           </Route>
           <Route path="/marketing" element={<ProtectedRoute><MarketingCalendar /></ProtectedRoute>} />
-          <Route path="/revenue" element={<ProtectedRoute><RevenueAnalytics /></ProtectedRoute>} />
+          <Route path="/revenue">
+            <Route index element={<ProtectedRoute><RevenueAnalytics /></ProtectedRoute>} />
+            <Route path="templates" element={<ProtectedRoute><RevenueSplitTemplates /></ProtectedRoute>} />
+          </Route>
           <Route path="/transactions">
             <Route index element={<ProtectedRoute><TransactionsList /></ProtectedRoute>} />
             <Route path=":id" element={<ProtectedRoute><TransactionManager /></ProtectedRoute>} />
