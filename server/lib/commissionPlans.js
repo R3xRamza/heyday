@@ -125,6 +125,32 @@ export function serializeCustomFees(fees) {
   return JSON.stringify(parseCustomFees(fees));
 }
 
+/** Deal-level dollar overrides for plan fee lines (keys like exp_split, fee_*, split_*). */
+export function parseFeeAmounts(raw) {
+  if (raw == null || raw === '') return {};
+  let obj = raw;
+  if (typeof raw === 'string') {
+    try {
+      obj = JSON.parse(raw);
+    } catch {
+      return {};
+    }
+  }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
+  const out = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === null || value === '' || value === undefined) continue;
+    const n = Number(value);
+    if (Number.isNaN(n) || n < 0) continue;
+    out[String(key)] = round2(n);
+  }
+  return out;
+}
+
+export function serializeFeeAmounts(amounts) {
+  return JSON.stringify(parseFeeAmounts(amounts));
+}
+
 /** Resolve a custom fee to dollars. Percent fees are of GCI. */
 export function customFeeDollars(fee, gci) {
   const n = Math.max(0, Number(fee?.amount) || 0);
@@ -401,6 +427,10 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
       cappedFeesPaidAfter: 0,
       feePaidAfter: {},
       lines,
+      expFeeLines: [],
+      teamSplitLines: [],
+      customLines: lines,
+      expFeesTotal: 0,
     };
   }
 
@@ -415,7 +445,7 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
       key: 'exp_split',
       label: beforeCap
         ? `eXp split (${splitPct}% sliding scale)`
-        : 'eXp split (capped — 100% retained)',
+        : 'eXp split (capped)',
       amount: -expSplit,
     },
   ];
@@ -470,7 +500,7 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
     if (/margaret/i.test(split.label)) margaret = amount;
     lines.push({
       key: `split_${split.id}`,
-      label: `${split.label} ${pct}% of post-split balance`,
+      label: `${split.label} ${pct}%`,
       amount: -amount,
     });
   }
@@ -485,31 +515,82 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
     });
   }
 
-  const net = round2(postSplit - fixedFees - teamSplitsTotal - customSum);
+  // Deal-level amount overrides (positive dollars → deducted as negative lines)
+  const feeAmounts = parseFeeAmounts(overrides.feeAmounts);
+  for (const line of lines) {
+    if (String(line.key).startsWith('custom_')) continue;
+    if (!(line.key in feeAmounts)) continue;
+    line.amount = -feeAmounts[line.key];
+    line.overridden = true;
+  }
+
+  // Recompute aggregates + YTD fee paid from (possibly overridden) lines
+  let expSplitOut = 0;
+  let fixedFeesOut = 0;
+  let teamSplitsOut = 0;
+  let tessaOut = 0;
+  let margaretOut = 0;
+  const teamSplitDetailsOut = [];
+  const feePaidRecomputed = { ...ytd.feePaid };
+  for (const line of lines) {
+    const dollars = Math.abs(Number(line.amount) || 0);
+    if (line.key === 'exp_split') {
+      expSplitOut = dollars;
+    } else if (String(line.key).startsWith('fee_')) {
+      fixedFeesOut = round2(fixedFeesOut + dollars);
+      const feeId = String(line.key).slice(4);
+      const paidBefore = Number(ytd.feePaid[feeId]) || 0;
+      feePaidRecomputed[feeId] = round2(paidBefore + dollars);
+      if (line.key === 'fee_risk_mgmt') riskFee = dollars;
+      if (line.key === 'fee_broker_review') brokerReview = dollars;
+      if (line.key === 'fee_capped_trans') cappedFee = dollars;
+    } else if (String(line.key).startsWith('split_')) {
+      teamSplitsOut = round2(teamSplitsOut + dollars);
+      const detail = teamSplitDetails.find((d) => `split_${d.id}` === line.key);
+      if (detail) {
+        teamSplitDetailsOut.push({ ...detail, amount: dollars });
+        if (/tessa/i.test(detail.label)) tessaOut = dollars;
+        if (/margaret/i.test(detail.label)) margaretOut = dollars;
+      }
+    }
+  }
+  Object.assign(feePaidAfter, feePaidRecomputed);
+
+  const postSplitOut = round2(gciN - expSplitOut);
+  const net = round2(postSplitOut - fixedFeesOut - teamSplitsOut - customSum);
   const riskPaidAfter = round2(feePaidAfter.risk_mgmt || 0);
   const cappedFeesPaidAfter = round2(feePaidAfter.capped_trans || 0);
+
+  const expFeeLines = lines.filter((l) => l.key === 'exp_split' || String(l.key).startsWith('fee_'));
+  const teamSplitLines = lines.filter((l) => String(l.key).startsWith('split_'));
+  const customLines = lines.filter((l) => String(l.key).startsWith('custom_'));
+  const expFeesTotal = round2(expSplitOut + fixedFeesOut);
 
   return {
     plan: beforeCap ? 'before_cap' : 'after_cap',
     applyPlanFees: true,
     gci: gciN,
-    expSplit,
-    postSplit,
+    expSplit: expSplitOut,
+    postSplit: postSplitOut,
     riskFee,
     brokerReview,
     cappedFee,
-    tessa,
-    margaret,
+    tessa: tessaOut,
+    margaret: margaretOut,
     customSum,
-    fixedFees,
-    teamSplits: teamSplitsTotal,
-    teamSplitDetails,
+    fixedFees: fixedFeesOut,
+    teamSplits: teamSplitsOut,
+    teamSplitDetails: teamSplitDetailsOut.length ? teamSplitDetailsOut : teamSplitDetails,
     net,
-    capPaidAfter: round2(capPaidBefore + expSplit),
+    capPaidAfter: round2(capPaidBefore + expSplitOut),
     riskPaidAfter,
     cappedFeesPaidAfter,
     feePaidAfter,
     lines,
+    expFeeLines,
+    teamSplitLines,
+    customLines,
+    expFeesTotal,
   };
 }
 
@@ -530,6 +611,7 @@ export function computeYearCommissions(deals, startingYtd = 0, settings = COMMIS
     const isReferral = saleType.includes('referral');
     const overrides = {
       customFees: deal.commission_custom_fees,
+      feeAmounts: deal.commission_fee_overrides,
       applyPlanFees: !isReferral,
     };
     const breakdown = computeDealCommission(gci, ytd, overrides, settings);

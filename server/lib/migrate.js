@@ -79,8 +79,21 @@ export function runMigrations(db) {
   addColumnIfMissing(db, 'transactions', 'gross_commission', 'REAL');
   addColumnIfMissing(db, 'transactions', 'commission_exp_stock', 'REAL DEFAULT 0');
   addColumnIfMissing(db, 'transactions', 'commission_custom_fees', "TEXT DEFAULT '[]'");
-  addColumnIfMissing(db, 'transactions', 'commission_gci_mode', "TEXT DEFAULT 'amount'");
-  addColumnIfMissing(db, 'transactions', 'commission_gci_percent', 'REAL');
+  addColumnIfMissing(db, 'transactions', 'commission_fee_overrides', "TEXT DEFAULT '{}'");
+  addColumnIfMissing(db, 'transactions', 'commission_gci_mode', "TEXT DEFAULT 'percent'");
+  addColumnIfMissing(db, 'transactions', 'commission_gci_percent', 'REAL DEFAULT 3');
+  // Default unset GCI to 3% (do not overwrite deals that already have a dollar GCI or percent).
+  try {
+    db.prepare(`
+      UPDATE transactions
+      SET commission_gci_mode = 'percent', commission_gci_percent = 3
+      WHERE gross_commission IS NULL
+        AND commission_gci_percent IS NULL
+        AND (commission_gci_mode IS NULL OR commission_gci_mode = 'amount')
+    `).run();
+  } catch {
+    // ignore if columns missing on first pass
+  }
   addColumnIfMissing(db, 'transactions', 'buyer_agreement_date', 'DATE');
   addColumnIfMissing(db, 'transactions', 'buyer_expiration_date', 'DATE');
 

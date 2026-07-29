@@ -114,6 +114,39 @@ function UnitValueField({
   );
 }
 
+function FeeAmountField({ value, onCommit }) {
+  const [text, setText] = useState(value == null || value === '' ? '' : String(value));
+
+  useEffect(() => {
+    setText(value == null || value === '' ? '' : String(value));
+  }, [value]);
+
+  return (
+    <div className="relative w-[7.5rem] shrink-0">
+      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-xs">$</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={text}
+        onChange={(e) => {
+          const raw = e.target.value.replace(/[^0-9.]/g, '');
+          setText(raw);
+        }}
+        onBlur={() => {
+          if (text === '' || text === '.') {
+            onCommit(0);
+            setText('0');
+            return;
+          }
+          const n = Number(text);
+          if (!Number.isNaN(n) && n >= 0) onCommit(n);
+        }}
+        className="w-full pl-6 pr-2 py-1.5 rounded-lg bg-surface-container-low border border-outline-variant/15 text-sm text-primary font-semibold tabular-nums text-right focus:outline-none focus:ring-2 focus:ring-secondary/30"
+      />
+    </div>
+  );
+}
+
 let feeSeq = 0;
 function newFeeId() {
   feeSeq += 1;
@@ -126,18 +159,20 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [gciMode, setGciMode] = useState('amount');
+  const [gciMode, setGciMode] = useState('percent');
   const [gciAmount, setGciAmount] = useState(null);
-  const [gciPercent, setGciPercent] = useState(null);
+  const [gciPercent, setGciPercent] = useState(3);
   const [customFees, setCustomFees] = useState([]);
+  const [feeAmounts, setFeeAmounts] = useState({});
   const saveTimer = useRef(null);
 
   const applyServer = useCallback((json) => {
     setData(json);
     setGciMode(json.gci_mode === 'percent' ? 'percent' : 'amount');
     setGciAmount(json.gross_commission);
-    setGciPercent(json.gci_percent);
+    setGciPercent(json.gci_percent != null ? json.gci_percent : 3);
     setCustomFees(json.custom_fees?.length ? json.custom_fees : []);
+    setFeeAmounts(json.fee_amounts && typeof json.fee_amounts === 'object' ? json.fee_amounts : {});
   }, []);
 
   const load = useCallback(async () => {
@@ -212,6 +247,21 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   const appliesPlan = data?.applies_plan === true || data?.applies_meredith_plan === true;
   const netLabel = data?.agent_label ? `Net to ${data.agent_label}` : 'Net';
 
+  const planLines = (breakdown?.lines || []).filter((line) => !String(line.key).startsWith('custom_'));
+  const customLines = breakdown?.customLines
+    || (breakdown?.lines || []).filter((line) => String(line.key).startsWith('custom_'));
+
+  function displayFeeValue(line) {
+    if (feeAmounts[line.key] != null) return feeAmounts[line.key];
+    return Math.abs(Number(line.amount) || 0);
+  }
+
+  function commitFeeAmount(key, amount) {
+    const next = { ...feeAmounts, [key]: amount == null ? 0 : amount };
+    setFeeAmounts(next);
+    persist({ fee_amounts: next });
+  }
+
   function switchGciMode(nextMode) {
     if (nextMode === gciMode) return;
     if (nextMode === 'percent') {
@@ -219,6 +269,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
       if ((pct == null || pct === '') && price > 0 && gciAmount != null) {
         pct = Math.round((Number(gciAmount) / Number(price)) * 10000) / 100;
       }
+      if (pct == null || pct === '') pct = 3;
       setGciMode('percent');
       setGciPercent(pct);
       persist({ gci_mode: 'percent', gci_percent: pct });
@@ -354,7 +405,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                 <p className="text-xs text-on-surface-variant mt-1">
                   {gciMode === 'percent' && price == null
                     ? 'Percent GCI needs a sales price.'
-                    : 'No numbers are invented until gross commission is set.'}
+                    : 'Default is 3% of sales price once price is set.'}
                 </p>
               </div>
             ) : (
@@ -363,18 +414,17 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                   <span>Gross commission</span>
                   <span className="tabular-nums">{formatMoney(breakdown.gci)}</span>
                 </div>
-                {appliesPlan && (
-                  <ul className="space-y-2 border-t border-outline-variant/10 pt-3">
-                    {breakdown.lines
-                      .filter((line) => !String(line.key).startsWith('custom_'))
-                      .map((line) => (
-                        <li key={line.key} className="flex justify-between text-sm gap-4">
-                          <span className="text-on-surface-variant">{line.label}</span>
-                          <span className={`tabular-nums font-semibold shrink-0 ${line.amount < 0 ? 'text-error' : 'text-on-surface-variant'}`}>
-                            {line.amount === 0 ? '$0' : formatMoney(line.amount)}
-                          </span>
-                        </li>
-                      ))}
+                {appliesPlan && planLines.length > 0 && (
+                  <ul className="space-y-2.5 border-t border-outline-variant/10 pt-3">
+                    {planLines.map((line) => (
+                      <li key={line.key} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="text-on-surface-variant min-w-0 flex-1">{line.label}</span>
+                        <FeeAmountField
+                          value={displayFeeValue(line)}
+                          onCommit={(n) => commitFeeAmount(line.key, n)}
+                        />
+                      </li>
+                    ))}
                   </ul>
                 )}
               </>
@@ -471,25 +521,43 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
 
             {breakdown && (
               <div className="mt-5 pt-4 border-t border-outline-variant/15 space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Gross Commission</span>
+                  <span className="tabular-nums font-bold text-primary">{formatMoney(breakdown.gci)}</span>
+                </div>
                 {appliesPlan && (
-                  <>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Post-split</span>
-                      <span className="tabular-nums font-bold text-primary">{formatMoney(breakdown.postSplit)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Total fees</span>
-                      <span className="tabular-nums font-bold text-primary">
-                        {formatMoney(breakdown.fixedFees + breakdown.customSum)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Team splits</span>
-                      <span className="tabular-nums font-bold text-primary">{formatMoney(breakdown.teamSplits)}</span>
-                    </div>
-                  </>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-on-surface-variant uppercase tracking-wide font-semibold">eXp Fees</span>
+                    <span className="tabular-nums font-bold text-primary">
+                      {formatMoney(breakdown.expFeesTotal ?? (breakdown.expSplit + breakdown.fixedFees))}
+                    </span>
+                  </div>
                 )}
-                <div className={`flex justify-between text-base font-black text-secondary ${appliesPlan ? 'pt-2 border-t border-primary/10' : ''}`}>
+                <div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Custom Fees</span>
+                    <span className="tabular-nums font-bold text-primary">{formatMoney(breakdown.customSum || 0)}</span>
+                  </div>
+                  {customLines.length > 0 && (
+                    <ul className="mt-1.5 space-y-1 pl-3">
+                      {customLines.map((line) => (
+                        <li key={line.key} className="flex justify-between text-[11px] gap-3">
+                          <span className="text-on-surface-variant truncate">{line.label}</span>
+                          <span className="tabular-nums text-on-surface-variant shrink-0">
+                            {formatMoney(Math.abs(Number(line.amount) || 0))}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {appliesPlan && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Team Splits</span>
+                    <span className="tabular-nums font-bold text-primary">{formatMoney(breakdown.teamSplits)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-black text-secondary pt-2 border-t border-primary/10">
                   <span>{appliesPlan ? netLabel : 'Net'}</span>
                   <span className="tabular-nums">{formatMoney(breakdown.net)}</span>
                 </div>
