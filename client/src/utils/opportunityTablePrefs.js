@@ -16,15 +16,25 @@ import {
 
 export const MIN_COLUMN_WIDTH = 80;
 
+/** Per-column floors so selects (Status / Timing) stay readable after bad saved prefs. */
+export function columnWidthFloor(colId) {
+  if (colId === 'rep') return 64;
+  if (colId === 'status') return 128;
+  if (colId === 'timing') return 120;
+  if (colId === 'preapproval') return 96;
+  if (colId === 'buyer_name') return 120;
+  return MIN_COLUMN_WIDTH;
+}
+
 export const BUYER_COLUMNS = [
   { id: 'rep', label: 'Rep', pinned: 'start', sortable: false, defaultWidth: 72 },
-  { id: 'buyer_name', label: 'Buyers', pinned: null, sortable: true, defaultWidth: 160 },
-  { id: 'status', label: 'Status', pinned: null, sortable: true, defaultWidth: 120 },
+  { id: 'buyer_name', label: 'Buyers', pinned: null, sortable: true, defaultWidth: 168 },
+  { id: 'status', label: 'Status', pinned: null, sortable: true, defaultWidth: 136 },
   { id: 'budget', label: 'Budget', pinned: null, sortable: true, defaultWidth: 100 },
-  { id: 'location', label: 'Location', pinned: null, sortable: true, defaultWidth: 140 },
-  { id: 'timing', label: 'Timing', pinned: null, sortable: true, defaultWidth: 120 },
-  { id: 'notes', label: 'Notes', pinned: null, sortable: true, defaultWidth: 220 },
-  { id: 'preapproval', label: 'Pre approved', pinned: null, sortable: true, defaultWidth: 100 },
+  { id: 'location', label: 'Location', pinned: null, sortable: true, defaultWidth: 150 },
+  { id: 'timing', label: 'Timing', pinned: null, sortable: true, defaultWidth: 128 },
+  { id: 'notes', label: 'Notes', pinned: null, sortable: true, defaultWidth: 240 },
+  { id: 'preapproval', label: 'Pre approved', pinned: null, sortable: true, defaultWidth: 110 },
 ];
 
 export const SELLER_COLUMNS = [
@@ -97,10 +107,13 @@ export function normalizeOpportunityTablePrefs(kind, raw) {
     for (const c of cols) {
       const n = Number(src.widths[c.id]);
       if (Number.isFinite(n)) {
-        const floor = c.id === 'rep' ? 56 : MIN_COLUMN_WIDTH;
-        widths[c.id] = Math.max(floor, Math.round(n));
+        widths[c.id] = Math.max(columnWidthFloor(c.id), Math.round(n));
       }
     }
+  }
+  // Always enforce floors (fixes crushed Status/Timing from prior redistributing resize)
+  for (const c of cols) {
+    widths[c.id] = Math.max(columnWidthFloor(c.id), Number(widths[c.id]) || c.defaultWidth);
   }
 
   let sortKey = src.sortKey != null && src.sortKey !== '' ? String(src.sortKey) : null;
@@ -178,7 +191,7 @@ export function reorderColumn(prefs, draggedId, targetId, kind) {
 export function setColumnWidth(prefs, columnId, widthPx, kind) {
   const col = columnsForKind(kind).find((c) => c.id === columnId);
   if (!col) return prefs;
-  const floor = columnId === 'rep' ? 56 : MIN_COLUMN_WIDTH;
+  const floor = columnWidthFloor(columnId);
   return normalizeOpportunityTablePrefs(kind, {
     ...prefs,
     widths: {

@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { ArrowDown, ArrowUp } from 'lucide-react';
-import { MIN_COLUMN_WIDTH } from '../../utils/opportunityTablePrefs';
+import { columnWidthFloor } from '../../utils/opportunityTablePrefs';
 
 const TH =
   'relative px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-on-surface-variant whitespace-nowrap bg-surface-container-low sticky top-0 z-10 border-b border-outline-variant/20 select-none';
@@ -16,11 +16,12 @@ export default function OpportunityTableHead({
   onSort,
   onReorder,
   onResize,
+  trailingSpacer = false,
 }) {
   const dragCol = useRef(null);
 
   const startResize = useCallback((colId, startX, startW) => {
-    const floor = colId === 'rep' ? 56 : MIN_COLUMN_WIDTH;
+    const floor = columnWidthFloor(colId);
     function onMove(e) {
       const next = Math.max(floor, startW + (e.clientX - startX));
       onResize(colId, next);
@@ -98,6 +99,9 @@ export default function OpportunityTableHead({
             </th>
           );
         })}
+        {trailingSpacer && (
+          <th className={TH} aria-hidden />
+        )}
       </tr>
     </thead>
   );
