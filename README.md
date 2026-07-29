@@ -88,14 +88,16 @@ SQLite defaults to `heyday.db` in the project root locally. On Railway, attach a
 
 - Direction: **Follow Up Boss -> HEYDAY only** (read-only GET calls to FUB; no writes back).
 - Scope: contacts assigned to **Meredith Alderson** and active contacts only (`Trash` excluded).
-- Behavior: full overwrite each run (contacts table replaced after successful fetch).
+- Behavior: upsert by FUB `external_id` (preserves contact row ids); removes stale contacts that are **not** linked from `vendors`.
+- **Vendors are never modified** by this sync (vendor seed is skipped; script aborts if vendors change).
 - Command: `npm run sync-crm-fub`
 
 ### Safety checks
 
-- Script fetches all pages first, then writes to DB in one transaction.
+- Script fetches all pages first, then upserts contacts in one transaction (no full table wipe).
 - Sync aborts without writing if fetched count is 0 or under 5000 (`--force` bypass available for manual recovery).
 - Expected count is around 9,092 contacts and logs warning if outside 8,500-9,500.
+- Vendors fingerprint is checked before/after; any vendor change rolls back the sync.
 
 ### Railway schedule (2:00 AM America/Chicago)
 
