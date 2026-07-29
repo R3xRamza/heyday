@@ -79,6 +79,7 @@ export const FUB_CONTACT_FIELDS = [
   'stage', 'source', 'assignedTo', 'assignedUserId', 'contacted',
   'price', 'timeframeId', 'lastActivity',
   'tags', 'emails', 'phones', 'addresses', 'relationships',
+  'background', 'notes', 'description', 'message',
   'customFields', 'allCustom',
 ];
 
@@ -96,6 +97,13 @@ export function mapFubApiPerson(person, usersByName = {}) {
   const homeAnniversary = getCustom(person, ['Primary Home Purchase Date', 'primaryHomePurchaseDate', 'customPrimaryHomePurchaseDate']);
   const sphereSource = getCustom(person, ['Sphere Source', 'sphereSource', 'customSphereSource']);
   const referredBy = getCustom(person, ['Referred By', 'referredBy', 'customReferredBy']);
+
+  // FUB "Background" is the main bio field; also accept notes/description if present
+  const background = trim(person.background);
+  const fubNotes = trim(person.notes);
+  const fubDescription = trim(person.description);
+  const notes = background || fubNotes || null;
+  const description = fubDescription || background || null;
 
   const legacyRow = {
     Name: fullName,
@@ -136,8 +144,8 @@ export function mapFubApiPerson(person, usersByName = {}) {
     'Sphere Source': sphereSource,
     'Referred By': referredBy,
     Message: trim(person.message),
-    Description: trim(person.description),
-    Notes: trim(person.notes),
+    Description: description,
+    Notes: notes,
     ...related,
   };
 

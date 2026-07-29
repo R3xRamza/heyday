@@ -242,6 +242,10 @@ export default function ContactDetail() {
           <Field label="Anniversary" value={contact.anniversary} />
           <Field label="Sphere source" value={contact.sphere_source} />
           <Field label="Referred by" value={contact.referred_by} />
+          <Field label="Background" value={contact.description || contact.notes} />
+          {contact.description && contact.notes && contact.description !== contact.notes && (
+            <Field label="Notes" value={contact.notes} />
+          )}
 
           {relationships.length > 0 && (
             <div>

@@ -89,6 +89,7 @@ SQLite defaults to `heyday.db` in the project root locally. On Railway, attach a
 - Direction: **Follow Up Boss -> HEYDAY only** (read-only GET calls to FUB; no writes back).
 - Scope: contacts assigned to **Meredith Alderson**; excludes `Trash` and **Vendors** stage (vendors live under `/crm/vendors` only).
 - Behavior: upsert by FUB `external_id` (preserves contact row ids); removes stale / Vendors-stage contacts that are **not** linked from `vendors`.
+- Also pulls FUB **Background** into contact `notes`/`description` and imports timeline **Notes** into `contact_activity` (mailbox `fub`).
 - **Vendors table is never modified** by this sync (vendor seed is skipped; script aborts if vendors change).
 - Command: `npm run sync-crm-fub`
 
