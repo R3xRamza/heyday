@@ -81,4 +81,7 @@ if (process.env.NODE_ENV === 'production') {
 
 app.listen(PORT, () => {
   console.log(`HEYDAY server running on http://localhost:${PORT}`);
+  import('./lib/fubDailySync.js')
+    .then(({ startFubDailySyncScheduler }) => startFubDailySyncScheduler())
+    .catch((err) => console.error('[fub-sync] Scheduler failed to start:', err.message || err));
 });
