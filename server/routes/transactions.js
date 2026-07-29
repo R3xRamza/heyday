@@ -35,6 +35,8 @@ import {
   anniversaryWindowForDate,
   parseCustomFees,
   serializeCustomFees,
+  parseFeeAmounts,
+  serializeFeeAmounts,
   dealSortsBefore,
   resolveGrossCommission,
   normalizeGciMode,
@@ -92,7 +94,7 @@ const TX_FIELDS = [
   'address', 'city', 'state', 'zip', 'value', 'owner_name', 'representing', 'listing_visibility', 'stage',
   'important_date', 'important_date_label', 'close_date', 'listing_date',
   'acceptance_date', 'option_end_date', 'workflow_status', 'transaction_name',
-  'sale_type', 'gross_commission', 'commission_custom_fees',
+  'sale_type', 'gross_commission', 'commission_custom_fees', 'commission_fee_overrides',
   'commission_gci_mode', 'commission_gci_percent',
   'buyer_agreement_date', 'buyer_expiration_date',
   'client_name', 'owner_name', 'agent_id',
@@ -124,7 +126,7 @@ function buildCommissionSummary(tx) {
   let peers = [];
   if (appliesPlan && agentId) {
     peers = db.prepare(`
-      SELECT id, close_date, gross_commission, commission_custom_fees,
+      SELECT id, close_date, gross_commission, commission_custom_fees, commission_fee_overrides,
         stage, address, value, sale_type, representing
       FROM transactions
       WHERE agent_id = ?
@@ -146,7 +148,7 @@ function buildCommissionSummary(tx) {
   const gciMode = normalizeGciMode(tx.commission_gci_mode);
   const gciPercent = tx.commission_gci_percent != null && tx.commission_gci_percent !== ''
     ? Number(tx.commission_gci_percent)
-    : null;
+    : (gciMode === 'percent' ? 3 : null);
   const gci = resolveGrossCommission({
     mode: gciMode,
     grossCommission: tx.gross_commission,
@@ -155,8 +157,10 @@ function buildCommissionSummary(tx) {
   });
   const hasGci = gci != null && !Number.isNaN(gci) && gci >= 0;
 
+  const feeAmounts = parseFeeAmounts(tx.commission_fee_overrides);
   const overrides = {
     customFees: tx.commission_custom_fees,
+    feeAmounts,
     applyPlanFees: appliesPlan,
   };
 
@@ -211,6 +215,7 @@ function buildCommissionSummary(tx) {
     gross_commission: hasGci ? gci : null,
     sales_price: tx.value != null ? Number(tx.value) : null,
     custom_fees: parseCustomFees(tx.commission_custom_fees),
+    fee_amounts: feeAmounts,
     breakdown,
     progress: {
       capPaid,
@@ -567,6 +572,20 @@ router.patch('/:id/commission', (req, res) => {
     values.push(serialized);
   }
 
+  if ('fee_amounts' in req.body || 'commission_fee_overrides' in req.body) {
+    const raw = 'fee_amounts' in req.body ? req.body.fee_amounts : req.body.commission_fee_overrides;
+    if (raw != null && typeof raw !== 'object' && typeof raw !== 'string') {
+      return res.status(400).json({ error: 'fee_amounts must be an object' });
+    }
+    const amounts = parseFeeAmounts(raw);
+    const serialized = serializeFeeAmounts(amounts);
+    if (String(before.commission_fee_overrides || '{}') !== serialized) {
+      changes.push(formatFieldChange('fee amounts', before.commission_fee_overrides, serialized));
+    }
+    sets.push('commission_fee_overrides = ?');
+    values.push(serialized);
+  }
+
   if (sets.length > 0) {
     values.push(req.params.id);
     db.prepare(`UPDATE transactions SET ${sets.join(', ')} WHERE id = ?`).run(...values);
@@ -623,8 +642,11 @@ router.post('/', (req, res) => {
   if (!agent) return res.status(400).json({ error: 'Invalid agent_id' });
 
   const result = db.prepare(`
-    INSERT INTO transactions (address, city, state, zip, value, owner_name, client_name, agent_id, workflow_status, stage)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'details', 'active')
+    INSERT INTO transactions (
+      address, city, state, zip, value, owner_name, client_name, agent_id,
+      workflow_status, stage, commission_gci_mode, commission_gci_percent
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'details', 'active', 'percent', 3)
   `).run(
     normalized.address,
     normalized.city,
@@ -708,6 +730,8 @@ router.put('/:id', (req, res) => {
       val = normalizeGciMode(val);
     } else if (field === 'commission_custom_fees') {
       val = serializeCustomFees(val);
+    } else if (field === 'commission_fee_overrides') {
+      val = serializeFeeAmounts(val);
     } else if (field === 'agent_id') {
       val = val != null && val !== '' ? Number(val) : null;
       if (val) {

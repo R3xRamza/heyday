@@ -22,7 +22,7 @@ const router = Router();
 
 const DEAL_SELECT = `
   SELECT t.id, t.address, t.city, t.state, t.value, t.stage, t.representing, t.sale_type,
-    t.close_date, t.gross_commission, t.commission_custom_fees, t.agent_id,
+    t.close_date, t.gross_commission, t.commission_custom_fees, t.commission_fee_overrides, t.agent_id,
     t.client_name, u.name as agent_name
   FROM transactions t
   LEFT JOIN users u ON u.id = t.agent_id
