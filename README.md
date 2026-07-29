@@ -99,20 +99,22 @@ SQLite defaults to `heyday.db` in the project root locally. On Railway, attach a
 - Expected count is around 9,092 contacts and logs warning if outside 8,500-9,500.
 - Vendors fingerprint is checked before/after; any vendor change rolls back the sync.
 
-### Railway schedule (2:00 AM America/Chicago)
+### Daily schedule (2:00 AM America/Chicago)
 
-Use a dedicated Railway Cron service with command:
+In **production**, the main Hub server schedules `npm run sync-crm-fub` automatically at **2:00 AM America/Chicago** (requires `FUB_API_KEY`). Disable with `FUB_DAILY_SYNC=0`. Force-enable in non-production with `FUB_DAILY_SYNC=1`.
+
+You can still run a dedicated Railway Cron with the same command if you prefer a separate job — not required when the web service stays up.
+
+Manual one-off:
 
 ```bash
 npm run sync-crm-fub
 ```
 
-Use one of these UTC cron expressions:
+Optional UTC cron (only if using a separate Cron service instead):
 
 - `0 7 * * *` during CDT (UTC-5, roughly Mar-Nov)
 - `0 8 * * *` during CST (UTC-6, roughly Nov-Mar)
-
-If your cron runner supports timezone-aware schedules, set timezone to `America/Chicago` and schedule 2:00 AM daily.
 
 ## Changelog — 2026-06-18
 
