@@ -12,7 +12,7 @@ import BuyerRepIcons from './BuyerRepIcons';
 import OpportunityTableHead, { TD } from './OpportunityTableHead';
 
 const SELECT =
-  'buyer-flat-select w-full min-w-0 max-w-[11rem] -ml-1 pl-0 py-1 text-xs font-semibold bg-transparent border-0 shadow-none text-on-surface cursor-pointer focus:outline-none focus:ring-0';
+  'buyer-flat-select w-full min-w-0 pl-0 py-1 text-xs font-semibold bg-transparent border-0 shadow-none text-on-surface cursor-pointer focus:outline-none focus:ring-0';
 
 function TextCell({ children, className = '', title, style }) {
   return (
@@ -38,7 +38,7 @@ export default function BuyerOpportunitiesTable({
 }) {
   const columns = visibleColumnDefs('buyers', prefs);
   const widths = prefs.widths || {};
-  // Exact sum of column widths — do not force minWidth 100% (that redistributes siblings on resize).
+  // Sum of fixed columns. Spacer col absorbs leftover width so siblings don't redistribute on resize.
   const totalMin = columns.reduce((sum, c) => sum + (widths[c.id] ?? c.defaultWidth), 0);
 
   function renderCell(col, row) {
@@ -133,11 +133,16 @@ export default function BuyerOpportunitiesTable({
 
   return (
     <div className="hidden md:block w-full overflow-auto border border-outline-variant/20 rounded-lg bg-white max-h-[calc(100vh-16rem)]">
-      <table className="border-collapse table-fixed" style={{ width: totalMin }}>
+      <table
+        className="border-collapse table-fixed w-full"
+        style={{ minWidth: totalMin }}
+      >
         <colgroup>
           {columns.map((c) => (
             <col key={c.id} style={{ width: widths[c.id] ?? c.defaultWidth }} />
           ))}
+          {/* Flexible spacer — leftover viewport width lands here, not on data columns */}
+          <col />
         </colgroup>
         <OpportunityTableHead
           columns={columns}
@@ -147,6 +152,7 @@ export default function BuyerOpportunitiesTable({
           onSort={onSort}
           onReorder={onReorder}
           onResize={onResize}
+          trailingSpacer
         />
         <tbody>
           {rows.map((row) => (
@@ -156,6 +162,7 @@ export default function BuyerOpportunitiesTable({
               onClick={() => onEdit(row)}
             >
               {columns.map((col) => renderCell(col, row))}
+              <td className={`${TD} p-0 border-b border-outline-variant/10`} aria-hidden />
             </tr>
           ))}
         </tbody>
