@@ -109,6 +109,12 @@ function portfolioTodayStr() {
 export function transactionPortfolioType(tx) {
   if (!tx) return 'Active';
   if (tx.stage === 'closed') return 'Closed';
+
+  // Rent/lease deals show sale type in the Type column (not a list filter).
+  if (normalizeSaleType(tx.sale_type, tx.representing) === SALE_TYPE_RENT_LEASE) {
+    return 'Rent/lease';
+  }
+
   if (isUnderContract(tx)) {
     if (isListingSideRepresenting(normalizeRepresenting(tx.representing))) {
       return 'Pending listing';
