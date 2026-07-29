@@ -345,10 +345,17 @@ export default function Opportunities() {
           </button>
         </header>
 
-        <OpportunityKpis items={allForPills} kind={tab === 'buyers' ? 'buyer' : 'seller'} />
+        {tab === 'buyers' ? (
+          <OpportunityKpis items={allForPills} kind="buyer" />
+        ) : null}
 
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          {statusOptions.length > 0 ? (
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          {tab === 'sellers' && (
+            <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant shrink-0">
+              {allForPills.length} total
+            </span>
+          )}
+          {statusOptions.length > 0 && (
             <nav className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 flex-1 min-w-0">
               <button
                 type="button"
@@ -378,16 +385,16 @@ export default function Opportunities() {
                 );
               })}
             </nav>
-          ) : (
-            <div className="flex-1 min-w-0" aria-hidden />
           )}
           {prefsReady && (
-            <OpportunityTableColumnsMenu
-              kind={tab}
-              prefs={activePrefs}
-              onChange={handleColumnsChange}
-              onReset={handleResetColumns}
-            />
+            <div className="ml-auto shrink-0">
+              <OpportunityTableColumnsMenu
+                kind={tab}
+                prefs={activePrefs}
+                onChange={handleColumnsChange}
+                onReset={handleResetColumns}
+              />
+            </div>
           )}
         </div>
 
