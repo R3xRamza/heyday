@@ -1,6 +1,6 @@
 import { Pencil, Trash2 } from 'lucide-react';
 import OpportunityStatusBadge from './OpportunityStatusBadge';
-import { formatSellerPrice } from '../../utils/sellerOpportunity';
+import { formatSellerPrice, formatSellerAddressDisplay } from '../../utils/sellerOpportunity';
 
 function metaJoin(...parts) {
   return parts.map((p) => String(p || '').trim()).filter(Boolean).join(' · ');
@@ -58,7 +58,9 @@ export default function OpportunitySellerCards({ rows, onEdit, onDelete }) {
                 </div>
               </div>
 
-              <p className="font-semibold text-primary text-base leading-snug mb-1">{row.property_address}</p>
+              <p className="font-semibold text-primary text-base leading-snug mb-1">
+                {formatSellerAddressDisplay(row.property_address)}
+              </p>
               {meta && (
                 <p className="text-sm text-on-surface-variant truncate mb-0.5">{meta}</p>
               )}
