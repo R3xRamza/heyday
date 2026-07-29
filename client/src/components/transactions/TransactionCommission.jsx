@@ -116,34 +116,60 @@ function UnitValueField({
 
 function FeeAmountField({ value, onCommit }) {
   const [text, setText] = useState(value == null || value === '' ? '' : String(value));
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     setText(value == null || value === '' ? '' : String(value));
   }, [value]);
 
+  const display = value == null || Number.isNaN(Number(value))
+    ? '$0'
+    : formatMoney(Number(value) === 0 ? 0 : -Math.abs(Number(value)));
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        title="Click to edit"
+        onClick={() => setEditing(true)}
+        className={`tabular-nums font-semibold shrink-0 text-right hover:underline decoration-outline-variant/40 underline-offset-2 cursor-text ${
+          Number(value) > 0 ? 'text-error' : 'text-on-surface-variant'
+        }`}
+      >
+        {Number(value) === 0 ? '$0' : display}
+      </button>
+    );
+  }
+
   return (
-    <div className="relative w-[7.5rem] shrink-0">
-      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-xs">$</span>
-      <input
-        type="text"
-        inputMode="decimal"
-        value={text}
-        onChange={(e) => {
-          const raw = e.target.value.replace(/[^0-9.]/g, '');
-          setText(raw);
-        }}
-        onBlur={() => {
-          if (text === '' || text === '.') {
-            onCommit(0);
-            setText('0');
-            return;
-          }
-          const n = Number(text);
-          if (!Number.isNaN(n) && n >= 0) onCommit(n);
-        }}
-        className="w-full pl-6 pr-2 py-1.5 rounded-lg bg-surface-container-low border border-outline-variant/15 text-sm text-primary font-semibold tabular-nums text-right focus:outline-none focus:ring-2 focus:ring-secondary/30"
-      />
-    </div>
+    <input
+      type="text"
+      inputMode="decimal"
+      autoFocus
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value.replace(/[^0-9.]/g, '');
+        setText(raw);
+      }}
+      onBlur={() => {
+        setEditing(false);
+        if (text === '' || text === '.') {
+          onCommit(0);
+          setText('0');
+          return;
+        }
+        const n = Number(text);
+        if (!Number.isNaN(n) && n >= 0) onCommit(n);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') {
+          setText(value == null || value === '' ? '' : String(value));
+          setEditing(false);
+        }
+      }}
+      className="w-[6.5rem] shrink-0 px-1 py-0.5 bg-transparent border-0 border-b border-secondary/50 text-sm text-primary font-semibold tabular-nums text-right focus:outline-none"
+    />
   );
 }
 
