@@ -17,7 +17,7 @@ import {
 export const MIN_COLUMN_WIDTH = 80;
 
 export const BUYER_COLUMNS = [
-  { id: 'rep', label: 'Rep', pinned: 'start', sortable: false, defaultWidth: 48 },
+  { id: 'rep', label: 'Rep', pinned: 'start', sortable: false, defaultWidth: 72 },
   { id: 'buyer_name', label: 'Buyers', pinned: null, sortable: true, defaultWidth: 160 },
   { id: 'status', label: 'Status', pinned: null, sortable: true, defaultWidth: 120 },
   { id: 'budget', label: 'Budget', pinned: null, sortable: true, defaultWidth: 100 },
@@ -97,7 +97,7 @@ export function normalizeOpportunityTablePrefs(kind, raw) {
     for (const c of cols) {
       const n = Number(src.widths[c.id]);
       if (Number.isFinite(n)) {
-        const floor = c.id === 'rep' ? 40 : MIN_COLUMN_WIDTH;
+        const floor = c.id === 'rep' ? 56 : MIN_COLUMN_WIDTH;
         widths[c.id] = Math.max(floor, Math.round(n));
       }
     }
@@ -178,7 +178,7 @@ export function reorderColumn(prefs, draggedId, targetId, kind) {
 export function setColumnWidth(prefs, columnId, widthPx, kind) {
   const col = columnsForKind(kind).find((c) => c.id === columnId);
   if (!col) return prefs;
-  const floor = columnId === 'rep' ? 40 : MIN_COLUMN_WIDTH;
+  const floor = columnId === 'rep' ? 56 : MIN_COLUMN_WIDTH;
   return normalizeOpportunityTablePrefs(kind, {
     ...prefs,
     widths: {

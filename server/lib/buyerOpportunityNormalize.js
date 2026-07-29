@@ -194,16 +194,155 @@ export function resolveBuyerPriceFields({ price_min, price_max, price } = {}) {
   return { price_min: null, price_max: null, price: null };
 }
 
+function parseRepExpiryDate(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const d = new Date(`${s.slice(0, 10)}T12:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const m = s.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if (!m) return null;
+  let year = Number(m[3]);
+  if (year < 100) year += 2000;
+  const d = new Date(year, Number(m[1]) - 1, Number(m[2]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function toYmd(date) {
+  if (!date || Number.isNaN(date.getTime())) return null;
+  const y = date.getFullYear();
+  const mo = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${d}`;
+}
+
+/** @returns {{ signed: boolean, expires_on: string|null }} */
+export function parseBuyerRep(rowOrSigned, maybeExpires) {
+  let signedRaw;
+  let expiresRaw;
+  if (rowOrSigned != null && typeof rowOrSigned === 'object' && !Array.isArray(rowOrSigned)) {
+    signedRaw = rowOrSigned.buyer_rep_signed;
+    expiresRaw = rowOrSigned.buyer_rep_expires_on;
+  } else {
+    signedRaw = rowOrSigned;
+    expiresRaw = maybeExpires;
+  }
+
+  let expires_on = null;
+  if (expiresRaw != null && String(expiresRaw).trim() !== '') {
+    const fromCol = parseRepExpiryDate(expiresRaw);
+    if (fromCol) expires_on = toYmd(fromCol);
+  }
+  if (!expires_on && signedRaw != null) {
+    const fromSigned = parseRepExpiryDate(signedRaw);
+    if (fromSigned) expires_on = toYmd(fromSigned);
+  }
+
+  const s = String(signedRaw ?? '').trim();
+  const lower = s.toLowerCase();
+  const looksNo = !s
+    || lower === 'n'
+    || lower === 'no'
+    || lower === '?'
+    || lower === 'x'
+    || /^n[\s\-.]/i.test(s);
+
+  let signed = false;
+  if (looksNo && !expires_on) {
+    signed = false;
+  } else if (
+    /^y\b/i.test(s)
+    || lower === 'y'
+    || lower.includes('yes')
+    || lower.includes('signed')
+    || (expires_on && !looksNo)
+  ) {
+    signed = true;
+  } else if (expires_on) {
+    signed = true;
+  } else if (s && !looksNo) {
+    signed = true;
+  }
+
+  return { signed, expires_on };
+}
+
+export function encodeBuyerRepStorage({ signed, expires_on }) {
+  if (!signed) {
+    return { buyer_rep_signed: null, buyer_rep_expires_on: null };
+  }
+  let expires = null;
+  if (expires_on != null && String(expires_on).trim() !== '') {
+    const d = parseRepExpiryDate(expires_on);
+    expires = d ? toYmd(d) : String(expires_on).trim().slice(0, 10);
+  }
+  return { buyer_rep_signed: 'Y', buyer_rep_expires_on: expires };
+}
+
+/** Resolve body fields for buyer rep (checkbox + date). Dropbox ignored. */
+export function resolveBuyerRepFields(body = {}, existing = {}) {
+  const hasSigned = Object.prototype.hasOwnProperty.call(body, 'buyer_rep_signed')
+    || Object.prototype.hasOwnProperty.call(body, 'buyer_rep_is_signed');
+  const hasExpires = Object.prototype.hasOwnProperty.call(body, 'buyer_rep_expires_on');
+
+  if (!hasSigned && !hasExpires) {
+    const parsed = parseBuyerRep(existing);
+    return encodeBuyerRepStorage(parsed);
+  }
+
+  const base = parseBuyerRep(existing);
+  let signed = base.signed;
+  let expires_on = base.expires_on;
+
+  if (hasExpires) {
+    const raw = body.buyer_rep_expires_on;
+    if (raw == null || String(raw).trim() === '') expires_on = null;
+    else {
+      const d = parseRepExpiryDate(raw);
+      expires_on = d ? toYmd(d) : String(raw).trim().slice(0, 10);
+    }
+  }
+
+  if (hasSigned) {
+    const raw = body.buyer_rep_is_signed ?? body.buyer_rep_signed;
+    if (typeof raw === 'boolean') signed = raw;
+    else if (raw == null || raw === '') signed = false;
+    else {
+      const parsed = parseBuyerRep(raw, expires_on);
+      signed = parsed.signed;
+      if (!hasExpires && parsed.expires_on) expires_on = parsed.expires_on;
+    }
+  }
+
+  if (!signed) expires_on = null;
+  return encodeBuyerRepStorage({ signed, expires_on });
+}
+
 /** Normalize status/preapproval/timing and backfill price_min/max from legacy price text. */
 export function normalizeBuyerOpportunityRows(db) {
+  const cols = db.prepare('PRAGMA table_info(opportunity_buyers)').all().map((c) => c.name);
+  const hasExpires = cols.includes('buyer_rep_expires_on');
+
   const rows = db.prepare(
-    'SELECT id, status, preapproval, timing, price, price_min, price_max FROM opportunity_buyers',
+    hasExpires
+      ? 'SELECT id, status, preapproval, timing, price, price_min, price_max, buyer_rep_signed, buyer_rep_expires_on FROM opportunity_buyers'
+      : 'SELECT id, status, preapproval, timing, price, price_min, price_max, buyer_rep_signed FROM opportunity_buyers',
   ).all();
-  const update = db.prepare(`
-    UPDATE opportunity_buyers
-    SET status = ?, preapproval = ?, timing = ?, price = ?, price_min = ?, price_max = ?
-    WHERE id = ?
-  `);
+
+  const update = hasExpires
+    ? db.prepare(`
+        UPDATE opportunity_buyers
+        SET status = ?, preapproval = ?, timing = ?, price = ?, price_min = ?, price_max = ?,
+            buyer_rep_signed = ?, buyer_rep_expires_on = ?, buyer_rep_dropbox = NULL
+        WHERE id = ?
+      `)
+    : db.prepare(`
+        UPDATE opportunity_buyers
+        SET status = ?, preapproval = ?, timing = ?, price = ?, price_min = ?, price_max = ?
+        WHERE id = ?
+      `);
+
   let n = 0;
   const tx = db.transaction(() => {
     for (const row of rows) {
@@ -232,15 +371,34 @@ export function normalizeBuyerOpportunityRows(db) {
         if (display) price = display;
       }
 
-      const changed = status !== row.status
-        || (mappedPre != null && mappedPre !== row.preapproval)
-        || (mappedTiming != null && mappedTiming !== row.timing)
-        || priceMin !== row.price_min
-        || priceMax !== row.price_max
-        || price !== row.price;
-      if (changed) {
-        update.run(status, preapproval, timing, price, priceMin, priceMax, row.id);
-        n += 1;
+      if (hasExpires) {
+        const rep = encodeBuyerRepStorage(parseBuyerRep(row));
+        const changed = status !== row.status
+          || (mappedPre != null && mappedPre !== row.preapproval)
+          || (mappedTiming != null && mappedTiming !== row.timing)
+          || priceMin !== row.price_min
+          || priceMax !== row.price_max
+          || price !== row.price
+          || rep.buyer_rep_signed !== row.buyer_rep_signed
+          || rep.buyer_rep_expires_on !== row.buyer_rep_expires_on;
+        if (changed) {
+          update.run(
+            status, preapproval, timing, price, priceMin, priceMax,
+            rep.buyer_rep_signed, rep.buyer_rep_expires_on, row.id,
+          );
+          n += 1;
+        }
+      } else {
+        const changed = status !== row.status
+          || (mappedPre != null && mappedPre !== row.preapproval)
+          || (mappedTiming != null && mappedTiming !== row.timing)
+          || priceMin !== row.price_min
+          || priceMax !== row.price_max
+          || price !== row.price;
+        if (changed) {
+          update.run(status, preapproval, timing, price, priceMin, priceMax, row.id);
+          n += 1;
+        }
       }
     }
   });

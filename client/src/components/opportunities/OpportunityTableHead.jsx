@@ -20,7 +20,7 @@ export default function OpportunityTableHead({
   const dragCol = useRef(null);
 
   const startResize = useCallback((colId, startX, startW) => {
-    const floor = colId === 'rep' ? 40 : MIN_COLUMN_WIDTH;
+    const floor = colId === 'rep' ? 56 : MIN_COLUMN_WIDTH;
     function onMove(e) {
       const next = Math.max(floor, startW + (e.clientX - startX));
       onResize(colId, next);

@@ -8,7 +8,7 @@ import {
   normalizePreapproval,
   visibleColumnDefs,
 } from '../../utils/opportunityTablePrefs';
-import BuyerRepDropboxIcons from './BuyerRepDropboxIcons';
+import BuyerRepIcons from './BuyerRepIcons';
 import OpportunityTableHead, { TD } from './OpportunityTableHead';
 
 const SELECT =
@@ -38,11 +38,13 @@ export default function BuyerOpportunitiesTable({
 }) {
   const columns = visibleColumnDefs('buyers', prefs);
   const widths = prefs.widths || {};
+  // Exact sum of column widths — do not force minWidth 100% (that redistributes siblings on resize).
   const totalMin = columns.reduce((sum, c) => sum + (widths[c.id] ?? c.defaultWidth), 0);
 
   function renderCell(col, row) {
     const style = cellStyle(widths, col.id, col.defaultWidth);
     const status = normalizeBuyerStatus(row.status);
+    const statusValue = status === 'closed' ? 'active' : status;
     const timing = normalizeBuyerTiming(row.timing) || '';
     const pre = normalizePreapproval(row.preapproval);
     const priceLabel = formatBuyerPrice(row);
@@ -51,9 +53,9 @@ export default function BuyerOpportunitiesTable({
       case 'rep':
         return (
           <td key={col.id} className={TD} style={style}>
-            <BuyerRepDropboxIcons
+            <BuyerRepIcons
               buyerRepSigned={row.buyer_rep_signed}
-              buyerRepDropbox={row.buyer_rep_dropbox}
+              buyerRepExpiresOn={row.buyer_rep_expires_on}
             />
           </td>
         );
@@ -68,7 +70,7 @@ export default function BuyerOpportunitiesTable({
           <td key={col.id} className={TD} style={style} onClick={(e) => e.stopPropagation()}>
             <select
               className={SELECT}
-              value={status}
+              value={statusValue}
               aria-label="Status"
               onChange={(e) => onPatch(row.id, { status: e.target.value })}
             >
@@ -131,7 +133,7 @@ export default function BuyerOpportunitiesTable({
 
   return (
     <div className="hidden md:block w-full overflow-auto border border-outline-variant/20 rounded-lg bg-white max-h-[calc(100vh-16rem)]">
-      <table className="border-collapse table-fixed" style={{ width: totalMin, minWidth: '100%' }}>
+      <table className="border-collapse table-fixed" style={{ width: totalMin }}>
         <colgroup>
           {columns.map((c) => (
             <col key={c.id} style={{ width: widths[c.id] ?? c.defaultWidth }} />

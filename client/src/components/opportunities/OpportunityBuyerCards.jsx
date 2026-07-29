@@ -1,5 +1,5 @@
 import OpportunityStatusBadge from './OpportunityStatusBadge';
-import BuyerRepDropboxIcons from './BuyerRepDropboxIcons';
+import BuyerRepIcons from './BuyerRepIcons';
 import {
   buyerTimingLabel,
   formatBuyerPrice,
@@ -46,9 +46,9 @@ export default function OpportunityBuyerCards({ rows, onEdit }) {
                     </span>
                   )}
                 </div>
-                <BuyerRepDropboxIcons
+                <BuyerRepIcons
                   buyerRepSigned={row.buyer_rep_signed}
-                  buyerRepDropbox={row.buyer_rep_dropbox}
+                  buyerRepExpiresOn={row.buyer_rep_expires_on}
                   layout="row"
                   size={15}
                 />

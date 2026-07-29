@@ -5,6 +5,11 @@ export const BUYER_STATUSES = [
   { value: 'option_period', label: 'Option period' },
   { value: 'active', label: 'Active' },
   { value: 'on_hold', label: 'On hold' },
+];
+
+/** Includes legacy closed for display labels only — not selectable. */
+const BUYER_STATUS_LABELS = [
+  ...BUYER_STATUSES,
   { value: 'closed', label: 'Closed' },
 ];
 
@@ -24,13 +29,16 @@ export const BUYER_PREAPPROVALS = [
   { value: 'cash', label: 'Cash' },
 ];
 
-const CANONICAL_STATUS = new Set(BUYER_STATUSES.map((s) => s.value));
+const CANONICAL_STATUS = new Set([
+  ...BUYER_STATUSES.map((s) => s.value),
+  'closed',
+]);
 const CANONICAL_TIMING = new Set(BUYER_TIMINGS.map((s) => s.value));
 const CANONICAL_PRE = new Set(BUYER_PREAPPROVALS.map((s) => s.value));
 
 export function buyerStatusLabel(value) {
   const v = normalizeBuyerStatus(value);
-  return BUYER_STATUSES.find((s) => s.value === v)?.label || 'Active';
+  return BUYER_STATUS_LABELS.find((s) => s.value === v)?.label || 'Active';
 }
 
 export function buyerTimingLabel(value) {
@@ -44,7 +52,6 @@ export function normalizeBuyerStatus(raw) {
   const s = String(raw).trim();
   const lower = s.toLowerCase();
   if (CANONICAL_STATUS.has(lower)) return lower;
-  // Legacy
   if (lower === 'under_contract' || lower.includes('under contract') || lower.includes('leaseback')) {
     return 'pending';
   }
@@ -65,7 +72,6 @@ export function normalizeBuyerTiming(raw) {
   const s = String(raw).trim();
   const lower = s.toLowerCase();
   if (CANONICAL_TIMING.has(lower)) return lower;
-  // Legacy timing values
   if (lower === 'flexible' || lower === 'lease_driven' || lower === 'on_hold') {
     if (lower === 'lease_driven') return 'near_term';
     if (lower === 'on_hold') return 'casual';
@@ -144,16 +150,11 @@ function scalePriceNumber(n, suffix) {
   const suf = (suffix || '').toLowerCase();
   if (suf === 'm') return Math.round(n * 1_000_000);
   if (suf === 'k') return Math.round(n * 1_000);
-  // Bare numbers: < 20 → millions; 20–9999 → thousands; else dollars
   if (n > 0 && n < 20) return Math.round(n * 1_000_000);
   if (n >= 20 && n < 10000) return Math.round(n * 1_000);
   return Math.round(n);
 }
 
-/**
- * Parse freeform price text into { min, max }.
- * Examples: "2.7", ">1.3M", "900-", "2.5M - 3.5M", "Up to $5M", "$450-500K"
- */
 export function parseBuyerPriceText(raw) {
   if (raw == null || String(raw).trim() === '') return { min: null, max: null };
   const original = String(raw).trim();
@@ -165,7 +166,6 @@ export function parseBuyerPriceText(raw) {
     || lower.startsWith('<');
   const atLeast = lower.startsWith('>') || lower.startsWith('≥') || /\bmin\b/i.test(lower);
 
-  // Split ranges on – — - or "to"
   const rangeParts = original.split(/\s*(?:–|—|to)\s*|\s+-\s*|(?<=\d)\s*-\s*(?=\d)/i);
   if (rangeParts.length >= 2) {
     const a = parsePriceAmount(rangeParts[0].replace(/^[<>]=?\s*/, ''));
@@ -177,7 +177,6 @@ export function parseBuyerPriceText(raw) {
     if (a == null && b != null) return { min: null, max: b };
   }
 
-  // Trailing dash like "900-" → min only
   if (/[-\u2013\u2014]\s*$/.test(original)) {
     const min = parsePriceAmount(original.replace(/[-\u2013\u2014]\s*$/, '').replace(/^[<>]=?\s*/, ''));
     return { min, max: null };
@@ -206,7 +205,6 @@ export function formatCompactDollars(n) {
   return `$${Math.round(v).toLocaleString()}`;
 }
 
-/** Display price from min/max (falls back to legacy price text). */
 export function formatBuyerPrice(rowOrMin, maybeMax) {
   let min;
   let max;
@@ -233,7 +231,6 @@ export function formatBuyerPrice(rowOrMin, maybeMax) {
   return '—';
 }
 
-/** Sync display `price` text from numeric bounds. */
 export function priceDisplayFromBounds(min, max) {
   const label = formatBuyerPrice(min, max);
   return label === '—' ? null : label;
@@ -272,7 +269,11 @@ export function resolveBuyerPriceFields({ price_min, price_max, price }) {
 /** Parse a date from buyer_rep_signed strings like "Y- 9/30/2026". */
 export function parseRepExpiryDate(raw) {
   if (!raw) return null;
-  const s = String(raw);
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    const d = new Date(`${s.slice(0, 10)}T12:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
   const m = s.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
   if (!m) return null;
   let year = Number(m[3]);
@@ -284,35 +285,111 @@ export function parseRepExpiryDate(raw) {
   return d;
 }
 
-export function isDropboxYes(raw) {
-  if (!raw) return false;
-  const lower = String(raw).trim().toLowerCase();
-  if (!lower || lower === 'n' || lower === 'no' || lower === '?' || lower === 'x') return false;
-  if (lower === 'y' || lower === 'yes' || lower.startsWith('y')) return true;
-  return false;
+export function toYmd(date) {
+  if (!date || Number.isNaN(date.getTime())) return null;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 /**
+ * Canonical buyer rep model from row or legacy signed string.
+ * @returns {{ signed: boolean, expires_on: string|null }}
+ */
+export function parseBuyerRep(rowOrSigned, maybeExpires) {
+  let signedRaw;
+  let expiresRaw;
+  if (rowOrSigned != null && typeof rowOrSigned === 'object' && !Array.isArray(rowOrSigned)) {
+    signedRaw = rowOrSigned.buyer_rep_signed;
+    expiresRaw = rowOrSigned.buyer_rep_expires_on;
+  } else {
+    signedRaw = rowOrSigned;
+    expiresRaw = maybeExpires;
+  }
+
+  let expires_on = null;
+  if (expiresRaw != null && String(expiresRaw).trim() !== '') {
+    const fromCol = parseRepExpiryDate(expiresRaw);
+    if (fromCol) expires_on = toYmd(fromCol);
+  }
+  if (!expires_on && signedRaw != null) {
+    const fromSigned = parseRepExpiryDate(signedRaw);
+    if (fromSigned) expires_on = toYmd(fromSigned);
+  }
+
+  const s = String(signedRaw ?? '').trim();
+  const lower = s.toLowerCase();
+  const looksNo = !s
+    || lower === 'n'
+    || lower === 'no'
+    || lower === '?'
+    || lower === 'x'
+    || /^n[\s\-.]/i.test(s);
+
+  let signed = false;
+  if (looksNo && !expires_on) {
+    signed = false;
+  } else if (
+    /^y\b/i.test(s)
+    || lower === 'y'
+    || lower.includes('yes')
+    || lower.includes('signed')
+    || (expires_on && !looksNo)
+  ) {
+    signed = true;
+  } else if (expires_on) {
+    // Legacy "Y- date" already extracted; treat as signed
+    signed = true;
+  } else if (s && !looksNo) {
+    signed = true;
+  }
+
+  return { signed, expires_on };
+}
+
+/** Persist helpers — signed flag as Y/N; expiry as YYYY-MM-DD. */
+export function encodeBuyerRepStorage({ signed, expires_on }) {
+  if (!signed) {
+    return { buyer_rep_signed: null, buyer_rep_expires_on: null };
+  }
+  return {
+    buyer_rep_signed: 'Y',
+    buyer_rep_expires_on: expires_on || null,
+  };
+}
+
+export function formatRepExpiryLabel(expiresOn) {
+  if (!expiresOn) return null;
+  const d = parseRepExpiryDate(expiresOn);
+  if (!d) return null;
+  return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+}
+
+/**
+ * @param {string|{signed?:boolean,expires_on?:string|null}|null} raw
  * @returns {'ok'|'soon'|'expired'|'missing'}
  */
 export function repExpiryTone(raw) {
-  const s = String(raw || '').trim();
-  if (!s) return 'missing';
-  const lower = s.toLowerCase();
-  const looksNo = lower === 'n' || lower === 'no' || lower.startsWith('n-') || lower.startsWith('n ');
-  if (looksNo && !parseRepExpiryDate(s)) return 'missing';
+  const rep = raw != null && typeof raw === 'object' && 'signed' in raw
+    ? raw
+    : parseBuyerRep(raw);
+  if (!rep.signed) return 'missing';
+  if (!rep.expires_on) return 'ok';
 
-  const d = parseRepExpiryDate(s);
-  if (!d) {
-    if (/^y\b/i.test(s) || lower.includes('yes') || lower.includes('signed')) return 'ok';
-    return 'missing';
-  }
+  const d = parseRepExpiryDate(rep.expires_on);
+  if (!d) return 'ok';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const end = new Date(d);
   end.setHours(0, 0, 0, 0);
   const days = Math.round((end - today) / (24 * 60 * 60 * 1000));
   if (days < 0) return 'expired';
-  if (days <= 30) return 'soon';
+  if (days <= 14) return 'soon';
   return 'ok';
+}
+
+/** @deprecated Dropbox removed — always false. */
+export function isDropboxYes() {
+  return false;
 }

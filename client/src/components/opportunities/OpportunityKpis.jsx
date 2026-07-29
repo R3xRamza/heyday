@@ -20,7 +20,8 @@ export default function OpportunityKpis({ items, kind }) {
       return a[0].localeCompare(b[0]);
     });
   } else {
-    const order = ['pending', 'option_period', 'active', 'on_hold', 'closed'];
+    const order = ['pending', 'option_period', 'active', 'on_hold'];
+    entries = entries.filter(([status]) => status !== 'closed');
     entries.sort((a, b) => {
       const ia = order.indexOf(a[0]);
       const ib = order.indexOf(b[0]);
