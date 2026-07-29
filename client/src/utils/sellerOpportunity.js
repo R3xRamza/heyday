@@ -89,6 +89,20 @@ export function parseSellerAddressLine(raw) {
   return { street, apt, city, state, zip };
 }
 
+/** Table/card label: street + apt only (no city / state / ZIP). */
+export function formatSellerAddressDisplay(raw) {
+  const { street, apt } = parseSellerAddressLine(raw);
+  if (!street && !apt) {
+    const fallback = trimStr(raw);
+    return fallback || '—';
+  }
+  if (apt) {
+    const aptPart = apt.startsWith('#') ? apt : `#${apt}`;
+    return street ? `${street} ${aptPart}` : aptPart;
+  }
+  return street;
+}
+
 /** Compact price label — same rules as buyer budget; falls back to legacy price_range. */
 export function formatSellerPrice(row) {
   if (row == null || typeof row !== 'object') return formatBuyerPrice(row);

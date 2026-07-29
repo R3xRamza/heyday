@@ -2,7 +2,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import OpportunityStatusBadge from './OpportunityStatusBadge';
 import OpportunityTableHead, { TD } from './OpportunityTableHead';
 import { visibleColumnDefs } from '../../utils/opportunityTablePrefs';
-import { formatSellerPrice } from '../../utils/sellerOpportunity';
+import { formatSellerPrice, formatSellerAddressDisplay } from '../../utils/sellerOpportunity';
 
 const TD_MUTED = `${TD} text-on-surface-variant`;
 
@@ -41,12 +41,14 @@ export default function SellerOpportunitiesTable({
             <OpportunityStatusBadge status={row.status} kind="seller" />
           </td>
         );
-      case 'property_address':
+      case 'property_address': {
+        const label = formatSellerAddressDisplay(row.property_address);
         return (
-          <td key={col.id} className={`${TD} font-semibold text-primary`} style={style}>
-            <span className="line-clamp-2">{row.property_address}</span>
+          <td key={col.id} className={`${TD} font-semibold text-primary`} style={style} title={row.property_address || label}>
+            <span className="line-clamp-2">{label}</span>
           </td>
         );
+      }
       case 'seller_name':
         return <Cell key={col.id} title={row.seller_name} style={style}>{row.seller_name}</Cell>;
       case 'timing':
