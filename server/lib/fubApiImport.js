@@ -79,7 +79,7 @@ export const FUB_CONTACT_FIELDS = [
   'stage', 'source', 'assignedTo', 'assignedUserId', 'contacted',
   'price', 'timeframeId', 'lastActivity',
   'tags', 'emails', 'phones', 'addresses', 'relationships',
-  'background', 'notes', 'description', 'message',
+  'background',
   'customFields', 'allCustom',
 ];
 
