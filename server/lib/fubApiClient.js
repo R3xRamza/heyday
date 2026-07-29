@@ -114,3 +114,44 @@ export async function fetchAllPeopleForAssignedUser(apiKey, assignedUserId, fiel
 
   return { people, expectedTotal };
 }
+
+/** Paginate all FUB timeline notes (optional personId filter). */
+export async function fetchAllNotes(apiKey, { personId } = {}) {
+  let nextLink = null;
+  let offset = 0;
+  const notes = [];
+  let expectedTotal = null;
+
+  while (true) {
+    const url = nextLink
+      ? new URL(nextLink)
+      : buildUrl('/notes', {
+        limit: PAGE_LIMIT,
+        offset,
+        ...(personId != null ? { personId } : {}),
+      });
+
+    const data = await fetchJson(url, apiKey);
+    const page = Array.isArray(data.notes) ? data.notes : [];
+    notes.push(...page);
+
+    const meta = data._metadata || {};
+    if (Number.isFinite(meta.total)) expectedTotal = meta.total;
+    if (notes.length > 0 && notes.length % 1000 === 0) {
+      console.log(`Fetched ${notes.length} notes from FUB...`);
+    }
+
+    if (meta.nextLink) {
+      nextLink = meta.nextLink;
+      continue;
+    }
+    if (meta.next) {
+      nextLink = buildUrl('/notes', { next: meta.next }).toString();
+      continue;
+    }
+    if (page.length < PAGE_LIMIT) break;
+    offset += PAGE_LIMIT;
+  }
+
+  return { notes, expectedTotal };
+}
