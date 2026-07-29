@@ -62,7 +62,7 @@ export function defaultOpportunityTablePrefs(kind) {
   const cols = columnsForKind(kind);
   return {
     columnOrder: cols.map((c) => c.id),
-    hidden: [],
+    hidden: kind === 'sellers' ? ['status'] : [],
     widths: Object.fromEntries(cols.map((c) => [c.id, c.defaultWidth])),
     sortKey: null,
     sortDir: null,
@@ -95,7 +95,7 @@ export function normalizeOpportunityTablePrefs(kind, raw) {
   columnOrder = enforcePinnedOrder(kind, columnOrder);
 
   const hideable = cols.filter((c) => !c.pinned).map((c) => c.id);
-  let hidden = (Array.isArray(src.hidden) ? src.hidden.map(String) : [])
+  let hidden = (Array.isArray(src.hidden) ? src.hidden.map(String) : [...defaults.hidden])
     .filter((id) => known.has(id) && !pinned.has(id));
   const visibleHideable = hideable.filter((id) => !hidden.includes(id));
   if (visibleHideable.length === 0 && hideable.length > 0) {
@@ -253,8 +253,13 @@ function sellerSortValue(row, key) {
       return row.seller_name || '';
     case 'timing':
       return row.timing || '';
-    case 'price_range':
+    case 'price_range': {
+      const min = row.price_min != null ? Number(row.price_min) : null;
+      const max = row.price_max != null ? Number(row.price_max) : null;
+      if (Number.isFinite(min)) return min;
+      if (Number.isFinite(max)) return max;
       return row.price_range || '';
+    }
     case 'neighborhood':
       return row.neighborhood || '';
     case 'notes':

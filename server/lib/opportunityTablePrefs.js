@@ -65,7 +65,7 @@ export function defaultOpportunityTablePrefs(kind) {
   const ids = idsFor(kind);
   return {
     columnOrder: [...ids],
-    hidden: [],
+    hidden: kind === 'sellers' ? ['status'] : [],
     widths: { ...defaultWidthsFor(kind) },
     sortKey: null,
     sortDir: null,
@@ -95,7 +95,7 @@ export function normalizeOpportunityTablePrefs(kind, raw) {
     : [...defaults.columnOrder];
   columnOrder = enforcePinnedOrder(kind, columnOrder);
 
-  const hiddenRaw = Array.isArray(src.hidden) ? src.hidden.map(String) : [];
+  const hiddenRaw = Array.isArray(src.hidden) ? src.hidden.map(String) : [...defaults.hidden];
   let hidden = hiddenRaw.filter((id) => known.has(id) && !pinned.has(id));
 
   const hideable = ids.filter((id) => !pinned.has(id));

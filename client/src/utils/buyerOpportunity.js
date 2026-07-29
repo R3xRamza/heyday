@@ -212,7 +212,7 @@ export function formatBuyerPrice(rowOrMin, maybeMax) {
   if (rowOrMin != null && typeof rowOrMin === 'object') {
     min = rowOrMin.price_min;
     max = rowOrMin.price_max;
-    legacy = rowOrMin.price;
+    legacy = rowOrMin.price ?? rowOrMin.price_range;
   } else {
     min = rowOrMin;
     max = maybeMax;

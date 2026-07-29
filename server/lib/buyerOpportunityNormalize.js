@@ -407,3 +407,92 @@ export function normalizeBuyerOpportunityRows(db) {
     console.log(`[opportunities] Normalized ${n} buyer row(s)`);
   }
 }
+
+export const SELLER_STATUS = 'Leads';
+
+/** All seller rows are Leads; legacy Upcoming/Pre-listing/LIVE/PRIVATE map away. */
+export function normalizeSellerStatus() {
+  return SELLER_STATUS;
+}
+
+/**
+ * Resolve seller price_min/max + display text for price_range column.
+ * Reuses buyer price parsing; returns { price_min, price_max, price_range }.
+ */
+export function resolveSellerPriceFields({ price_min, price_max, price_range } = {}) {
+  const resolved = resolveBuyerPriceFields({
+    price_min,
+    price_max,
+    price: price_range,
+  });
+  return {
+    price_min: resolved.price_min,
+    price_max: resolved.price_max,
+    price_range: resolved.price,
+  };
+}
+
+/** Force status → Leads; backfill price_min/max from legacy price_range text. */
+export function normalizeSellerOpportunityRows(db) {
+  const tables = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='opportunity_sellers'",
+  ).all();
+  if (tables.length === 0) return;
+
+  const cols = db.prepare('PRAGMA table_info(opportunity_sellers)').all().map((c) => c.name);
+  if (!cols.includes('price_min')) {
+    db.exec('ALTER TABLE opportunity_sellers ADD COLUMN price_min REAL');
+  }
+  if (!cols.includes('price_max')) {
+    db.exec('ALTER TABLE opportunity_sellers ADD COLUMN price_max REAL');
+  }
+
+  const rows = db.prepare(
+    'SELECT id, status, price_range, price_min, price_max FROM opportunity_sellers',
+  ).all();
+  const update = db.prepare(`
+    UPDATE opportunity_sellers
+    SET status = ?, price_range = ?, price_min = ?, price_max = ?
+    WHERE id = ?
+  `);
+
+  let n = 0;
+  const tx = db.transaction(() => {
+    for (const row of rows) {
+      const status = SELLER_STATUS;
+      let priceMin = row.price_min;
+      let priceMax = row.price_max;
+      let priceRange = row.price_range;
+      const hasMin = priceMin != null && priceMin !== '' && !Number.isNaN(Number(priceMin));
+      const hasMax = priceMax != null && priceMax !== '' && !Number.isNaN(Number(priceMax));
+      if (!hasMin && !hasMax && priceRange) {
+        const resolved = resolveSellerPriceFields({ price_range: priceRange });
+        priceMin = resolved.price_min;
+        priceMax = resolved.price_max;
+        if (resolved.price_range) priceRange = resolved.price_range;
+      } else if (hasMin || hasMax) {
+        const resolved = resolveSellerPriceFields({
+          price_min: hasMin ? priceMin : null,
+          price_max: hasMax ? priceMax : null,
+          price_range: priceRange,
+        });
+        priceMin = resolved.price_min;
+        priceMax = resolved.price_max;
+        if (resolved.price_range) priceRange = resolved.price_range;
+      }
+
+      const changed = status !== row.status
+        || priceMin !== row.price_min
+        || priceMax !== row.price_max
+        || priceRange !== row.price_range;
+      if (changed) {
+        update.run(status, priceRange, priceMin, priceMax, row.id);
+        n += 1;
+      }
+    }
+  });
+  tx();
+  if (n > 0) {
+    console.log(`[opportunities] Normalized ${n} seller row(s)`);
+  }
+}
