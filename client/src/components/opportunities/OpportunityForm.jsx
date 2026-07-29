@@ -12,7 +12,7 @@ import {
   parseBuyerRep,
   parsePriceAmount,
 } from '../../utils/buyerOpportunity';
-import { composeFullAddressLine, SELLER_STATUS } from '../../utils/sellerOpportunity';
+import { composeSellerAddressLine, parseSellerAddressLine, SELLER_STATUS } from '../../utils/sellerOpportunity';
 
 const INPUT =
   'w-full mt-1 px-3 py-3 md:py-2 border border-outline-variant/30 rounded text-base md:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary/25';
@@ -33,7 +33,11 @@ const emptyBuyer = {
 
 const emptySeller = {
   status: SELLER_STATUS,
-  property_address: '',
+  street: '',
+  apt: '',
+  city: '',
+  state: '',
+  zip: '',
   seller_name: '',
   timing: '',
   neighborhood: '',
@@ -95,9 +99,11 @@ function initSellerForm(initial) {
     max = parsed.max;
   }
   const isRange = min != null && max != null && Number(min) !== Number(max);
+  const addr = parseSellerAddressLine(base.property_address);
   return {
     ...emptySeller,
     ...base,
+    ...addr,
     status: SELLER_STATUS,
     priceMode: isRange ? 'range' : 'single',
     priceSingle: isRange
@@ -184,9 +190,21 @@ export default function OpportunityForm({
           price_min = v;
           price_max = v;
         }
+        const property_address = composeSellerAddressLine({
+          street: form.street,
+          apt: form.apt,
+          city: form.city,
+          state: form.state,
+          zip: form.zip,
+        });
+        if (!property_address) {
+          setError('Address is required');
+          setSaving(false);
+          return;
+        }
         payload = {
           status: SELLER_STATUS,
-          property_address: form.property_address,
+          property_address,
           seller_name: form.seller_name,
           timing: form.timing,
           price_min,
@@ -406,15 +424,55 @@ export default function OpportunityForm({
             </>
           ) : (
             <>
-              <Field label="Address">
+              <Field label="Street">
                 <AddressAutocomplete
                   required
                   className={INPUT}
-                  value={form.property_address || ''}
-                  onChange={(v) => set('property_address', v)}
-                  onAddressSelect={(fields) => set('property_address', composeFullAddressLine(fields))}
+                  value={form.street || ''}
+                  onChange={(v) => set('street', v)}
+                  onAddressSelect={(fields) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      street: fields.address || prev.street,
+                      city: fields.city || prev.city,
+                      state: fields.state || prev.state,
+                      zip: fields.zip || prev.zip,
+                    }));
+                  }}
                   placeholder="Start typing an address…"
-                  id="seller-opp-address"
+                  id="seller-opp-street"
+                />
+              </Field>
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Apt #">
+                  <input
+                    className={INPUT}
+                    value={form.apt || ''}
+                    onChange={(e) => set('apt', e.target.value)}
+                    placeholder="Optional"
+                  />
+                </Field>
+                <Field label="City">
+                  <input
+                    className={INPUT}
+                    value={form.city || ''}
+                    onChange={(e) => set('city', e.target.value)}
+                  />
+                </Field>
+                <Field label="ZIP">
+                  <input
+                    className={INPUT}
+                    value={form.zip || ''}
+                    onChange={(e) => set('zip', e.target.value)}
+                    inputMode="numeric"
+                  />
+                </Field>
+              </div>
+              <Field label="Neighborhood">
+                <input
+                  className={INPUT}
+                  value={form.neighborhood || ''}
+                  onChange={(e) => set('neighborhood', e.target.value)}
                 />
               </Field>
               <Field label="Seller">
@@ -432,13 +490,6 @@ export default function OpportunityForm({
                 />
               </Field>
               {priceFields}
-              <Field label="Neighborhood">
-                <input
-                  className={INPUT}
-                  value={form.neighborhood || ''}
-                  onChange={(e) => set('neighborhood', e.target.value)}
-                />
-              </Field>
               <Field label="Notes">
                 <textarea
                   rows={5}
