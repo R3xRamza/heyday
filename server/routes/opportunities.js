@@ -10,6 +10,7 @@ import {
   normalizeBuyerTiming,
   normalizePreapproval,
   resolveBuyerPriceFields,
+  resolveBuyerRepFields,
 } from '../lib/buyerOpportunityNormalize.js';
 
 const router = Router();
@@ -100,11 +101,11 @@ router.get('/buyers', (req, res) => {
   const q = String(req.query.q || '').trim();
   const { sql: searchSql, params: searchParams } = buyerSearchClause(q);
   const status = String(req.query.status || '').trim();
-  // "All" hides closed; pick Closed filter to see them
-  const statusSql = status
+  // "All" hides closed (legacy rows). Closed is not a choosable filter.
+  const statusSql = status && status !== 'closed'
     ? ' AND status = ?'
     : " AND lower(COALESCE(status, '')) != 'closed'";
-  const statusParams = status ? [status] : [];
+  const statusParams = status && status !== 'closed' ? [status] : [];
 
   const rows = db.prepare(`
     SELECT * FROM opportunity_buyers
@@ -142,24 +143,27 @@ router.post('/buyers', (req, res) => {
     price_max: req.body.price_max,
     price: req.body.price,
   });
+  const repFields = resolveBuyerRepFields(req.body, {});
 
   const result = db.prepare(`
     INSERT INTO opportunity_buyers (
       agent_id, status, buyer_name, price, price_min, price_max, location, timing,
-      buyer_rep_signed, buyer_rep_dropbox, notes, lender, preapproval,
+      buyer_rep_signed, buyer_rep_expires_on, buyer_rep_dropbox, notes, lender, preapproval,
       showings, search_setup, sort_order
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)
   `).run(
     agentId,
-    normalizeBuyerStatus(req.body.status),
+    normalizeBuyerStatus(req.body.status) === 'closed'
+      ? 'active'
+      : normalizeBuyerStatus(req.body.status),
     buyerName,
     priceFields.price,
     priceFields.price_min,
     priceFields.price_max,
     trimOrNull(req.body.location),
     normalizeBuyerTiming(req.body.timing) ?? trimOrNull(req.body.timing),
-    trimOrNull(req.body.buyer_rep_signed),
-    trimOrNull(req.body.buyer_rep_dropbox),
+    repFields.buyer_rep_signed,
+    repFields.buyer_rep_expires_on,
     trimOrNull(req.body.notes),
     trimOrNull(req.body.lender),
     normalizePreapproval(req.body.preapproval) ?? trimOrNull(req.body.preapproval),
@@ -188,6 +192,9 @@ router.patch('/buyers/:id', (req, res) => {
   const status = Object.prototype.hasOwnProperty.call(req.body, 'status')
     ? normalizeBuyerStatus(req.body.status)
     : normalizeBuyerStatus(existing.status);
+  const statusOut = status === 'closed' && Object.prototype.hasOwnProperty.call(req.body, 'status')
+    ? 'active'
+    : status;
 
   let preapproval = existing.preapproval;
   if (Object.prototype.hasOwnProperty.call(req.body, 'preapproval')) {
@@ -230,24 +237,32 @@ router.patch('/buyers/:id', (req, res) => {
     ? resolveBuyerPriceFields({ price: req.body.price })
     : priceFields;
 
+  const repTouched = ['buyer_rep_signed', 'buyer_rep_expires_on', 'buyer_rep_is_signed'].some((k) => (
+    Object.prototype.hasOwnProperty.call(req.body, k)
+  ));
+  const repFields = repTouched
+    ? resolveBuyerRepFields(req.body, existing)
+    : resolveBuyerRepFields({}, existing);
+
   db.prepare(`
     UPDATE opportunity_buyers SET
       status = ?, buyer_name = ?, price = ?, price_min = ?, price_max = ?,
       location = ?, timing = ?,
-      buyer_rep_signed = ?, buyer_rep_dropbox = ?, notes = ?, lender = ?,
+      buyer_rep_signed = ?, buyer_rep_expires_on = ?, buyer_rep_dropbox = NULL,
+      notes = ?, lender = ?,
       preapproval = ?, showings = ?, search_setup = ?,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(
-    status,
+    statusOut,
     buyerName,
     priceFieldsFinal.price,
     priceFieldsFinal.price_min,
     priceFieldsFinal.price_max,
     pick('location'),
     timing,
-    pick('buyer_rep_signed'),
-    pick('buyer_rep_dropbox'),
+    repFields.buyer_rep_signed,
+    repFields.buyer_rep_expires_on,
     pick('notes'),
     pick('lender'),
     preapproval,

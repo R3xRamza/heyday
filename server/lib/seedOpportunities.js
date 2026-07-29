@@ -85,6 +85,7 @@ export function migrateOpportunitiesTables(db) {
 
   addColumnIfMissingLocal(db, 'opportunity_buyers', 'price_min', 'REAL');
   addColumnIfMissingLocal(db, 'opportunity_buyers', 'price_max', 'REAL');
+  addColumnIfMissingLocal(db, 'opportunity_buyers', 'buyer_rep_expires_on', 'TEXT');
 
   seedOpportunitiesIfEmpty(db);
   normalizeBuyerOpportunityRows(db);

@@ -123,7 +123,7 @@ export default function OpportunityTableColumnsMenu({
                       className="rounded border-outline-variant text-secondary"
                     />
                     <span className="text-sm text-primary truncate">
-                      {col.id === 'actions' ? 'Edit / Delete' : col.id === 'rep' ? 'Rep & Dropbox' : col.label}
+                      {col.id === 'actions' ? 'Edit / Delete' : col.label}
                     </span>
                   </label>
                 </li>

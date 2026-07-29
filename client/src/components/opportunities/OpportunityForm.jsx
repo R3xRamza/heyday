@@ -3,9 +3,11 @@ import {
   BUYER_PREAPPROVALS,
   BUYER_STATUSES,
   BUYER_TIMINGS,
+  encodeBuyerRepStorage,
   normalizeBuyerStatus,
   normalizeBuyerTiming,
   normalizePreapproval,
+  parseBuyerRep,
   parsePriceAmount,
 } from '../../utils/buyerOpportunity';
 
@@ -20,8 +22,8 @@ const emptyBuyer = {
   buyer_name: '',
   location: '',
   timing: '',
-  buyer_rep_signed: '',
-  buyer_rep_dropbox: '',
+  buyer_rep_signed_checked: false,
+  buyer_rep_expires_on: '',
   notes: '',
   lender: '',
   preapproval: '',
@@ -53,15 +55,21 @@ function dollarsToInput(n) {
 }
 
 function initBuyerForm(initial) {
-  const base = { ...emptyBuyer, ...(initial || {}) };
+  const base = { ...(initial || {}) };
+  const rep = parseBuyerRep(base);
   const min = base.price_min;
   const max = base.price_max;
   const isRange = min != null && max != null && Number(min) !== Number(max);
+  let status = normalizeBuyerStatus(base.status);
+  if (status === 'closed') status = 'active';
   return {
+    ...emptyBuyer,
     ...base,
-    status: normalizeBuyerStatus(base.status),
+    status,
     timing: normalizeBuyerTiming(base.timing) || '',
     preapproval: normalizePreapproval(base.preapproval),
+    buyer_rep_signed_checked: rep.signed,
+    buyer_rep_expires_on: rep.expires_on || '',
     priceMode: isRange ? 'range' : 'single',
     priceSingle: isRange
       ? ''
@@ -116,15 +124,22 @@ export default function OpportunityForm({
           price_min = v;
           price_max = v;
         }
+        const repStorage = encodeBuyerRepStorage({
+          signed: Boolean(form.buyer_rep_signed_checked),
+          expires_on: form.buyer_rep_signed_checked
+            ? (form.buyer_rep_expires_on || null)
+            : null,
+        });
         payload = {
-          status: form.status,
+          status: form.status === 'closed' ? 'active' : form.status,
           buyer_name: form.buyer_name,
           price_min,
           price_max,
           location: form.location,
           timing: form.timing,
-          buyer_rep_signed: form.buyer_rep_signed,
-          buyer_rep_dropbox: form.buyer_rep_dropbox,
+          buyer_rep_signed: repStorage.buyer_rep_signed,
+          buyer_rep_expires_on: repStorage.buyer_rep_expires_on,
+          buyer_rep_dropbox: null,
           notes: form.notes,
           lender: form.lender,
           preapproval: form.preapproval || null,
@@ -306,23 +321,34 @@ export default function OpportunityForm({
               </Field>
 
               <div className="space-y-4 pt-1 border-t border-outline-variant/15">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Field label="Buyer Rep signed?">
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
-                      className={INPUT}
-                      value={form.buyer_rep_signed || ''}
-                      onChange={(e) => set('buyer_rep_signed', e.target.value)}
-                      placeholder="Y- 9/30/2026"
+                      type="checkbox"
+                      className="rounded border-outline-variant/40 text-secondary focus:ring-secondary/30"
+                      checked={Boolean(form.buyer_rep_signed_checked)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setForm((prev) => ({
+                          ...prev,
+                          buyer_rep_signed_checked: checked,
+                          buyer_rep_expires_on: checked ? prev.buyer_rep_expires_on : '',
+                        }));
+                      }}
                     />
-                  </Field>
-                  <Field label="Buyer Rep in Dropbox?">
-                    <input
-                      className={INPUT}
-                      value={form.buyer_rep_dropbox || ''}
-                      onChange={(e) => set('buyer_rep_dropbox', e.target.value)}
-                      placeholder="Y / N"
-                    />
-                  </Field>
+                    <span className="text-sm font-semibold text-primary">Buyer Rep signed</span>
+                  </label>
+                  {form.buyer_rep_signed_checked && (
+                    <div className="mt-3">
+                      <label className={LABEL}>Rep expiry date</label>
+                      <input
+                        type="date"
+                        className={INPUT}
+                        value={form.buyer_rep_expires_on || ''}
+                        onChange={(e) => set('buyer_rep_expires_on', e.target.value)}
+                      />
+                    </div>
+                  )}
                 </div>
                 <Field label="Lender / Lender Intro">
                   <input className={INPUT} value={form.lender || ''} onChange={(e) => set('lender', e.target.value)} />
@@ -356,12 +382,13 @@ export default function OpportunityForm({
                   ))}
                 </select>
               </Field>
-              <Field label="Property address">
+              <Field label="Address">
                 <input
                   required
                   className={INPUT}
                   value={form.property_address || ''}
                   onChange={(e) => set('property_address', e.target.value)}
+                  autoFocus={!initial}
                 />
               </Field>
               <Field label="Seller">
@@ -371,18 +398,20 @@ export default function OpportunityForm({
                   onChange={(e) => set('seller_name', e.target.value)}
                 />
               </Field>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Timing">
-                  <input className={INPUT} value={form.timing || ''} onChange={(e) => set('timing', e.target.value)} />
-                </Field>
-                <Field label="Price range">
-                  <input
-                    className={INPUT}
-                    value={form.price_range || ''}
-                    onChange={(e) => set('price_range', e.target.value)}
-                  />
-                </Field>
-              </div>
+              <Field label="Timing">
+                <input
+                  className={INPUT}
+                  value={form.timing || ''}
+                  onChange={(e) => set('timing', e.target.value)}
+                />
+              </Field>
+              <Field label="Price range">
+                <input
+                  className={INPUT}
+                  value={form.price_range || ''}
+                  onChange={(e) => set('price_range', e.target.value)}
+                />
+              </Field>
               <Field label="Neighborhood">
                 <input
                   className={INPUT}
@@ -392,8 +421,8 @@ export default function OpportunityForm({
               </Field>
               <Field label="Notes">
                 <textarea
-                  rows={6}
-                  className={`${INPUT} resize-y min-h-[8rem]`}
+                  rows={5}
+                  className={`${INPUT} resize-y`}
                   value={form.notes || ''}
                   onChange={(e) => set('notes', e.target.value)}
                 />
@@ -402,27 +431,29 @@ export default function OpportunityForm({
           )}
         </div>
 
-        <div className="px-4 md:px-6 py-3 md:py-4 border-t border-outline-variant/20 flex flex-wrap gap-3 shrink-0 items-center">
-          {initial?.id && onDelete && (
+        <div className="px-4 md:px-6 py-4 border-t border-outline-variant/20 flex items-center gap-3 shrink-0">
+          {onDelete && initial?.id ? (
             <button
               type="button"
               onClick={handleDelete}
-              className="min-h-11 px-4 py-2.5 text-sm font-semibold text-error hover:bg-error/10 rounded mr-auto"
+              className="text-sm font-semibold text-error hover:underline mr-auto"
             >
               Delete
             </button>
+          ) : (
+            <span className="mr-auto" />
           )}
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 md:flex-none min-h-11 px-4 py-2.5 text-sm font-semibold text-on-surface-variant hover:text-primary"
+            className="px-4 py-2.5 text-sm font-semibold text-on-surface-variant hover:text-primary"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="flex-1 md:flex-none min-h-11 px-5 py-2.5 bg-primary-container text-white text-xs font-semibold uppercase tracking-wider hover:brightness-110 disabled:opacity-50"
+            className="px-5 py-2.5 rounded-lg bg-primary-container text-white text-sm font-bold disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
