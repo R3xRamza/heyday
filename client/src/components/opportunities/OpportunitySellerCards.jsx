@@ -1,5 +1,6 @@
 import { Pencil, Trash2 } from 'lucide-react';
 import OpportunityStatusBadge from './OpportunityStatusBadge';
+import { formatSellerPrice } from '../../utils/sellerOpportunity';
 
 function metaJoin(...parts) {
   return parts.map((p) => String(p || '').trim()).filter(Boolean).join(' · ');
@@ -10,7 +11,8 @@ export default function OpportunitySellerCards({ rows, onEdit, onDelete }) {
     <ul className="md:hidden flex flex-col gap-3">
       {rows.map((row) => {
         const meta = metaJoin(row.seller_name, row.timing);
-        const place = metaJoin(row.neighborhood, row.price_range);
+        const priceLabel = formatSellerPrice(row);
+        const place = metaJoin(row.neighborhood, priceLabel === '—' ? '' : priceLabel);
 
         return (
           <li key={row.id}>

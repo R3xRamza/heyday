@@ -2,7 +2,13 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { parse } from 'csv-parse/sync';
-import { normalizeBuyerOpportunityRows, resolveBuyerPriceFields } from './buyerOpportunityNormalize.js';
+import {
+  normalizeBuyerOpportunityRows,
+  normalizeSellerOpportunityRows,
+  resolveBuyerPriceFields,
+  resolveSellerPriceFields,
+  SELLER_STATUS,
+} from './buyerOpportunityNormalize.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SEED_DIR = path.join(__dirname, '..', 'seed', 'opportunities');
@@ -72,6 +78,8 @@ export function migrateOpportunitiesTables(db) {
       seller_name TEXT,
       timing TEXT,
       price_range TEXT,
+      price_min REAL,
+      price_max REAL,
       neighborhood TEXT,
       notes TEXT,
       sort_order INTEGER DEFAULT 0,
@@ -86,9 +94,12 @@ export function migrateOpportunitiesTables(db) {
   addColumnIfMissingLocal(db, 'opportunity_buyers', 'price_min', 'REAL');
   addColumnIfMissingLocal(db, 'opportunity_buyers', 'price_max', 'REAL');
   addColumnIfMissingLocal(db, 'opportunity_buyers', 'buyer_rep_expires_on', 'TEXT');
+  addColumnIfMissingLocal(db, 'opportunity_sellers', 'price_min', 'REAL');
+  addColumnIfMissingLocal(db, 'opportunity_sellers', 'price_max', 'REAL');
 
   seedOpportunitiesIfEmpty(db);
   normalizeBuyerOpportunityRows(db);
+  normalizeSellerOpportunityRows(db);
 }
 
 export function seedOpportunitiesIfEmpty(db) {
@@ -179,8 +190,8 @@ function seedSellers(db, agentId) {
   const insert = db.prepare(`
     INSERT INTO opportunity_sellers (
       agent_id, status, property_address, seller_name, timing,
-      price_range, neighborhood, notes, sort_order
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      price_range, price_min, price_max, neighborhood, notes, sort_order
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   let n = 0;
@@ -189,13 +200,18 @@ function seedSellers(db, agentId) {
       const address = cell(row, 'Property Address', 'property_address', 'Address');
       const seller = cell(row, 'Seller', 'seller', 'seller_name');
       if (!address && !seller) continue;
+      const priceFields = resolveSellerPriceFields({
+        price_range: emptyToNull(cell(row, 'Price Range', 'price_range')),
+      });
       insert.run(
         agentId,
-        emptyToNull(cell(row, 'STATUS', 'Status', 'status')),
+        SELLER_STATUS,
         address || '(no address)',
         emptyToNull(seller),
         emptyToNull(cell(row, 'Timing', 'timing')),
-        emptyToNull(cell(row, 'Price Range', 'price_range')),
+        priceFields.price_range,
+        priceFields.price_min,
+        priceFields.price_max,
         emptyToNull(cell(row, 'Neighborhood', 'neighborhood')),
         emptyToNull(cell(row, 'Notes', 'notes')),
         n,

@@ -175,13 +175,9 @@ export default function Opportunities() {
     if (tab === 'buyers') {
       return BUYER_STATUSES.map((s) => s.value);
     }
-    const set = new Set();
-    for (const r of allForPills) {
-      const s = String(r.status || '').trim();
-      if (s) set.add(s);
-    }
-    return [...set].sort((a, b) => a.localeCompare(b));
-  }, [tab, allForPills]);
+    // Sellers are Leads-only — no multi-status filter strip
+    return [];
+  }, [tab]);
 
   const sortedRows = useMemo(
     () => sortOpportunityRows(tab, rows, activePrefs.sortKey, activePrefs.sortDir),

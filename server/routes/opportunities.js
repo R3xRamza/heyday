@@ -11,6 +11,8 @@ import {
   normalizePreapproval,
   resolveBuyerPriceFields,
   resolveBuyerRepFields,
+  resolveSellerPriceFields,
+  SELLER_STATUS,
 } from '../lib/buyerOpportunityNormalize.js';
 
 const router = Router();
@@ -297,13 +299,6 @@ router.get('/sellers', (req, res) => {
     SELECT * FROM opportunity_sellers
     WHERE 1=1 ${scopeSql} ${searchSql} ${statusSql}
     ORDER BY
-      CASE lower(COALESCE(status, ''))
-        WHEN 'upcoming' THEN 0
-        WHEN 'pre-listing' THEN 1
-        WHEN 'live' THEN 2
-        WHEN 'private' THEN 3
-        ELSE 4
-      END ASC,
       property_address COLLATE NOCASE ASC,
       id ASC
   `).all(...scopeParams, ...searchParams, ...statusParams);
@@ -318,6 +313,12 @@ router.post('/sellers', (req, res) => {
   const address = trimOrNull(req.body.property_address);
   if (!address) return res.status(400).json({ error: 'property_address is required' });
 
+  const priceFields = resolveSellerPriceFields({
+    price_min: req.body.price_min,
+    price_max: req.body.price_max,
+    price_range: req.body.price_range,
+  });
+
   const maxOrder = db.prepare(
     'SELECT COALESCE(MAX(sort_order), -1) AS m FROM opportunity_sellers WHERE agent_id = ?',
   ).get(agentId);
@@ -325,15 +326,17 @@ router.post('/sellers', (req, res) => {
   const result = db.prepare(`
     INSERT INTO opportunity_sellers (
       agent_id, status, property_address, seller_name, timing,
-      price_range, neighborhood, notes, sort_order
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      price_range, price_min, price_max, neighborhood, notes, sort_order
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     agentId,
-    trimOrNull(req.body.status),
+    SELLER_STATUS,
     address,
     trimOrNull(req.body.seller_name),
     trimOrNull(req.body.timing),
-    trimOrNull(req.body.price_range),
+    priceFields.price_range,
+    priceFields.price_min,
+    priceFields.price_max,
     trimOrNull(req.body.neighborhood),
     trimOrNull(req.body.notes),
     maxOrder.m + 1,
@@ -356,18 +359,44 @@ router.patch('/sellers/:id', (req, res) => {
     ? trimOrNull(req.body[key])
     : existing[key]);
 
+  const priceTouched = ['price_range', 'price_min', 'price_max'].some((k) => (
+    Object.prototype.hasOwnProperty.call(req.body, k)
+  ));
+  let priceFieldsFinal;
+  if (priceTouched) {
+    priceFieldsFinal = resolveSellerPriceFields({
+      price_min: Object.prototype.hasOwnProperty.call(req.body, 'price_min')
+        ? req.body.price_min
+        : existing.price_min,
+      price_max: Object.prototype.hasOwnProperty.call(req.body, 'price_max')
+        ? req.body.price_max
+        : existing.price_max,
+      price_range: Object.prototype.hasOwnProperty.call(req.body, 'price_range')
+        ? req.body.price_range
+        : existing.price_range,
+    });
+  } else {
+    priceFieldsFinal = {
+      price_min: existing.price_min,
+      price_max: existing.price_max,
+      price_range: existing.price_range,
+    };
+  }
+
   db.prepare(`
     UPDATE opportunity_sellers SET
       status = ?, property_address = ?, seller_name = ?, timing = ?,
-      price_range = ?, neighborhood = ?, notes = ?,
+      price_range = ?, price_min = ?, price_max = ?, neighborhood = ?, notes = ?,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(
-    pick('status'),
+    SELLER_STATUS,
     address,
     pick('seller_name'),
     pick('timing'),
-    pick('price_range'),
+    priceFieldsFinal.price_range,
+    priceFieldsFinal.price_min,
+    priceFieldsFinal.price_max,
     pick('neighborhood'),
     pick('notes'),
     existing.id,

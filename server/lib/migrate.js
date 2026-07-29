@@ -9,7 +9,10 @@ import { syncAllTaskAssigneesFromTemplates } from './taskAssignment.js';
 import { resyncNamedChecklistTemplates } from '../seed-data.js';
 import { dedupeAllChecklistTemplates } from './checklistTaskCleanup.js';
 import { migrateOpportunitiesTables } from './seedOpportunities.js';
-import { normalizeBuyerOpportunityRows } from './buyerOpportunityNormalize.js';
+import {
+  normalizeBuyerOpportunityRows,
+  normalizeSellerOpportunityRows,
+} from './buyerOpportunityNormalize.js';
 import { seedVendorsFromCrm } from './seedVendorsFromCrm.js';
 import { migrateRevenueSplitTemplates } from './revenueTemplates.js';
 
@@ -174,6 +177,7 @@ export function runMigrations(db, options = {}) {
   migrateRevenueSplitTemplates(db);
   migrateOpportunitiesTables(db);
   normalizeBuyerOpportunityRows(db);
+  normalizeSellerOpportunityRows(db);
   migrateUserUiPrefsTable(db);
 }
 

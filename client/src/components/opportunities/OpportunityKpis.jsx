@@ -1,36 +1,33 @@
 import { buyerStatusLabel, normalizeBuyerStatus } from '../../utils/buyerOpportunity';
 
 export default function OpportunityKpis({ items, kind }) {
+  if (kind === 'seller') {
+    return (
+      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
+        <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant shrink-0">
+          {items.length} total
+        </span>
+      </div>
+    );
+  }
+
   const counts = new Map();
   for (const row of items) {
     const raw = String(row.status || '').trim() || '(none)';
-    const key = kind === 'buyer' ? normalizeBuyerStatus(raw) : raw;
+    const key = normalizeBuyerStatus(raw);
     counts.set(key, (counts.get(key) || 0) + 1);
   }
 
-  let entries = [...counts.entries()];
-  if (kind === 'seller') {
-    const order = ['Upcoming', 'Pre-listing', 'LIVE', 'PRIVATE'];
-    entries.sort((a, b) => {
-      const ia = order.findIndex((o) => o.toLowerCase() === a[0].toLowerCase());
-      const ib = order.findIndex((o) => o.toLowerCase() === b[0].toLowerCase());
-      const ra = ia === -1 ? 99 : ia;
-      const rb = ib === -1 ? 99 : ib;
-      if (ra !== rb) return ra - rb;
-      return a[0].localeCompare(b[0]);
-    });
-  } else {
-    const order = ['pending', 'option_period', 'active', 'on_hold'];
-    entries = entries.filter(([status]) => status !== 'closed');
-    entries.sort((a, b) => {
-      const ia = order.indexOf(a[0]);
-      const ib = order.indexOf(b[0]);
-      const ra = ia === -1 ? 99 : ia;
-      const rb = ib === -1 ? 99 : ib;
-      if (ra !== rb) return ra - rb;
-      return a[0].localeCompare(b[0]);
-    });
-  }
+  const order = ['pending', 'option_period', 'active', 'on_hold'];
+  let entries = [...counts.entries()].filter(([status]) => status !== 'closed');
+  entries.sort((a, b) => {
+    const ia = order.indexOf(a[0]);
+    const ib = order.indexOf(b[0]);
+    const ra = ia === -1 ? 99 : ia;
+    const rb = ib === -1 ? 99 : ib;
+    if (ra !== rb) return ra - rb;
+    return a[0].localeCompare(b[0]);
+  });
 
   return (
     <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
@@ -38,7 +35,7 @@ export default function OpportunityKpis({ items, kind }) {
         {items.length} total
       </span>
       {entries.map(([status, count]) => {
-        const label = kind === 'buyer' ? buyerStatusLabel(status) : status;
+        const label = buyerStatusLabel(status);
         return (
           <span
             key={status}

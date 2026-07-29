@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import AddressAutocomplete from '../shared/AddressAutocomplete';
 import {
   BUYER_PREAPPROVALS,
   BUYER_STATUSES,
@@ -7,15 +8,15 @@ import {
   normalizeBuyerStatus,
   normalizeBuyerTiming,
   normalizePreapproval,
+  parseBuyerPriceText,
   parseBuyerRep,
   parsePriceAmount,
 } from '../../utils/buyerOpportunity';
+import { composeFullAddressLine, SELLER_STATUS } from '../../utils/sellerOpportunity';
 
 const INPUT =
   'w-full mt-1 px-3 py-3 md:py-2 border border-outline-variant/30 rounded text-base md:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-secondary/25';
 const LABEL = 'text-xs font-semibold text-on-surface-variant uppercase';
-
-const SELLER_STATUSES = ['Upcoming', 'Pre-listing', 'LIVE', 'PRIVATE'];
 
 const emptyBuyer = {
   status: 'active',
@@ -31,13 +32,16 @@ const emptyBuyer = {
 };
 
 const emptySeller = {
-  status: 'Upcoming',
+  status: SELLER_STATUS,
   property_address: '',
   seller_name: '',
   timing: '',
-  price_range: '',
   neighborhood: '',
   notes: '',
+  priceMode: 'single',
+  priceSingle: '',
+  priceMinInput: '',
+  priceMaxInput: '',
 };
 
 function Field({ label, children }) {
@@ -79,6 +83,31 @@ function initBuyerForm(initial) {
   };
 }
 
+function initSellerForm(initial) {
+  const base = { ...(initial || {}) };
+  let min = base.price_min;
+  let max = base.price_max;
+  const hasMin = min != null && min !== '' && !Number.isNaN(Number(min));
+  const hasMax = max != null && max !== '' && !Number.isNaN(Number(max));
+  if (!hasMin && !hasMax && base.price_range) {
+    const parsed = parseBuyerPriceText(base.price_range);
+    min = parsed.min;
+    max = parsed.max;
+  }
+  const isRange = min != null && max != null && Number(min) !== Number(max);
+  return {
+    ...emptySeller,
+    ...base,
+    status: SELLER_STATUS,
+    priceMode: isRange ? 'range' : 'single',
+    priceSingle: isRange
+      ? ''
+      : dollarsToInput(min ?? max),
+    priceMinInput: isRange ? dollarsToInput(min) : '',
+    priceMaxInput: isRange ? dollarsToInput(max) : '',
+  };
+}
+
 export default function OpportunityForm({
   kind,
   initial = null,
@@ -89,8 +118,7 @@ export default function OpportunityForm({
   const isBuyer = kind === 'buyer';
   const [form, setForm] = useState(() => {
     if (isBuyer) return initBuyerForm(initial);
-    if (initial) return { ...emptySeller, ...initial };
-    return { ...emptySeller };
+    return initSellerForm(initial);
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -146,12 +174,23 @@ export default function OpportunityForm({
           showings: form.showings,
         };
       } else {
+        let price_min = null;
+        let price_max = null;
+        if (form.priceMode === 'range') {
+          price_min = parsePriceAmount(form.priceMinInput);
+          price_max = parsePriceAmount(form.priceMaxInput);
+        } else {
+          const v = parsePriceAmount(form.priceSingle);
+          price_min = v;
+          price_max = v;
+        }
         payload = {
-          status: form.status,
+          status: SELLER_STATUS,
           property_address: form.property_address,
           seller_name: form.seller_name,
           timing: form.timing,
-          price_range: form.price_range,
+          price_min,
+          price_max,
           neighborhood: form.neighborhood,
           notes: form.notes,
         };
@@ -174,6 +213,63 @@ export default function OpportunityForm({
     `flex-1 px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors ${
       active ? 'bg-primary text-white' : 'text-on-surface-variant hover:bg-surface-container-low'
     }`;
+
+  const priceFields = (
+    <div>
+      <span className={LABEL}>{isBuyer ? 'Budget' : 'Price range'}</span>
+      <div className="mt-1 flex rounded-lg border border-outline-variant/30 overflow-hidden bg-white">
+        <button
+          type="button"
+          className={modeBtn(form.priceMode === 'single')}
+          onClick={() => set('priceMode', 'single')}
+        >
+          Single
+        </button>
+        <button
+          type="button"
+          className={modeBtn(form.priceMode === 'range')}
+          onClick={() => set('priceMode', 'range')}
+        >
+          Range
+        </button>
+      </div>
+      {form.priceMode === 'range' ? (
+        <div className="grid grid-cols-2 gap-3 mt-2">
+          <div>
+            <label className="text-[10px] font-semibold text-on-surface-variant uppercase">Min</label>
+            <input
+              className={INPUT}
+              inputMode="decimal"
+              placeholder="900k or 900000"
+              value={form.priceMinInput || ''}
+              onChange={(e) => set('priceMinInput', e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-on-surface-variant uppercase">Max</label>
+            <input
+              className={INPUT}
+              inputMode="decimal"
+              placeholder="1.4M or 1400000"
+              value={form.priceMaxInput || ''}
+              onChange={(e) => set('priceMaxInput', e.target.value)}
+            />
+          </div>
+        </div>
+      ) : (
+        <input
+          className={`${INPUT} mt-2`}
+          inputMode="decimal"
+          placeholder="1.2M, 900k, or 1200000"
+          value={form.priceSingle || ''}
+          onChange={(e) => set('priceSingle', e.target.value)}
+        />
+      )}
+      <p className="mt-1 text-[11px] text-on-surface-variant">
+        Use full dollars or suffixes (k / m). Example: 1.2m → $1.2M
+      </p>
+    </div>
+  );
 
   return (
     <div
@@ -214,7 +310,7 @@ export default function OpportunityForm({
                   autoFocus={!initial}
                 />
               </Field>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <Field label="Status">
                   <select
                     className={INPUT}
@@ -240,60 +336,7 @@ export default function OpportunityForm({
                 </Field>
               </div>
 
-              <div>
-                <span className={LABEL}>Budget</span>
-                <div className="mt-1 flex rounded-lg border border-outline-variant/30 overflow-hidden bg-white">
-                  <button
-                    type="button"
-                    className={modeBtn(form.priceMode === 'single')}
-                    onClick={() => set('priceMode', 'single')}
-                  >
-                    Single
-                  </button>
-                  <button
-                    type="button"
-                    className={modeBtn(form.priceMode === 'range')}
-                    onClick={() => set('priceMode', 'range')}
-                  >
-                    Range
-                  </button>
-                </div>
-                {form.priceMode === 'range' ? (
-                  <div className="grid grid-cols-2 gap-3 mt-2">
-                    <div>
-                      <label className="text-[10px] font-semibold text-on-surface-variant uppercase">Min</label>
-                      <input
-                        className={INPUT}
-                        inputMode="decimal"
-                        placeholder="900k or 900000"
-                        value={form.priceMinInput || ''}
-                        onChange={(e) => set('priceMinInput', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-semibold text-on-surface-variant uppercase">Max</label>
-                      <input
-                        className={INPUT}
-                        inputMode="decimal"
-                        placeholder="1.4M or 1400000"
-                        value={form.priceMaxInput || ''}
-                        onChange={(e) => set('priceMaxInput', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <input
-                    className={`${INPUT} mt-2`}
-                    inputMode="decimal"
-                    placeholder="1.2M, 900k, or 1200000"
-                    value={form.priceSingle || ''}
-                    onChange={(e) => set('priceSingle', e.target.value)}
-                  />
-                )}
-                <p className="mt-1 text-[11px] text-on-surface-variant">
-                  Use full dollars or suffixes (k / m). Example: 1.2m → $1.2M
-                </p>
-              </div>
+              {priceFields}
 
               <Field label="Timing">
                 <select
@@ -319,13 +362,12 @@ export default function OpportunityForm({
                   autoFocus={Boolean(initial)}
                 />
               </Field>
-
-              <div className="space-y-4 pt-1 border-t border-outline-variant/15">
-                <div>
-                  <label className="flex items-center gap-2 cursor-pointer">
+              <div className="grid grid-cols-1 gap-3">
+                <div className="rounded-lg border border-outline-variant/30 p-3 bg-surface-container-low/40">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
                     <input
                       type="checkbox"
-                      className="rounded border-outline-variant/40 text-secondary focus:ring-secondary/30"
+                      className="w-4 h-4 rounded border-outline-variant/40"
                       checked={Boolean(form.buyer_rep_signed_checked)}
                       onChange={(e) => {
                         const checked = e.target.checked;
@@ -364,31 +406,15 @@ export default function OpportunityForm({
             </>
           ) : (
             <>
-              <Field label="Status">
-                <select
-                  className={INPUT}
-                  value={
-                    SELLER_STATUSES.includes(form.status)
-                      ? form.status
-                      : (form.status ? form.status : 'Upcoming')
-                  }
-                  onChange={(e) => set('status', e.target.value)}
-                >
-                  {!SELLER_STATUSES.includes(form.status) && form.status ? (
-                    <option value={form.status}>{form.status}</option>
-                  ) : null}
-                  {SELLER_STATUSES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </Field>
               <Field label="Address">
-                <input
+                <AddressAutocomplete
                   required
                   className={INPUT}
                   value={form.property_address || ''}
-                  onChange={(e) => set('property_address', e.target.value)}
-                  autoFocus={!initial}
+                  onChange={(v) => set('property_address', v)}
+                  onAddressSelect={(fields) => set('property_address', composeFullAddressLine(fields))}
+                  placeholder="Start typing an address…"
+                  id="seller-opp-address"
                 />
               </Field>
               <Field label="Seller">
@@ -405,13 +431,7 @@ export default function OpportunityForm({
                   onChange={(e) => set('timing', e.target.value)}
                 />
               </Field>
-              <Field label="Price range">
-                <input
-                  className={INPUT}
-                  value={form.price_range || ''}
-                  onChange={(e) => set('price_range', e.target.value)}
-                />
-              </Field>
+              {priceFields}
               <Field label="Neighborhood">
                 <input
                   className={INPUT}
@@ -453,7 +473,7 @@ export default function OpportunityForm({
           <button
             type="submit"
             disabled={saving}
-            className="px-5 py-2.5 rounded-lg bg-primary-container text-white text-sm font-bold disabled:opacity-50"
+            className="px-5 py-2.5 bg-primary-container text-white text-xs font-semibold uppercase tracking-wider hover:brightness-110 disabled:opacity-60"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
