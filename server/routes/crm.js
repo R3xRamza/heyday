@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db from '../db.js';
 import { seedContactActivitiesFromNotes } from '../lib/contactActivitySeed.js';
+import { CRM_LIST_STAGE_SQL } from '../lib/crmContactScope.js';
 
 const router = Router();
 
@@ -17,7 +18,7 @@ const PATCH_FIELDS = [
 ];
 
 function buildListQuery(query) {
-  const conditions = ['1=1'];
+  const conditions = [CRM_LIST_STAGE_SQL];
   const params = [];
 
   const search = (query.search || '').trim();
@@ -61,16 +62,21 @@ function buildListQuery(query) {
 
 router.get('/filters', (_req, res) => {
   const stages = db.prepare(`
-    SELECT stage as value, COUNT(*) as count FROM contacts
-    WHERE stage IS NOT NULL AND stage != '' GROUP BY stage ORDER BY count DESC
+    SELECT stage as value, COUNT(*) as count FROM contacts c
+    WHERE ${CRM_LIST_STAGE_SQL}
+      AND stage IS NOT NULL AND stage != ''
+    GROUP BY stage ORDER BY count DESC
   `).all();
   const leadSources = db.prepare(`
-    SELECT lead_source as value, COUNT(*) as count FROM contacts
-    WHERE lead_source IS NOT NULL AND lead_source != '' GROUP BY lead_source ORDER BY count DESC LIMIT 100
+    SELECT lead_source as value, COUNT(*) as count FROM contacts c
+    WHERE ${CRM_LIST_STAGE_SQL}
+      AND lead_source IS NOT NULL AND lead_source != ''
+    GROUP BY lead_source ORDER BY count DESC LIMIT 100
   `).all();
   const assigned = db.prepare(`
-    SELECT assigned_to_name as value, COUNT(*) as count FROM contacts
-    WHERE assigned_to_name IS NOT NULL AND assigned_to_name != '' AND LENGTH(assigned_to_name) < 60
+    SELECT assigned_to_name as value, COUNT(*) as count FROM contacts c
+    WHERE ${CRM_LIST_STAGE_SQL}
+      AND assigned_to_name IS NOT NULL AND assigned_to_name != '' AND LENGTH(assigned_to_name) < 60
     GROUP BY assigned_to_name ORDER BY count DESC LIMIT 50
   `).all();
 
@@ -102,8 +108,9 @@ router.get('/', (req, res) => {
   `).all(...params, limit, offset);
 
   const byStage = db.prepare(`
-    SELECT stage, COUNT(*) as count FROM contacts
-    WHERE stage IS NOT NULL GROUP BY stage
+    SELECT stage, COUNT(*) as count FROM contacts c
+    WHERE ${CRM_LIST_STAGE_SQL} AND stage IS NOT NULL
+    GROUP BY stage
   `).all();
 
   const highlightStages = ['Sphere', 'Closed', 'Client: Actively Working', 'Hot Prospect (0-3 months)', 'Lead'];
