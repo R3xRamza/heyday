@@ -13,6 +13,7 @@ import {
   normalizeBuyerOpportunityRows,
   normalizeSellerOpportunityRows,
 } from './buyerOpportunityNormalize.js';
+import { normalizeOpportunityTablePrefs } from './opportunityTablePrefs.js';
 import { seedVendorsFromCrm } from './seedVendorsFromCrm.js';
 import { migrateRevenueSplitTemplates } from './revenueTemplates.js';
 
@@ -179,6 +180,7 @@ export function runMigrations(db, options = {}) {
   normalizeBuyerOpportunityRows(db);
   normalizeSellerOpportunityRows(db);
   migrateUserUiPrefsTable(db);
+  migrateSellerOpportunitiesHideStatusPrefs(db);
 }
 
 function migrateUserUiPrefsTable(db) {
@@ -190,6 +192,55 @@ function migrateUserUiPrefsTable(db) {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+}
+
+/** One-time: hide seller Status column in saved prefs (new default). */
+function migrateSellerOpportunitiesHideStatusPrefs(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )
+  `);
+  const done = db.prepare(
+    "SELECT 1 FROM app_meta WHERE key = 'opp_sellers_status_hidden_v1'",
+  ).get();
+  if (done) return;
+
+  const rows = db.prepare(
+    'SELECT user_id, opportunities_sellers_json FROM user_ui_prefs',
+  ).all();
+  const update = db.prepare(`
+    UPDATE user_ui_prefs
+    SET opportunities_sellers_json = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ?
+  `);
+
+  let n = 0;
+  for (const row of rows) {
+    if (!row.opportunities_sellers_json) continue;
+    let prefs;
+    try {
+      prefs = JSON.parse(row.opportunities_sellers_json);
+    } catch {
+      continue;
+    }
+    const hidden = Array.isArray(prefs.hidden) ? prefs.hidden.map(String) : [];
+    if (hidden.includes('status')) continue;
+    const next = normalizeOpportunityTablePrefs('sellers', {
+      ...prefs,
+      hidden: [...hidden, 'status'],
+    });
+    update.run(JSON.stringify(next), row.user_id);
+    n += 1;
+  }
+
+  db.prepare(
+    "INSERT INTO app_meta (key, value) VALUES ('opp_sellers_status_hidden_v1', '1')",
+  ).run();
+  if (n > 0) {
+    console.log(`[migrate] Hid Status column in ${n} seller Opportunities prefs`);
+  }
 }
 
 function migrateVendorLikesTable(db) {

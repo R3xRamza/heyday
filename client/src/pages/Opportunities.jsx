@@ -348,7 +348,7 @@ export default function Opportunities() {
         <OpportunityKpis items={allForPills} kind={tab === 'buyers' ? 'buyer' : 'seller'} />
 
         <div className="flex items-center gap-2 mb-4 flex-wrap">
-          {statusOptions.length > 0 && (
+          {statusOptions.length > 0 ? (
             <nav className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 flex-1 min-w-0">
               <button
                 type="button"
@@ -378,6 +378,8 @@ export default function Opportunities() {
                 );
               })}
             </nav>
+          ) : (
+            <div className="flex-1 min-w-0" aria-hidden />
           )}
           {prefsReady && (
             <OpportunityTableColumnsMenu

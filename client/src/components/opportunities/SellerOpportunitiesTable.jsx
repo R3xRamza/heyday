@@ -89,11 +89,16 @@ export default function SellerOpportunitiesTable({
 
   return (
     <div className="hidden md:block w-full overflow-auto border border-outline-variant/20 rounded-lg bg-white max-h-[calc(100vh-16rem)]">
-      <table className="border-collapse table-fixed" style={{ width: totalMin, minWidth: '100%' }}>
+      <table
+        className="border-collapse table-fixed w-full"
+        style={{ minWidth: totalMin }}
+      >
         <colgroup>
           {columns.map((c) => (
             <col key={c.id} style={{ width: widths[c.id] ?? c.defaultWidth }} />
           ))}
+          {/* Flexible spacer — leftover viewport width lands here, not on data columns */}
+          <col />
         </colgroup>
         <OpportunityTableHead
           columns={columns}
@@ -103,6 +108,7 @@ export default function SellerOpportunitiesTable({
           onSort={onSort}
           onReorder={onReorder}
           onResize={onResize}
+          trailingSpacer
         />
         <tbody>
           {rows.map((row) => (
@@ -112,6 +118,7 @@ export default function SellerOpportunitiesTable({
               onClick={() => onEdit(row)}
             >
               {columns.map((col) => renderCell(col, row))}
+              <td className={`${TD} p-0 border-b border-outline-variant/10`} aria-hidden />
             </tr>
           ))}
         </tbody>
