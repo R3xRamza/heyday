@@ -13,6 +13,7 @@ import { runMigrations } from '../lib/migrate.js';
 import { CONTACT_COLUMNS } from '../lib/fubImport.js';
 import { FUB_CONTACT_FIELDS, mapFubApiPerson } from '../lib/fubApiImport.js';
 import { fetchAllPeopleForAssignedUser, fetchFubUsers, resolveFubUserId } from '../lib/fubApiClient.js';
+import { isExcludedCrmStage } from '../lib/crmContactScope.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MEREDITH_NAME = 'Meredith Alderson';
@@ -110,16 +111,20 @@ async function main() {
 
   const vendorsBefore = vendorsSnapshot();
   const { people, expectedTotal } = await fetchAllPeopleForAssignedUser(apiKey, assignedUserId, FUB_CONTACT_FIELDS);
-  const activePeople = people.filter((p) => String(p.stage || '').toLowerCase() !== 'trash');
+  const vendorStageCount = people.filter((p) => String(p.stage || '').trim().toLowerCase() === 'vendors').length;
+  const trashCount = people.filter((p) => String(p.stage || '').trim().toLowerCase() === 'trash').length;
+  // CRM contacts only — Vendors stage lives in /crm/vendors, never in contacts list
+  const crmPeople = people.filter((p) => !isExcludedCrmStage(p.stage));
 
   console.log(`Fetched total rows: ${people.length}${expectedTotal != null ? ` (metadata total: ${expectedTotal})` : ''}`);
-  console.log(`Active rows (excluding Trash): ${activePeople.length}`);
+  console.log(`Excluded Trash: ${trashCount}, Vendors stage: ${vendorStageCount}`);
+  console.log(`CRM contacts to sync: ${crmPeople.length}`);
 
-  if (activePeople.length === 0) {
-    throw new Error('Safety stop: API returned 0 active contacts. Contacts table was not modified.');
+  if (crmPeople.length === 0) {
+    throw new Error('Safety stop: API returned 0 CRM contacts. Contacts table was not modified.');
   }
-  if (!useForce && activePeople.length < MIN_SAFE_COUNT) {
-    throw new Error(`Safety stop: only ${activePeople.length} contacts (< ${MIN_SAFE_COUNT}). Re-run with --force if intentional.`);
+  if (!useForce && crmPeople.length < MIN_SAFE_COUNT) {
+    throw new Error(`Safety stop: only ${crmPeople.length} CRM contacts (< ${MIN_SAFE_COUNT}). Re-run with --force if intentional.`);
   }
 
   const users = db.prepare('SELECT id, email, name FROM users').all();
@@ -136,8 +141,8 @@ async function main() {
   const keepExternalIds = new Set();
 
   const applyAll = db.transaction(() => {
-    for (let i = 0; i < activePeople.length; i += BATCH) {
-      const batch = activePeople.slice(i, i + BATCH);
+    for (let i = 0; i < crmPeople.length; i += BATCH) {
+      const batch = crmPeople.slice(i, i + BATCH);
       for (const person of batch) {
         try {
           const mapped = mapFubApiPerson(person, usersByName);
@@ -153,15 +158,15 @@ async function main() {
           if (errors <= 5) console.error('Row error:', err.message);
         }
       }
-      const processed = Math.min(i + BATCH, activePeople.length);
-      if (processed % 1000 === 0 || processed === activePeople.length) {
-        console.log(`  upserted ${processed} / ${activePeople.length}`);
+      const processed = Math.min(i + BATCH, crmPeople.length);
+      if (processed % 1000 === 0 || processed === crmPeople.length) {
+        console.log(`  upserted ${processed} / ${crmPeople.length}`);
       }
     }
 
-    // Remove stale contacts not in FUB — but never delete rows vendors still point at.
+    // Remove stale / Vendors-stage contacts — never delete rows vendors still point at.
     const existing = db.prepare(`
-      SELECT c.id, c.external_id
+      SELECT c.id, c.external_id, c.stage
       FROM contacts c
       WHERE c.external_id IS NOT NULL AND TRIM(c.external_id) != ''
     `).all();
@@ -175,7 +180,8 @@ async function main() {
     `);
 
     for (const row of existing) {
-      if (keepExternalIds.has(String(row.external_id))) continue;
+      const keep = keepExternalIds.has(String(row.external_id)) && !isExcludedCrmStage(row.stage);
+      if (keep) continue;
       const result = deleteOne.run(row.id);
       removed += result.changes;
     }
@@ -190,15 +196,20 @@ async function main() {
   assertVendorsUnchanged(vendorsBefore, vendorsFinal);
 
   const total = db.prepare('SELECT COUNT(*) as c FROM contacts').get().c;
+  const crmTotal = db.prepare(`
+    SELECT COUNT(*) as c FROM contacts c
+    WHERE (c.stage IS NULL OR LOWER(TRIM(c.stage)) NOT IN ('vendors', 'trash'))
+  `).get().c;
   console.log('\nDone.');
   console.log(`  Previous count: ${beforeCount}`);
   console.log(`  Upserted: ${inserted}`);
-  console.log(`  Removed (stale, not vendor-linked): ${removed}`);
+  console.log(`  Removed (stale/Vendors, not vendor-linked): ${removed}`);
   console.log(`  Skipped (no ID): ${skipped}`);
   console.log(`  Errors: ${errors}`);
-  console.log(`  Total in DB: ${total}`);
+  console.log(`  Total contact rows: ${total}`);
+  console.log(`  CRM list count (excl. Vendors/Trash): ${crmTotal}`);
   console.log(`  Vendors unchanged: ${vendorsFinal.count} rows`);
-  console.log(`  Target range check (${EXPECTED_MIN}-${EXPECTED_MAX}): ${total >= EXPECTED_MIN && total <= EXPECTED_MAX ? 'OK' : 'outside expected range'}`);
+  console.log(`  Target range check (${EXPECTED_MIN}-${EXPECTED_MAX}): ${crmTotal >= EXPECTED_MIN && crmTotal <= EXPECTED_MAX ? 'OK' : 'outside expected range'}`);
 }
 
 main().catch((e) => {
