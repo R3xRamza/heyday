@@ -30,7 +30,7 @@ export default function OpportunityKpis({ items, kind }) {
   });
 
   return (
-    <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
+    <div className="flex items-center gap-2 mb-2 overflow-x-auto pb-0.5 -mx-1 px-1">
       <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant shrink-0">
         {items.length} total
       </span>
@@ -39,7 +39,7 @@ export default function OpportunityKpis({ items, kind }) {
         return (
           <span
             key={status}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-white border border-outline-variant/25 text-xs text-on-surface shrink-0"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white border border-outline-variant/25 text-xs text-on-surface shrink-0"
             title={label}
           >
             <span className="font-semibold truncate max-w-[10rem]">{label}</span>

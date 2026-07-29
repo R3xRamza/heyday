@@ -62,11 +62,11 @@ export default function OpportunityTableColumnsMenu({
   }
 
   return (
-    <div className="relative hidden md:flex items-center gap-2" ref={rootRef}>
+    <div className="relative flex items-center gap-2" ref={rootRef}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-1.5 min-h-10 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider border rounded-lg transition-colors ${
+        className={`inline-flex items-center gap-1.5 min-h-11 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider border rounded-lg transition-colors whitespace-nowrap ${
           open
             ? 'bg-primary text-white border-primary'
             : 'bg-white text-on-surface-variant border-outline-variant/30 hover:bg-surface-container-low hover:text-primary'
@@ -80,7 +80,7 @@ export default function OpportunityTableColumnsMenu({
       <button
         type="button"
         onClick={onReset}
-        className="inline-flex items-center gap-1.5 min-h-10 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider border border-outline-variant/30 rounded-lg bg-white text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
+        className="inline-flex items-center gap-1.5 min-h-11 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider border border-outline-variant/30 rounded-lg bg-white text-on-surface-variant hover:bg-surface-container-low hover:text-primary whitespace-nowrap"
         title="Reset columns to defaults"
       >
         <RotateCcw size={14} />
