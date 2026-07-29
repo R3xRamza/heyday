@@ -15,6 +15,13 @@ function formatMoney(value) {
   }).format(n);
 }
 
+/** Deduction lines: $0 or -$X */
+function formatDeduction(value) {
+  const n = Math.abs(Number(value) || 0);
+  if (n === 0) return formatMoney(0);
+  return formatMoney(-n);
+}
+
 function formatDateLabel(ymd) {
   if (!ymd) return '—';
   const d = new Date(`${ymd}T12:00:00`);
@@ -555,14 +562,14 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                   <div className="flex justify-between text-xs">
                     <span className="text-on-surface-variant uppercase tracking-wide font-semibold">eXp Fees</span>
                     <span className="tabular-nums font-bold text-primary">
-                      {formatMoney(breakdown.expFeesTotal ?? (breakdown.expSplit + breakdown.fixedFees))}
+                      {formatDeduction(breakdown.expFeesTotal ?? (breakdown.expSplit + breakdown.fixedFees))}
                     </span>
                   </div>
                 )}
                 <div>
                   <div className="flex justify-between text-xs">
                     <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Custom Fees</span>
-                    <span className="tabular-nums font-bold text-primary">{formatMoney(breakdown.customSum || 0)}</span>
+                    <span className="tabular-nums font-bold text-primary">{formatDeduction(breakdown.customSum || 0)}</span>
                   </div>
                   {customLines.length > 0 && (
                     <ul className="mt-1.5 space-y-1 pl-3">
@@ -570,7 +577,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                         <li key={line.key} className="flex justify-between text-[11px] gap-3">
                           <span className="text-on-surface-variant truncate">{line.label}</span>
                           <span className="tabular-nums text-on-surface-variant shrink-0">
-                            {formatMoney(Math.abs(Number(line.amount) || 0))}
+                            {formatDeduction(line.amount)}
                           </span>
                         </li>
                       ))}
@@ -580,7 +587,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                 {appliesPlan && (
                   <div className="flex justify-between text-xs">
                     <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Team Splits</span>
-                    <span className="tabular-nums font-bold text-primary">{formatMoney(breakdown.teamSplits)}</span>
+                    <span className="tabular-nums font-bold text-primary">{formatDeduction(breakdown.teamSplits)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-base font-black text-secondary pt-2 border-t border-primary/10">
