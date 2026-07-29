@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, Fragment, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { SlidersHorizontal } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import AgentScopeToggle from '../components/AgentScopeToggle';
 import Icon from '../components/shared/Icon';
@@ -430,6 +431,13 @@ export default function RevenueAnalytics() {
               Dec 1 anniversary · {s.anniversaryStart.slice(0, 7)} → {s.anniversaryEnd}
             </span>
           )}
+          <Link
+            to="/revenue/templates"
+            className="hidden md:inline-flex items-center gap-2 shrink-0 px-3 py-1.5 bg-surface-container-highest border border-outline-variant/30 text-primary text-xs font-semibold uppercase tracking-wider hover:bg-surface-container-high"
+          >
+            <SlidersHorizontal size={14} />
+            Edit Split Templates
+          </Link>
           <select
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
