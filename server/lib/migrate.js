@@ -20,7 +20,7 @@ export function addColumnIfMissing(db, table, column, definition) {
   }
 }
 
-export function runMigrations(db) {
+export function runMigrations(db, options = {}) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS checklist_templates (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -164,7 +164,13 @@ export function runMigrations(db) {
   migrateHubDocItemsTable(db);
   migrateVendorsTable(db);
   migrateVendorLikesTable(db);
-  seedVendorsFromCrm(db);
+  // Only seed when empty — never rewrite vendors from CRM/FUB on routine migrate/sync.
+  if (!options.skipVendorSeed) {
+    const vendorCount = db.prepare('SELECT COUNT(*) AS c FROM vendors').get()?.c ?? 0;
+    if (vendorCount === 0) {
+      seedVendorsFromCrm(db);
+    }
+  }
   migrateRevenueSplitTemplates(db);
   migrateOpportunitiesTables(db);
   normalizeBuyerOpportunityRows(db);
