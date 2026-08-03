@@ -31,8 +31,8 @@ const FILTERS = [
   { key: 'active_transactions', label: 'Active Transactions' },
   { key: 'coming_soon', label: 'Coming Soon' },
   { key: 'current_listings', label: 'Current Listings' },
-  { key: 'expiring_soon', label: 'Expiring Soon' },
   { key: 'pending', label: 'Pending' },
+  { key: 'expiring_soon', label: 'Expiring Soon' },
   { key: 'closed', label: 'Closed' },
   { key: 'all', label: 'All Transactions' },
 ];
