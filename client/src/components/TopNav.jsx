@@ -1,4 +1,3 @@
-import { Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSidebar } from '../context/SidebarContext';
 import TeamAvatar from './TeamAvatar';
@@ -38,13 +37,6 @@ export default function TopNav({ title, subtitle, headerRight, titleAddon, pinne
           <AgentScopeBadge />
         </div>
         {headerRight}
-        <button
-          type="button"
-          className="p-1.5 text-on-surface-variant hover:text-feather transition-colors hidden md:inline-flex"
-          aria-label="Notifications"
-        >
-          <Bell size={18} />
-        </button>
         {!isMobileNav && (
           <TeamAvatar email={user?.email} name={user?.name} size="md" />
         )}
