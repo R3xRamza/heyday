@@ -2,12 +2,15 @@ import { Link } from 'react-router-dom';
 import Icon from '../shared/Icon';
 import DateText from '../shared/DateText';
 
+/** Visible body height: 3 rows + 2 gaps + vertical padding. */
+const BODY_MAX_H = 'max-h-[11.75rem]';
+
 function CompactMilestoneCard({ milestone, todayStr }) {
   const isToday = milestone.date === todayStr;
   return (
     <Link
       to={`/transactions/${milestone.transaction_id}`}
-      className="block rounded-md border border-outline-variant/10 bg-surface-container-low/40 px-2.5 py-2 hover:border-secondary/30 hover:bg-secondary/5 transition-colors"
+      className="block h-[3.25rem] rounded-md border border-outline-variant/10 bg-surface-container-low/40 px-2.5 py-1.5 hover:border-secondary/30 hover:bg-secondary/5 transition-colors"
     >
       <span
         className={`text-[9px] font-black uppercase tracking-widest ${
@@ -26,10 +29,10 @@ function ClosingListRow({ milestone, todayStr }) {
   return (
     <Link
       to={`/transactions/${milestone.transaction_id}`}
-      className="flex items-center gap-3 rounded-lg border border-outline-variant/10 bg-surface-container-low/40 px-3 py-2 hover:border-secondary/30 hover:bg-secondary/5 transition-colors min-w-0"
+      className="flex items-center gap-2.5 h-[3.25rem] rounded-lg border border-outline-variant/10 bg-surface-container-low/40 px-3 py-1.5 hover:border-secondary/30 hover:bg-secondary/5 transition-colors min-w-0"
     >
       <span
-        className={`shrink-0 w-[5.75rem] text-[10px] font-black uppercase tracking-widest ${
+        className={`shrink-0 w-[5.25rem] text-[10px] font-black uppercase tracking-widest ${
           isToday ? 'text-secondary' : 'text-on-surface-variant'
         }`}
       >
@@ -37,7 +40,7 @@ function ClosingListRow({ milestone, todayStr }) {
       </span>
       <div className="min-w-0 flex-1">
         <p className="font-bold text-primary text-sm leading-snug truncate">{milestone.title}</p>
-        <p className="text-[11px] text-on-surface-variant truncate mt-0.5">{milestone.sub}</p>
+        <p className="text-[11px] text-on-surface-variant truncate">{milestone.sub}</p>
       </div>
       <Icon name="chevron_right" className="!text-[18px] text-on-surface-variant/40 shrink-0" />
     </Link>
@@ -63,10 +66,13 @@ export default function ClosingSoonPanel({
 
   if (layout === 'horizontal') {
     const headerClass = 'flex items-center gap-2 px-4 h-11 border-b border-primary/5 bg-surface-container-high shrink-0';
+    const listClass = isCompactHorizontal
+      ? 'grid grid-cols-1 gap-1.5'
+      : 'grid grid-cols-1 sm:grid-cols-2 gap-1.5';
 
     return (
       <section
-        className={`bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden flex flex-col h-full ${className}`}
+        className={`bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden flex flex-col ${className}`}
       >
         <div className={headerClass}>
           <Icon name={icon} className="text-secondary !text-[17px] shrink-0" />
@@ -89,16 +95,11 @@ export default function ClosingSoonPanel({
           </Link>
         </div>
 
-        <div className="flex-1 min-h-0 px-2.5 py-2.5 overflow-y-auto custom-scrollbar">
+        <div className={`px-2.5 py-2.5 overflow-y-auto custom-scrollbar ${BODY_MAX_H}`}>
           {loading ? (
-            <div className="space-y-1.5">
-              {(isCompactHorizontal ? [0, 1, 2] : [0, 1, 2, 3]).map((i) => (
-                <div
-                  key={i}
-                  className={`rounded-lg bg-surface-container-low animate-pulse ${
-                    isCompactHorizontal ? 'h-11' : 'h-[3.25rem]'
-                  }`}
-                />
+            <div className={listClass}>
+              {(isCompactHorizontal ? [0, 1, 2] : [0, 1, 2, 3, 4, 5]).map((i) => (
+                <div key={i} className="h-[3.25rem] rounded-lg bg-surface-container-low animate-pulse" />
               ))}
             </div>
           ) : milestones.length === 0 ? (
@@ -106,7 +107,7 @@ export default function ClosingSoonPanel({
               {emptyMessage}
             </p>
           ) : isCompactHorizontal ? (
-            <div className="space-y-1.5">
+            <div className={listClass}>
               {milestones.map((m) => (
                 <CompactMilestoneCard
                   key={`${m.transaction_id}-${m.date}`}
@@ -116,7 +117,7 @@ export default function ClosingSoonPanel({
               ))}
             </div>
           ) : (
-            <div className="space-y-1.5">
+            <div className={listClass}>
               {milestones.map((m) => (
                 <ClosingListRow
                   key={`${m.transaction_id}-${m.date}`}
