@@ -7,7 +7,7 @@ function CompactMilestoneCard({ milestone, todayStr }) {
   return (
     <Link
       to={`/transactions/${milestone.transaction_id}`}
-      className="block rounded-md border border-outline-variant/10 bg-surface-container-low/40 px-2 py-1.5 hover:border-secondary/30 hover:bg-secondary/5 transition-colors"
+      className="block rounded-md border border-outline-variant/10 bg-surface-container-low/40 px-2.5 py-2 hover:border-secondary/30 hover:bg-secondary/5 transition-colors"
     >
       <span
         className={`text-[9px] font-black uppercase tracking-widest ${
@@ -16,7 +16,7 @@ function CompactMilestoneCard({ milestone, todayStr }) {
       >
         {isToday ? 'Today' : <DateText value={milestone.date} />}
       </span>
-      <p className="font-semibold text-primary text-xs leading-snug line-clamp-2 mt-0.5">{milestone.title}</p>
+      <p className="font-semibold text-primary text-xs leading-snug truncate mt-0.5">{milestone.title}</p>
     </Link>
   );
 }
@@ -66,9 +66,7 @@ export default function ClosingSoonPanel({
 
     return (
       <section
-        className={`bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden flex flex-col ${
-          isCompactHorizontal ? 'min-h-0' : 'h-full'
-        } ${className}`}
+        className={`bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden flex flex-col h-full ${className}`}
       >
         <div className={headerClass}>
           <Icon name={icon} className="text-secondary !text-[17px] shrink-0" />
@@ -83,38 +81,28 @@ export default function ClosingSoonPanel({
               {milestones.length}
             </span>
           )}
-          {!isCompactHorizontal && (
-            <Link
-              to={viewAllTo}
-              className="ml-auto text-[10px] font-bold uppercase tracking-wider text-secondary hover:underline shrink-0 whitespace-nowrap"
-            >
-              {viewAllLabel}
-            </Link>
-          )}
+          <Link
+            to={viewAllTo}
+            className="ml-auto text-[10px] font-bold uppercase tracking-wider text-secondary hover:underline shrink-0 whitespace-nowrap"
+          >
+            {viewAllLabel}
+          </Link>
         </div>
 
-        <div className={`flex-1 min-h-0 ${
-          isCompactHorizontal
-            ? 'px-2 py-2 overflow-y-auto custom-scrollbar max-h-[11.25rem]'
-            : 'px-3 py-2.5 overflow-y-auto custom-scrollbar'
-        }`}
-        >
+        <div className="flex-1 min-h-0 px-2.5 py-2.5 overflow-y-auto custom-scrollbar">
           {loading ? (
-            isCompactHorizontal ? (
-              <div className="space-y-1.5">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="h-10 rounded-md bg-surface-container-low animate-pulse" />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="h-[3.25rem] rounded-lg bg-surface-container-low animate-pulse" />
-                ))}
-              </div>
-            )
+            <div className="space-y-1.5">
+              {(isCompactHorizontal ? [0, 1, 2] : [0, 1, 2, 3]).map((i) => (
+                <div
+                  key={i}
+                  className={`rounded-lg bg-surface-container-low animate-pulse ${
+                    isCompactHorizontal ? 'h-11' : 'h-[3.25rem]'
+                  }`}
+                />
+              ))}
+            </div>
           ) : milestones.length === 0 ? (
-            <p className={`text-on-surface-variant ${isCompactHorizontal ? 'text-[11px] px-1' : 'text-sm px-1'}`}>
+            <p className={`text-on-surface-variant px-1 ${isCompactHorizontal ? 'text-[11px]' : 'text-sm'}`}>
               {emptyMessage}
             </p>
           ) : isCompactHorizontal ? (
@@ -139,15 +127,6 @@ export default function ClosingSoonPanel({
             </div>
           )}
         </div>
-
-        {isCompactHorizontal && (
-          <Link
-            to={viewAllTo}
-            className="shrink-0 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-secondary hover:bg-secondary/5 border-t border-primary/5 text-center"
-          >
-            {viewAllLabel}
-          </Link>
-        )}
       </section>
     );
   }
