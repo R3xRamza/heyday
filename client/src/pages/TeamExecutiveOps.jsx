@@ -6,7 +6,7 @@ import TeamAvatar from '../components/TeamAvatar';
 import DateText from '../components/shared/DateText';
 import { getTeamProfile } from '../data/teamProfiles';
 import { formatCurrency, shortAddress } from '../utils/format';
-import ClosingSoonPanel from '../components/tasks/ClosingSoonPanel';
+import ClosingSoonPanel, { sharedMilestoneRows } from '../components/tasks/ClosingSoonPanel';
 import AgentScopeToggle from '../components/AgentScopeToggle';
 import { useAgentScope } from '../context/AgentScopeContext';
 import { appendAgentScope } from '../utils/agentScope';
@@ -708,6 +708,11 @@ export default function TeamExecutiveOps() {
             layout="horizontal"
             className="col-span-2 xl:col-span-3 min-w-0"
             viewAllTo="/transactions?filter=pending"
+            visibleRows={sharedMilestoneRows(
+              closings.length,
+              expirations.length,
+              { loading: loadingClosings || loadingExpirations },
+            )}
           />
 
           <ClosingSoonPanel
@@ -722,6 +727,11 @@ export default function TeamExecutiveOps() {
             loadingMessage="Loading…"
             viewAllTo="/transactions?filter=expiring_soon&order=asc"
             viewAllLabel="View expiring →"
+            visibleRows={sharedMilestoneRows(
+              closings.length,
+              expirations.length,
+              { loading: loadingClosings || loadingExpirations },
+            )}
           />
         </div>
 

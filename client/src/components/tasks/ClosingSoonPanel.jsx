@@ -2,20 +2,34 @@ import { Link } from 'react-router-dom';
 import Icon from '../shared/Icon';
 import DateText from '../shared/DateText';
 
+export const MILESTONE_MAX_ROWS = 3;
+export const CLOSING_COLUMNS = 2;
+export const EXPIRING_COLUMNS = 1;
+
 const ROW_PX = 52; // h-[3.25rem]
 const GAP_PX = 6; // gap-1.5
 const PAD_Y_PX = 20; // py-2.5
 
-/** Body height for 1–3 visible rows (scroll beyond that). */
-function bodyStyle(itemCount, columns, { loading = false } = {}) {
-  const rawRows = loading
-    ? 3
-    : itemCount <= 0
-      ? 1
-      : Math.ceil(itemCount / columns);
-  const rows = Math.min(3, Math.max(1, rawRows));
-  const height = PAD_Y_PX + rows * ROW_PX + (rows - 1) * GAP_PX;
-  return { height: `${height}px`, maxHeight: `${height}px` };
+/** Rows needed to show all items (uncapped). Empty → 1. */
+export function milestoneContentRows(itemCount, columns) {
+  if (itemCount <= 0) return 1;
+  return Math.ceil(itemCount / columns);
+}
+
+/**
+ * Shared visible row count for Closing + Expiring panels (1–3).
+ * Uses the taller content need so both panels match height.
+ */
+export function sharedMilestoneRows(closingCount, expiringCount, { loading = false } = {}) {
+  if (loading) return MILESTONE_MAX_ROWS;
+  const closingNeed = Math.min(MILESTONE_MAX_ROWS, milestoneContentRows(closingCount, CLOSING_COLUMNS));
+  const expiringNeed = Math.min(MILESTONE_MAX_ROWS, milestoneContentRows(expiringCount, EXPIRING_COLUMNS));
+  return Math.max(1, Math.max(closingNeed, expiringNeed));
+}
+
+function bodyHeightPx(rows) {
+  const r = Math.min(MILESTONE_MAX_ROWS, Math.max(1, rows));
+  return PAD_Y_PX + r * ROW_PX + (r - 1) * GAP_PX;
 }
 
 function CompactMilestoneCard({ milestone, todayStr }) {
@@ -73,16 +87,27 @@ export default function ClosingSoonPanel({
   loadingMessage = 'Loading closings…',
   viewAllTo = '/transactions',
   viewAllLabel = 'View transactions →',
+  /** Shared 1–3 row height from parent so Closing + Expiring match. */
+  visibleRows = null,
 }) {
   const todayStr = new Date().toISOString().slice(0, 10);
   const isCompactHorizontal = layout === 'horizontal' && size === 'compact';
 
   if (layout === 'horizontal') {
     const headerClass = 'flex items-center gap-2 px-4 h-11 border-b border-primary/5 bg-surface-container-high shrink-0';
-    const columns = isCompactHorizontal ? 1 : 2;
+    const columns = isCompactHorizontal ? EXPIRING_COLUMNS : CLOSING_COLUMNS;
     const listClass = isCompactHorizontal
       ? 'grid grid-cols-1 gap-1.5'
       : 'grid grid-cols-1 sm:grid-cols-2 gap-1.5';
+
+    const ownRows = Math.min(
+      MILESTONE_MAX_ROWS,
+      milestoneContentRows(loading ? columns * MILESTONE_MAX_ROWS : milestones.length, columns),
+    );
+    const rows = visibleRows != null ? visibleRows : ownRows;
+    // Scroll only when items exceed what max rows can show (closing ≥7, expiring ≥4).
+    const overflows = milestones.length > columns * MILESTONE_MAX_ROWS;
+    const heightPx = bodyHeightPx(rows);
 
     return (
       <section
@@ -110,12 +135,12 @@ export default function ClosingSoonPanel({
         </div>
 
         <div
-          className="px-2.5 py-2.5 overflow-y-auto custom-scrollbar"
-          style={bodyStyle(milestones.length, columns, { loading })}
+          className={`px-2.5 py-2.5 ${overflows ? 'overflow-y-auto custom-scrollbar' : 'overflow-hidden'}`}
+          style={{ height: `${heightPx}px` }}
         >
           {loading ? (
             <div className={listClass}>
-              {(isCompactHorizontal ? [0, 1, 2] : [0, 1, 2, 3, 4, 5]).map((i) => (
+              {Array.from({ length: columns * MILESTONE_MAX_ROWS }, (_, i) => (
                 <div key={i} className="h-[3.25rem] rounded-lg bg-surface-container-low animate-pulse" />
               ))}
             </div>
