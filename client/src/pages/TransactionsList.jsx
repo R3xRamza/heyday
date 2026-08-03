@@ -30,6 +30,7 @@ const FILTERS = [
   { key: 'active_transactions', label: 'Active Transactions' },
   { key: 'coming_soon', label: 'Coming Soon' },
   { key: 'current_listings', label: 'Current Listings' },
+  { key: 'expiring_soon', label: 'Expiring Soon' },
   { key: 'pending', label: 'Pending' },
   { key: 'closed', label: 'Closed' },
   { key: 'all', label: 'All Transactions' },
@@ -48,6 +49,7 @@ const VOLUME_BOX_BY_FILTER = {
   all: { label: 'Total Volume', sub: (n) => `${n} propert${n === 1 ? 'y' : 'ies'}` },
   current_listings: { label: 'Listing Volume', sub: (n) => `${n} active listings` },
   coming_soon: { label: 'Coming Soon Volume', sub: (n) => `${n} future listing${n === 1 ? '' : 's'}` },
+  expiring_soon: { label: 'Expiring Volume', sub: (n) => `${n} expiring soon` },
   pending: { label: 'Total Pending Volume', sub: (n) => `${n} under contract` },
   closed: { label: 'Closed YTD', sub: (n) => `${n} closing${n === 1 ? '' : 's'}` },
 };
@@ -57,6 +59,7 @@ const FOOTER_VOLUME_LABEL = {
   all: 'total volume',
   current_listings: 'listing volume',
   coming_soon: 'coming soon volume',
+  expiring_soon: 'expiring volume',
   pending: 'total pending volume',
   closed: 'closed YTD',
 };
@@ -79,6 +82,7 @@ const DATE_COLUMN_BY_FILTER = {
   all: { label: 'Creation Date', field: 'created_at' },
   current_listings: { label: 'Listing Date', field: 'listing_date' },
   coming_soon: { label: 'Listing Date', field: 'listing_date' },
+  expiring_soon: { label: 'Expiration', field: 'important_date' },
   pending: { label: 'Closing Date', field: 'close_date' },
   closed: { label: 'Closing Date', field: 'close_date' },
 };
@@ -137,6 +141,7 @@ function emptyFilterMessage(filter) {
   switch (filter) {
     case 'coming_soon': return 'No coming soon listings.';
     case 'current_listings': return 'No current listings.';
+    case 'expiring_soon': return 'No listings expiring in the next 30 days.';
     case 'pending': return 'No pending transactions.';
     case 'closed': return 'No closed transactions.';
     case 'all': return 'No transactions yet.';
@@ -262,16 +267,22 @@ export default function TransactionsList() {
   const columns = tableColumns(filter);
   const statsFilter = refreshing ? loadedFilter : filter;
 
+  function defaultSortForFilter(key) {
+    if (key === 'expiring_soon') return { sortKey: 'date', sortDir: 'asc' };
+    return { sortKey: 'date', sortDir: 'desc' };
+  }
+
   function handleFilterChange(key) {
+    const nextSort = defaultSortForFilter(key);
     setPage(1);
-    setSortKey('date');
-    setSortDir('desc');
+    setSortKey(nextSort.sortKey);
+    setSortDir(nextSort.sortDir);
     setSearchParams(buildTransactionsListSearchParams({
       filter: key,
       page: 1,
       search,
-      sortKey: 'date',
-      sortDir: 'desc',
+      sortKey: nextSort.sortKey,
+      sortDir: nextSort.sortDir,
     }), { replace: true });
   }
 
@@ -281,9 +292,10 @@ export default function TransactionsList() {
       return;
     }
     if (prevFilterRef.current !== filter) {
+      const nextSort = defaultSortForFilter(filter);
       setPage(1);
-      setSortKey('date');
-      setSortDir('desc');
+      setSortKey(nextSort.sortKey);
+      setSortDir(nextSort.sortDir);
       prevFilterRef.current = filter;
     }
   }, [filter]);

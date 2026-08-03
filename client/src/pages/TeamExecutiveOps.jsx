@@ -707,6 +707,7 @@ export default function TeamExecutiveOps() {
             loading={loadingClosings}
             layout="horizontal"
             className="col-span-2 xl:col-span-3 min-w-0"
+            viewAllTo="/transactions?filter=pending"
           />
 
           <ClosingSoonPanel
@@ -719,7 +720,8 @@ export default function TeamExecutiveOps() {
             className="col-span-2 xl:col-span-1 min-w-0"
             emptyMessage="None in 30 days."
             loadingMessage="Loading…"
-            viewAllTo="/transactions?filter=current_listings"
+            viewAllTo="/transactions?filter=expiring_soon&order=asc"
+            viewAllLabel="View expiring →"
           />
         </div>
 

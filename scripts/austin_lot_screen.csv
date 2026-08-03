@@ -1,0 +1,2 @@
+address,verdict,zoning,zoning_base,acres,prop_id,situs,watershed,jurisdiction,lon,lat,flood_zones,overlays,notes
+"5104 Evergreen Ct, Austin, TX, 78731",CAUTION,SF-3,SF,,125975,5104,,,-97.757862814589,30.332575296207,,"{""barton_springs"": false, ""capitol_view"": false, ""nccd"": false, ""wui"": true, ""local_historic"": false, ""nr_historic"": false}",CAUTION: Wildland-Urban Interface

@@ -24,7 +24,12 @@ import {
 } from '../lib/transactionValidation.js';
 import { closePastDueTransactions, deriveStageFromCloseDate } from '../lib/transactionAutoClose.js';
 import { completeMarketing90DayTasksForTransaction } from '../lib/completeMarketing90DayOnClose.js';
-import { CURRENT_LISTINGS_VIEW_SCOPE, ON_MARKET_LISTINGS_SCOPE, PRE_LISTINGS_SCOPE } from '../lib/transactionScopes.js';
+import {
+  CURRENT_LISTINGS_VIEW_SCOPE,
+  ON_MARKET_LISTINGS_SCOPE,
+  PRE_LISTINGS_SCOPE,
+  EXPIRING_SOON_SCOPE,
+} from '../lib/transactionScopes.js';
 import { parseAgentScope, transactionAgentScopeClause, assertTransactionInScope } from '../lib/agentScope.js';
 import { runBrokermintImport, fixBrokermintAgentIds } from '../lib/brokermintImport.js';
 import { parsePagination } from '../lib/pagination.js';
@@ -61,6 +66,7 @@ const VIEW_MAP = {
   all_listings: PRE_LISTINGS_SCOPE,
   pending: PENDING_COUNT,
   closed: "stage = 'closed'",
+  expiring_soon: EXPIRING_SOON_SCOPE,
 };
 
 /** Case-insensitive address / zip / client search predicate. `alias` e.g. 't' or '' for bare table. */
@@ -282,6 +288,7 @@ const DATE_FIELD_BY_FILTER = {
   all_listings: 'listing_date',
   pending: 'close_date',
   closed: 'close_date',
+  expiring_soon: 'important_date',
 };
 
 function transactionOrderClause(sortKey, sortDir, dateField) {

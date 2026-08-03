@@ -91,14 +91,14 @@ export default function ClosingSoonPanel({
 
         <div className={`flex-1 min-h-0 ${
           isCompactHorizontal
-            ? 'px-2 py-2 overflow-y-auto custom-scrollbar max-h-[88px]'
+            ? 'px-2 py-2 overflow-y-auto custom-scrollbar max-h-[11.25rem]'
             : 'px-4 py-3 overflow-x-auto custom-scrollbar'
         }`}
         >
           {loading ? (
             isCompactHorizontal ? (
               <div className="space-y-1.5">
-                {[0, 1].map((i) => (
+                {[0, 1, 2].map((i) => (
                   <div key={i} className="h-10 rounded-md bg-surface-container-low animate-pulse" />
                 ))}
               </div>
@@ -142,7 +142,7 @@ export default function ClosingSoonPanel({
             to={viewAllTo}
             className="shrink-0 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-secondary hover:bg-secondary/5 border-t border-primary/5 text-center"
           >
-            View all →
+            {viewAllLabel}
           </Link>
         )}
       </section>

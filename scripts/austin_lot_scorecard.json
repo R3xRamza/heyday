@@ -1,0 +1,191 @@
+[
+  {
+    "address": "5104 Evergreen Ct, Austin, TX, 78731",
+    "lon": -97.757862814589,
+    "lat": 30.332575296207,
+    "zoning": "SF-3",
+    "lot_sqft": 12366.2265625,
+    "acres": 0.28388949867998164,
+    "prop_id": 125975,
+    "pid_10": "0130020425",
+    "overall": "CAUTION",
+    "sections": {
+      "1_protected_trees": {
+        "status": "CAUTION",
+        "findings": {
+          "nearby_tree_permits_300ft": 8,
+          "rules": "Protected \u226519in DBH; Heritage \u226524in (oaks, pecan, cedar elm, etc.)"
+        },
+        "flags": [
+          "MANUAL: City has no public private-lot tree inventory \u2014 need arborist survey (protected \u226519\" DBH; heritage \u226524\" certain species)",
+          "INFO: 8 tree permit point(s) within ~300 ft (neighborhood activity)"
+        ]
+      },
+      "2_access_and_utilities": {
+        "status": "CAUTION",
+        "findings": {
+          "jurisdiction": "AUSTIN FULL PURPOSE",
+          "easements": [
+            {
+              "type": "MULTIPLE USE",
+              "use": "10' Drainage & Public Utility Easement",
+              "status": "DEDICATED",
+              "doc_id": "4/299",
+              "case": "C8-46-0128"
+            }
+          ],
+          "curb_inlets_within_250ft": 0,
+          "prop_id": 125975,
+          "pid_10": "0130020425",
+          "lot": "12"
+        },
+        "flags": [
+          "PASS: jurisdiction AUSTIN FULL PURPOSE",
+          "CAUTION: 1 mapped easement(s) on parcel \u2014 verify buildable envelope",
+          "MANUAL: confirm water/wastewater taps + Austin Energy capacity with utility providers",
+          "INFO: no curb inlets within ~250 ft (not a utility kill)"
+        ]
+      },
+      "3_floodplain_watershed_drainage": {
+        "status": "CAUTION",
+        "findings": {
+          "flood_coa": [],
+          "flood_fema": [],
+          "watershed_regulation": "WATER SUPPLY SUBURBAN",
+          "desired_development_zone": "Drinking Water Protection",
+          "watershed_name": "Taylor Slough North",
+          "cwqz": false,
+          "edwards": {
+            "recharge": "CENTRAL",
+            "verification_buffer": true,
+            "contributing": false
+          },
+          "cef_setback": false,
+          "wui": "Proximity Zone C"
+        },
+        "flags": [
+          "PASS: no floodplain at parcel centroid (confirm FloodPro polygon)",
+          "INFO: watershed regulation = WATER SUPPLY SUBURBAN",
+          "INFO: watershed = Taylor Slough North",
+          "CAUTION: Edwards Aquifer Recharge Zone (CENTRAL) \u2014 water quality review",
+          "CAUTION: Wildland-Urban Interface (Proximity Zone C)"
+        ]
+      },
+      "4_impervious_cover": {
+        "status": "CAUTION",
+        "findings": {
+          "zoning_ic_pct": 45,
+          "effective_ic_pct": 30,
+          "lot_sqft": 12366.2265625,
+          "max_ic_sqft": 3709.86796875,
+          "existing_ic_sqft": 5102.911145703125,
+          "existing_ic_pct": 41.26490097777654,
+          "existing_features": [
+            {
+              "feature": "Structure",
+              "area_sqft": 2637.79883144531
+            },
+            {
+              "feature": "Sidewalk",
+              "area_sqft": 254.965259765625
+            },
+            {
+              "feature": "Patio",
+              "area_sqft": 1120.53881933594
+            },
+            {
+              "feature": "Pavement",
+              "area_sqft": 186.937909375
+            },
+            {
+              "feature": "Paved Driveway",
+              "area_sqft": 902.67032578125
+            }
+          ]
+        },
+        "flags": [
+          "INFO: zoning base IC cap ~45% (SF-3); effective guidance after watershed ~30%",
+          "INFO: lot ~12,366 sqft \u2192 max IC ~3,710 sqft at 30%",
+          "INFO: existing mapped IC ~5,103 sqft (41.3%)",
+          "CAUTION: existing IC appears above effective cap \u2014 rebuild may need IC reduction",
+          "MANUAL: engineer must calculate net site area / proposed IC for permit"
+        ]
+      },
+      "5_far_limits_and_setbacks": {
+        "status": "CAUTION",
+        "findings": {
+          "zoning": "SF-3",
+          "setbacks_ft": {
+            "front": 25,
+            "side": 5,
+            "rear": 10
+          },
+          "building_coverage_pct": 40,
+          "far": 0.4,
+          "max_far_sqft": 4946.490625,
+          "subchapter_f": true,
+          "overlays": {
+            "barton_springs": false,
+            "capitol_view": false,
+            "nccd": false,
+            "local_historic": false,
+            "nr_historic": false,
+            "subchapter_f": true,
+            "wui": "Proximity Zone C"
+          }
+        },
+        "flags": [
+          "INFO: typical SF-3 setbacks F25 / S5 / R10",
+          "INFO: building coverage ~40%; FAR guidance ~0.4:1",
+          "INFO: FAR envelope ~4,946 sqft GFA at 0.4:1",
+          "CAUTION: Subchapter F (Residential Design Standards / McMansion) applies \u2014 confirm FAR, height, setback plane",
+          "MANUAL: confirm exact standards on Property Profile + LDC for this parcel"
+        ]
+      },
+      "6_legal_and_title": {
+        "status": "CAUTION",
+        "findings": {
+          "prop_id": 125975,
+          "pid_10": "0130020425",
+          "easements_gis": [
+            {
+              "type": "MULTIPLE USE",
+              "use": "10' Drainage & Public Utility Easement",
+              "status": "DEDICATED",
+              "doc_id": "4/299",
+              "case": "C8-46-0128"
+            }
+          ],
+          "tcad_url": "https://traviscad.org/property-search/?prop_id=125975"
+        },
+        "flags": [
+          "MANUAL: order title commitment (liens, deed restrictions, HOA covenants)",
+          "MANUAL: pull recorded plat + survey (easements beyond city GIS layer)",
+          "CAUTION: GIS easement \u2014 10' Drainage & Public Utility Easement (status DEDICATED, doc 4/299)"
+        ]
+      },
+      "7_profit_margin": {
+        "status": "CAUTION",
+        "findings": {
+          "ask": null,
+          "build_cost": null,
+          "arv": null,
+          "profit": null,
+          "margin_pct_on_cost": null,
+          "formula": "profit = ARV - ask - build_cost; margin% = profit / (ask + build_cost)",
+          "not_included": [
+            "impact/parkland fees",
+            "soft costs",
+            "carry/interest",
+            "tree mitigation",
+            "WUI upgrades"
+          ]
+        },
+        "flags": [
+          "MANUAL: provide --ask --build-cost --arv to compute margin (formula: profit = ARV \u2212 land \u2212 build; margin = profit / (land+build))"
+        ]
+      }
+    },
+    "property_profile": "https://www.austintexas.gov/development-services/property-profile-overview"
+  }
+]
