@@ -193,7 +193,8 @@ router.get('/milestones', (req, res) => {
     FROM transactions
     WHERE close_date IS NOT NULL
       AND close_date >= ?
-      AND close_date <= ?${scopeSql}
+      AND close_date <= ?
+      AND stage IN ('active', 'pending')${scopeSql}
     ORDER BY close_date ASC
   `).all(today, endStr, ...scopeParams);
 
@@ -222,7 +223,7 @@ router.get('/expirations', (req, res) => {
     WHERE important_date IS NOT NULL
       AND important_date >= ?
       AND important_date <= ?
-      AND stage != 'closed'${scopeSql}
+      AND stage IN ('active', 'pending')${scopeSql}
     ORDER BY important_date ASC
   `).all(today, endStr, ...scopeParams);
 
