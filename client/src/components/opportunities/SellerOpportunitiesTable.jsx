@@ -90,7 +90,7 @@ export default function SellerOpportunitiesTable({
   }
 
   return (
-    <div className="hidden md:block w-full overflow-auto border border-outline-variant/20 rounded-lg bg-white max-h-[calc(100vh-16rem)]">
+    <div className="hidden md:block flex-1 min-h-0 w-full overflow-auto border border-outline-variant/20 rounded-lg bg-white">
       <table
         className="border-collapse table-fixed w-full"
         style={{ minWidth: totalMin }}

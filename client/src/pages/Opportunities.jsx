@@ -7,6 +7,7 @@ import { appendAgentScope } from '../utils/agentScope';
 import {
   BUYER_STATUSES,
   buyerStatusLabel,
+  normalizeBuyerStatus,
 } from '../utils/buyerOpportunity';
 import {
   cycleSort,
@@ -21,7 +22,6 @@ import SellerOpportunitiesTable from '../components/opportunities/SellerOpportun
 import OpportunityBuyerCards from '../components/opportunities/OpportunityBuyerCards';
 import OpportunitySellerCards from '../components/opportunities/OpportunitySellerCards';
 import OpportunityForm from '../components/opportunities/OpportunityForm';
-import OpportunityKpis from '../components/opportunities/OpportunityKpis';
 import OpportunityTableColumnsMenu from '../components/opportunities/OpportunityTableColumnsMenu';
 
 const TAB_KEY = 'opportunities-tab-v1';
@@ -179,6 +179,16 @@ export default function Opportunities() {
     return [];
   }, [tab]);
 
+  const statusCounts = useMemo(() => {
+    const counts = { all: allForPills.length };
+    for (const row of allForPills) {
+      const key = normalizeBuyerStatus(row.status);
+      if (key === 'closed') continue;
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    return counts;
+  }, [allForPills]);
+
   const sortedRows = useMemo(
     () => sortOpportunityRows(tab, rows, activePrefs.sortKey, activePrefs.sortDir),
     [tab, rows, activePrefs.sortKey, activePrefs.sortDir],
@@ -290,10 +300,11 @@ export default function Opportunities() {
       title="Opportunities"
       subtitle="Buyer & seller pipelines"
       headerRight={<AgentScopeToggle />}
-      className="bg-surface"
+      fillViewport
+      className="p-0 overflow-hidden bg-surface"
     >
-      <div className="w-full px-4 md:px-6 lg:px-8 py-3 md:py-4">
-        <header className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 mb-2">
+      <div className="flex-1 min-h-0 flex flex-col w-full px-4 md:px-6 lg:px-8 py-3 md:py-4">
+        <header className="shrink-0 flex flex-col md:flex-row md:items-center gap-2 md:gap-3 mb-2">
           <div className="flex w-full md:w-auto rounded-lg border border-outline-variant/30 overflow-hidden bg-white shrink-0">
             <button
               type="button"
@@ -355,16 +366,8 @@ export default function Opportunities() {
           </div>
         </header>
 
-        {tab === 'buyers' ? (
-          <OpportunityKpis items={allForPills} kind="buyer" />
-        ) : (
-          <p className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant mb-2">
-            {allForPills.length} total
-          </p>
-        )}
-
         {statusOptions.length > 0 && (
-          <nav className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 mb-2">
+          <nav className="shrink-0 flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 mb-2">
             <button
               type="button"
               onClick={() => setStatusFilter('')}
@@ -372,72 +375,79 @@ export default function Opportunities() {
                 !statusFilter ? 'bg-primary text-white' : 'text-on-surface-variant hover:bg-surface-container-low'
               }`}
             >
-              All
+              All ({statusCounts.all || 0})
             </button>
             {statusOptions.map((s) => {
               const label = tab === 'buyers' ? buyerStatusLabel(s) : s;
+              const count = statusCounts[s] || 0;
               return (
                 <button
                   key={s}
                   type="button"
                   onClick={() => setStatusFilter(s)}
-                  className={`shrink-0 min-h-10 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap transition-colors max-w-[14rem] truncate ${
+                  className={`shrink-0 min-h-10 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap transition-colors max-w-[16rem] truncate ${
                     statusFilter === s
                       ? 'bg-primary text-white'
                       : 'text-on-surface-variant hover:bg-surface-container-low'
                   }`}
-                  title={label}
+                  title={`${label} (${count})`}
                 >
-                  {label}
+                  {label} ({count})
                 </button>
               );
             })}
           </nav>
         )}
 
-        {loading && rows.length === 0 ? (
-          <p className="text-sm text-on-surface-variant py-12 text-center">Loading…</p>
-        ) : rows.length === 0 ? (
-          <div className="py-12 md:py-16 px-4 text-center border border-dashed border-outline-variant/30 rounded-xl bg-white">
-            <p className="text-sm text-on-surface-variant mb-4">
-              No {tab === 'buyers' ? 'buyer' : 'seller'} opportunities
-              {search || statusFilter ? ' match these filters' : ' for this agent yet'}.
-            </p>
-            <button
-              type="button"
-              onClick={openNew}
-              className="inline-flex items-center justify-center gap-2 min-h-11 px-5 py-2.5 bg-primary-container text-white text-xs font-semibold uppercase tracking-wider hover:brightness-110"
-            >
-              <Plus size={16} /> New Opportunity
-            </button>
-          </div>
-        ) : tab === 'buyers' ? (
-          <>
-            <OpportunityBuyerCards rows={sortedRows} onEdit={openEdit} />
-            <BuyerOpportunitiesTable
-              rows={sortedRows}
-              onEdit={openEdit}
-              onPatch={handlePatchBuyer}
-              prefs={buyerPrefs}
-              onSort={handleSort}
-              onReorder={handleReorder}
-              onResize={handleResize}
-            />
-          </>
-        ) : (
-          <>
-            <OpportunitySellerCards rows={sortedRows} onEdit={openEdit} onDelete={handleDelete} />
-            <SellerOpportunitiesTable
-              rows={sortedRows}
-              onEdit={openEdit}
-              onDelete={handleDelete}
-              prefs={sellerPrefs}
-              onSort={handleSort}
-              onReorder={handleReorder}
-              onResize={handleResize}
-            />
-          </>
-        )}
+        <div className="flex-1 min-h-0 flex flex-col">
+          {loading && rows.length === 0 ? (
+            <p className="text-sm text-on-surface-variant py-12 text-center">Loading…</p>
+          ) : rows.length === 0 ? (
+            <div className="py-12 md:py-16 px-4 text-center border border-dashed border-outline-variant/30 rounded-xl bg-white">
+              <p className="text-sm text-on-surface-variant mb-4">
+                No {tab === 'buyers' ? 'buyer' : 'seller'} opportunities
+                {search || statusFilter ? ' match these filters' : ' for this agent yet'}.
+              </p>
+              <button
+                type="button"
+                onClick={openNew}
+                className="inline-flex items-center justify-center gap-2 min-h-11 px-5 py-2.5 bg-primary-container text-white text-xs font-semibold uppercase tracking-wider hover:brightness-110"
+              >
+                <Plus size={16} /> New Opportunity
+              </button>
+            </div>
+          ) : tab === 'buyers' ? (
+            <>
+              <div className="md:hidden flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+                <OpportunityBuyerCards rows={sortedRows} onEdit={openEdit} />
+              </div>
+              <BuyerOpportunitiesTable
+                rows={sortedRows}
+                onEdit={openEdit}
+                onPatch={handlePatchBuyer}
+                prefs={buyerPrefs}
+                onSort={handleSort}
+                onReorder={handleReorder}
+                onResize={handleResize}
+              />
+            </>
+          ) : (
+            <>
+              <div className="md:hidden flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+                <OpportunitySellerCards rows={sortedRows} onEdit={openEdit} onDelete={handleDelete} />
+              </div>
+              <SellerOpportunitiesTable
+                rows={sortedRows}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+                prefs={sellerPrefs}
+                onSort={handleSort}
+                onReorder={handleReorder}
+                onResize={handleResize}
+              />
+            </>
+          )}
+        </div>
       </div>
 
       {formOpen && (
