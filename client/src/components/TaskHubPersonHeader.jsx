@@ -6,32 +6,34 @@ import { APP_HEADER_BORDER_CLASS } from '../constants/appHeader';
 export default function TaskHubPersonHeader({ userId, title, member, profile, children, showBorder = true }) {
   return (
     <section
-      className={`relative bg-surface px-10 py-6 shrink-0${
+      className={`relative bg-surface px-4 md:px-10 py-4 md:py-6 shrink-0${
         showBorder ? ` ${APP_HEADER_BORDER_CLASS}` : ''
       }`}
     >
-      <div className="absolute right-10 top-6 z-10">
-        <TaskHubTabs userId={userId} />
-      </div>
+      <div className="flex flex-col gap-4 md:block">
+        <div className="order-2 md:order-none md:absolute md:right-10 md:top-6 z-10 w-full md:w-auto">
+          <TaskHubTabs userId={userId} />
+        </div>
 
-      <div className="pr-72 min-h-[6.5rem]">
-        <Link to="/tasks" className="text-sm text-secondary hover:underline mb-1 inline-block">
-          ← Back to Team Overview
-        </Link>
-        <div className="flex items-center gap-4">
-          {member && (
-            <TeamAvatar
-              email={member.email}
-              name={member.name}
-              size="lg"
-              borderClassName="border-2 border-surface-container"
-            />
-          )}
-          <div>
-            <h2 className="text-3xl font-semibold text-primary">{title}</h2>
-            <p className="text-on-surface-variant text-sm mt-1 min-h-[1.25rem]">
-              {member ? `${member.name} · ${profile?.role}` : '\u00a0'}
-            </p>
+        <div className="order-1 md:pr-72 md:min-h-[6.5rem]">
+          <Link to="/tasks" className="text-sm text-secondary hover:underline mb-1 inline-block">
+            ← Back to Team Overview
+          </Link>
+          <div className="flex items-center gap-3 md:gap-4 min-w-0">
+            {member && (
+              <TeamAvatar
+                email={member.email}
+                name={member.name}
+                size="lg"
+                borderClassName="border-2 border-surface-container"
+              />
+            )}
+            <div className="min-w-0">
+              <h2 className="text-xl md:text-3xl font-semibold text-primary leading-tight">{title}</h2>
+              <p className="text-on-surface-variant text-sm mt-1 min-h-[1.25rem] truncate">
+                {member ? `${member.name} · ${profile?.role}` : '\u00a0'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
