@@ -2,40 +2,44 @@ import { Link } from 'react-router-dom';
 import Icon from '../shared/Icon';
 import DateText from '../shared/DateText';
 
-function HorizontalMilestoneCard({ milestone, todayStr, compact = false }) {
+function CompactMilestoneCard({ milestone, todayStr }) {
   const isToday = milestone.date === todayStr;
-  if (compact) {
-    return (
-      <Link
-        to={`/transactions/${milestone.transaction_id}`}
-        className="block rounded-md border border-outline-variant/10 bg-surface-container-low/40 px-2 py-1.5 hover:border-secondary/30 hover:bg-secondary/5 transition-colors"
-      >
-        <span
-          className={`text-[9px] font-black uppercase tracking-widest ${
-            isToday ? 'text-secondary' : 'text-on-surface-variant'
-          }`}
-        >
-          {isToday ? 'Today' : <DateText value={milestone.date} />}
-        </span>
-        <p className="font-semibold text-primary text-xs leading-snug line-clamp-2 mt-0.5">{milestone.title}</p>
-      </Link>
-    );
-  }
-
   return (
     <Link
       to={`/transactions/${milestone.transaction_id}`}
-      className="shrink-0 min-w-[200px] max-w-[240px] rounded-lg border border-outline-variant/15 bg-surface-container-low/40 px-3 py-2.5 hover:border-secondary/30 hover:bg-secondary/5 transition-colors"
+      className="block rounded-md border border-outline-variant/10 bg-surface-container-low/40 px-2 py-1.5 hover:border-secondary/30 hover:bg-secondary/5 transition-colors"
     >
       <span
-        className={`inline-block text-[10px] font-black uppercase tracking-widest mb-1.5 px-1.5 py-0.5 rounded ${
-          isToday ? 'bg-secondary/15 text-secondary' : 'text-on-surface-variant'
+        className={`text-[9px] font-black uppercase tracking-widest ${
+          isToday ? 'text-secondary' : 'text-on-surface-variant'
         }`}
       >
         {isToday ? 'Today' : <DateText value={milestone.date} />}
       </span>
-      <p className="font-bold text-primary text-sm leading-snug line-clamp-2">{milestone.title}</p>
-      <p className="text-[11px] text-on-surface-variant mt-1 truncate">{milestone.sub}</p>
+      <p className="font-semibold text-primary text-xs leading-snug line-clamp-2 mt-0.5">{milestone.title}</p>
+    </Link>
+  );
+}
+
+function ClosingListRow({ milestone, todayStr }) {
+  const isToday = milestone.date === todayStr;
+  return (
+    <Link
+      to={`/transactions/${milestone.transaction_id}`}
+      className="flex items-center gap-3 rounded-lg border border-outline-variant/10 bg-surface-container-low/40 px-3 py-2 hover:border-secondary/30 hover:bg-secondary/5 transition-colors min-w-0"
+    >
+      <span
+        className={`shrink-0 w-[5.75rem] text-[10px] font-black uppercase tracking-widest ${
+          isToday ? 'text-secondary' : 'text-on-surface-variant'
+        }`}
+      >
+        {isToday ? 'Today' : <DateText value={milestone.date} />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="font-bold text-primary text-sm leading-snug truncate">{milestone.title}</p>
+        <p className="text-[11px] text-on-surface-variant truncate mt-0.5">{milestone.sub}</p>
+      </div>
+      <Icon name="chevron_right" className="!text-[18px] text-on-surface-variant/40 shrink-0" />
     </Link>
   );
 }
@@ -63,7 +67,7 @@ export default function ClosingSoonPanel({
     return (
       <section
         className={`bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden flex flex-col ${
-          isCompactHorizontal ? 'min-h-0' : ''
+          isCompactHorizontal ? 'min-h-0' : 'h-full'
         } ${className}`}
       >
         <div className={headerClass}>
@@ -92,7 +96,7 @@ export default function ClosingSoonPanel({
         <div className={`flex-1 min-h-0 ${
           isCompactHorizontal
             ? 'px-2 py-2 overflow-y-auto custom-scrollbar max-h-[11.25rem]'
-            : 'px-4 py-3 overflow-x-auto custom-scrollbar'
+            : 'px-3 py-2.5 overflow-y-auto custom-scrollbar'
         }`}
         >
           {loading ? (
@@ -103,31 +107,30 @@ export default function ClosingSoonPanel({
                 ))}
               </div>
             ) : (
-              <div className="flex gap-3">
+              <div className="space-y-1.5">
                 {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="shrink-0 min-w-[200px] h-[72px] rounded-lg bg-surface-container-low animate-pulse" />
+                  <div key={i} className="h-[3.25rem] rounded-lg bg-surface-container-low animate-pulse" />
                 ))}
               </div>
             )
           ) : milestones.length === 0 ? (
-            <p className={`text-on-surface-variant ${isCompactHorizontal ? 'text-[11px] px-1' : 'text-sm'}`}>
+            <p className={`text-on-surface-variant ${isCompactHorizontal ? 'text-[11px] px-1' : 'text-sm px-1'}`}>
               {emptyMessage}
             </p>
           ) : isCompactHorizontal ? (
             <div className="space-y-1.5">
               {milestones.map((m) => (
-                <HorizontalMilestoneCard
+                <CompactMilestoneCard
                   key={`${m.transaction_id}-${m.date}`}
                   milestone={m}
                   todayStr={todayStr}
-                  compact
                 />
               ))}
             </div>
           ) : (
-            <div className="flex gap-3">
+            <div className="space-y-1.5">
               {milestones.map((m) => (
-                <HorizontalMilestoneCard
+                <ClosingListRow
                   key={`${m.transaction_id}-${m.date}`}
                   milestone={m}
                   todayStr={todayStr}

@@ -17,6 +17,7 @@ import { useIsMdUp } from '../hooks/useMediaQuery';
 import {
   buildTransactionsListSearchParams,
   hasTransactionsListQuery,
+  parseTransactionsListSearchParams,
   readTransactionsListView,
   resolveTransactionsListView,
   filterFromSearchParams,
@@ -222,7 +223,6 @@ export default function TransactionsList() {
   const { scope } = useAgentScope();
   const [searchParams, setSearchParams] = useSearchParams();
   const restoredRef = useRef(false);
-  const prevFilterRef = useRef(null);
 
   useLayoutEffect(() => {
     if (restoredRef.current) return;
@@ -256,6 +256,22 @@ export default function TransactionsList() {
     writeTransactionsListView({ filter, page, search, sortKey, sortDir });
   }, [filter, page, search, sortKey, sortDir]);
 
+  // Keep local page/search/sort in sync when the URL changes (filters, back/forward, hub links).
+  useEffect(() => {
+    const view = hasTransactionsListQuery(searchParams)
+      ? parseTransactionsListSearchParams(searchParams)
+      : (readTransactionsListView() || {
+        page: 1,
+        search: '',
+        sortKey: 'date',
+        sortDir: 'desc',
+      });
+    setPage(view.page);
+    setSearch(view.search);
+    setSortKey(view.sortKey);
+    setSortDir(view.sortDir);
+  }, [searchParams]);
+
   useEffect(() => {
     if (!showCreate) return;
     fetch('/api/team', { credentials: 'include' })
@@ -272,64 +288,57 @@ export default function TransactionsList() {
     return { sortKey: 'date', sortDir: 'desc' };
   }
 
-  function handleFilterChange(key) {
-    const nextSort = defaultSortForFilter(key);
-    setPage(1);
-    setSortKey(nextSort.sortKey);
-    setSortDir(nextSort.sortDir);
+  /** Single write path for list URL + local view state (avoids filter/URL races). */
+  function commitListView({
+    filter: nextFilter = filter,
+    page: nextPage = page,
+    search: nextSearch = search,
+    sortKey: nextSortKey = sortKey,
+    sortDir: nextSortDir = sortDir,
+  }) {
+    setPage(nextPage);
+    setSearch(nextSearch);
+    setSortKey(nextSortKey);
+    setSortDir(nextSortDir);
     setSearchParams(buildTransactionsListSearchParams({
-      filter: key,
-      page: 1,
-      search,
-      sortKey: nextSort.sortKey,
-      sortDir: nextSort.sortDir,
+      filter: nextFilter,
+      page: nextPage,
+      search: nextSearch,
+      sortKey: nextSortKey,
+      sortDir: nextSortDir,
     }), { replace: true });
   }
 
-  useEffect(() => {
-    if (prevFilterRef.current === null) {
-      prevFilterRef.current = filter;
-      return;
-    }
-    if (prevFilterRef.current !== filter) {
-      const nextSort = defaultSortForFilter(filter);
-      setPage(1);
-      setSortKey(nextSort.sortKey);
-      setSortDir(nextSort.sortDir);
-      prevFilterRef.current = filter;
-    }
-  }, [filter]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [search]);
-
-  useEffect(() => {
-    setSearchParams(buildTransactionsListSearchParams({
-      filter,
-      page,
-      search,
-      sortKey,
-      sortDir,
-    }), { replace: true });
-  }, [filter, page, search, sortKey, sortDir, setSearchParams]);
+  function handleFilterChange(key) {
+    if (key === filter) return;
+    const nextSort = defaultSortForFilter(key);
+    commitListView({
+      filter: key,
+      page: 1,
+      sortKey: nextSort.sortKey,
+      sortDir: nextSort.sortDir,
+    });
+  }
 
   function handleSearchChange(value) {
-    setSearch(value);
+    commitListView({ search: value, page: 1 });
   }
 
   function clearSearch() {
-    setSearch('');
+    handleSearchChange('');
   }
 
   function handleSort(key) {
-    setPage(1);
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
+    const nextDir = sortKey === key ? (sortDir === 'asc' ? 'desc' : 'asc') : 'asc';
+    commitListView({
+      page: 1,
+      sortKey: key,
+      sortDir: nextDir,
+    });
+  }
+
+  function handlePageChange(nextPage) {
+    commitListView({ page: nextPage });
   }
 
   const transactions = data.transactions || [];
@@ -622,7 +631,7 @@ export default function TransactionsList() {
           <ListPagination
             page={page}
             total={data.total ?? 0}
-            onPageChange={setPage}
+            onPageChange={handlePageChange}
           />
         </div>
       </div>
