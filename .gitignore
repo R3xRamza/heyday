@@ -5,4 +5,5 @@ client/dist/
 *.db
 *.db-shm
 *.db-wal
+backups/
 .DS_Store

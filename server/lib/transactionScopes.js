@@ -25,6 +25,14 @@ export const PRE_LISTINGS_SCOPE = `${LISTING_SIDE_OPEN} AND (
 /** Under contract with a close date set. */
 export const PENDING_DEALS_SCOPE = "stage = 'pending' AND close_date IS NOT NULL";
 
+/** Listings / deals with expiration (important_date) in the next 30 days, not closed. */
+export const EXPIRING_SOON_SCOPE = `
+  important_date IS NOT NULL
+  AND important_date >= date('now')
+  AND important_date <= date('now', '+30 days')
+  AND stage != 'closed'
+`.replace(/\s+/g, ' ').trim();
+
 const TX_HUB_SELECT = `
   SELECT t.id, t.address, t.city, t.state, t.value, t.close_date, t.listing_date,
     COALESCE(t.client_name, t.owner_name) as client_name, u.name as agent_name

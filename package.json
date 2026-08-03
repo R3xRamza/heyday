@@ -13,7 +13,8 @@
     "fix-brokermint-agents": "node server/scripts/fix-brokermint-agent-ids.js",
     "post-brokermint-import": "node server/scripts/post-brokermint-import.js",
     "clear-transactions": "node server/scripts/clear-transactions.js",
-    "seed-sample-transactions": "node server/scripts/reset-transactions.js"
+    "seed-sample-transactions": "node server/scripts/reset-transactions.js",
+    "backup:prod": "bash scripts/backup-prod-db.sh"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
