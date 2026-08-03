@@ -108,22 +108,24 @@ export default function TaskCalendarView({ tasks, onTaskClick }) {
   }
 
   return (
-    <div className="p-6 md:p-10">
-      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <div className="flex items-center gap-2">
+    <div className="p-3 sm:p-6 md:p-10">
+      <div className="flex items-center justify-between gap-3 mb-4 md:mb-6 flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
           <button
             type="button"
             onClick={prevMonth}
-            className="p-2 rounded-lg border border-outline-variant/20 text-on-surface-variant hover:bg-surface-container-high transition-colors"
+            className="p-2 min-h-11 min-w-11 rounded-lg border border-outline-variant/20 text-on-surface-variant hover:bg-surface-container-high transition-colors"
             aria-label="Previous month"
           >
             <Icon name="chevron_left" className="!text-[20px]" />
           </button>
-          <h3 className="text-lg font-semibold text-primary min-w-[180px] text-center">{monthLabel}</h3>
+          <h3 className="text-base sm:text-lg font-semibold text-primary min-w-0 sm:min-w-[180px] text-center truncate">
+            {monthLabel}
+          </h3>
           <button
             type="button"
             onClick={nextMonth}
-            className="p-2 rounded-lg border border-outline-variant/20 text-on-surface-variant hover:bg-surface-container-high transition-colors"
+            className="p-2 min-h-11 min-w-11 rounded-lg border border-outline-variant/20 text-on-surface-variant hover:bg-surface-container-high transition-colors"
             aria-label="Next month"
           >
             <Icon name="chevron_right" className="!text-[20px]" />
@@ -132,51 +134,77 @@ export default function TaskCalendarView({ tasks, onTaskClick }) {
         <button
           type="button"
           onClick={goToday}
-          className="text-xs font-semibold uppercase tracking-wide text-secondary hover:underline"
+          className="text-xs font-semibold uppercase tracking-wide text-secondary hover:underline min-h-11 px-2"
         >
           Today
         </button>
       </div>
 
       <div className="bg-surface border border-outline-variant/20 rounded-xl overflow-hidden shadow-sm">
-        <div className="grid grid-cols-7 text-center py-3 bg-surface-container-high border-b border-outline-variant/20">
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-            <div key={d} className="text-[11px] font-bold text-on-surface-variant/60 uppercase tracking-widest">
-              {d}
+        <div className="grid grid-cols-7 text-center py-2 md:py-3 bg-surface-container-high border-b border-outline-variant/20">
+          {[
+            { short: 'M', full: 'Mon' },
+            { short: 'T', full: 'Tue' },
+            { short: 'W', full: 'Wed' },
+            { short: 'T', full: 'Thu' },
+            { short: 'F', full: 'Fri' },
+            { short: 'S', full: 'Sat' },
+            { short: 'S', full: 'Sun' },
+          ].map((d) => (
+            <div
+              key={d.full}
+              className="text-[10px] md:text-[11px] font-bold text-on-surface-variant/60 uppercase tracking-widest"
+            >
+              <span className="md:hidden">{d.short}</span>
+              <span className="hidden md:inline">{d.full}</span>
             </div>
           ))}
         </div>
         <div className="calendar-grid">
           {cells.map((cell) => {
             const dayTasks = cell.dateStr ? tasksByDate[cell.dateStr] || [] : [];
+            const mobileLimit = 2;
+            const desktopLimit = 4;
             return (
               <div
                 key={`${cell.dateStr}-${cell.day}`}
-                className={`calendar-cell min-h-[120px] ${
+                className={`calendar-cell min-h-[4.5rem] sm:min-h-[6rem] md:min-h-[120px] p-1 sm:p-1.5 ${
                   cell.muted ? 'bg-surface-container-lowest/50 text-outline-variant' : ''
                 } ${cell.today ? 'bg-secondary/5 ring-1 ring-inset ring-secondary/20' : ''}`}
               >
                 <span
-                  className={`font-bold text-xs block mb-1 ${
+                  className={`font-bold text-[10px] sm:text-xs block mb-0.5 sm:mb-1 ${
                     cell.today ? 'text-secondary' : cell.muted ? 'text-outline-variant' : 'text-on-surface'
                   }`}
                 >
                   {cell.day}
                   {cell.today ? (
-                    <span className="text-[10px] font-semibold text-secondary ml-1">Today</span>
+                    <span className="hidden sm:inline text-[10px] font-semibold text-secondary ml-1">Today</span>
                   ) : null}
                 </span>
                 {dayTasks.length > 0 && (
-                  <div className="mt-1 space-y-1 max-h-[88px] overflow-y-auto custom-scrollbar">
-                    {dayTasks.slice(0, 4).map((t) => (
-                      <TaskChip key={t.id} task={t} onClick={onTaskClick} />
-                    ))}
-                    {dayTasks.length > 4 && (
-                      <p className="text-[10px] text-on-surface-variant/60 pl-1">
-                        +{dayTasks.length - 4} more
-                      </p>
-                    )}
-                  </div>
+                  <>
+                    <div className="mt-0.5 space-y-0.5 max-h-[3rem] overflow-hidden md:hidden">
+                      {dayTasks.slice(0, mobileLimit).map((t) => (
+                        <TaskChip key={t.id} task={t} onClick={onTaskClick} />
+                      ))}
+                      {dayTasks.length > mobileLimit && (
+                        <p className="text-[9px] text-on-surface-variant/60 pl-0.5">
+                          +{dayTasks.length - mobileLimit}
+                        </p>
+                      )}
+                    </div>
+                    <div className="hidden md:block mt-1 space-y-1 max-h-[88px] overflow-y-auto custom-scrollbar">
+                      {dayTasks.slice(0, desktopLimit).map((t) => (
+                        <TaskChip key={t.id} task={t} onClick={onTaskClick} />
+                      ))}
+                      {dayTasks.length > desktopLimit && (
+                        <p className="text-[10px] text-on-surface-variant/60 pl-1">
+                          +{dayTasks.length - desktopLimit} more
+                        </p>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             );

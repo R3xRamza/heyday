@@ -13,8 +13,10 @@ import { useAgentScope } from '../context/AgentScopeContext';
 import { appendAgentScope } from '../utils/agentScope';
 import { recurrenceLabel } from '../utils/taskRecurrence';
 import TaskHubPersonHeader from '../components/TaskHubPersonHeader';
+import UserTaskMobileCards from '../components/tasks/UserTaskMobileCards';
 import { APP_HEADER_BORDER_CLASS } from '../constants/appHeader';
 import { shortAddress } from '../utils/format';
+import { useIsMdUp } from '../hooks/useMediaQuery';
 
 const FILTERS = [
   { key: 'all', label: 'All Tasks' },
@@ -81,6 +83,8 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
   const [viewMode, setViewMode] = useState('list');
   const [page, setPage] = useState(1);
   const [statusOverrides, setStatusOverrides] = useState({});
+  const [prefsOpen, setPrefsOpen] = useState(false);
+  const isMdUp = useIsMdUp();
 
   const includeCompleted = showCompleted;
 
@@ -285,6 +289,249 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
 
   const rowPad = compact ? 'py-2' : 'py-4';
 
+  function PrefToggle({ label, checked, onChange, disabled = false }) {
+    return (
+      <label className={`flex items-center justify-between gap-3 ${disabled ? 'cursor-default' : 'cursor-pointer'}`}>
+        <span className="text-sm text-on-surface-variant font-medium">{label}</span>
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={onChange}
+          className="sr-only peer"
+        />
+        <div className={`w-9 h-5 rounded-full relative transition-colors shrink-0 ${checked ? 'bg-secondary' : 'bg-outline-variant/30'}`}>
+          <div className={`absolute top-[2px] h-4 w-4 rounded-full bg-white transition-all ${checked ? 'left-[18px]' : 'left-[2px]'}`} />
+        </div>
+      </label>
+    );
+  }
+
+  const preferences = (
+    <div className="space-y-4">
+      {isMdUp && (
+        <PrefToggle
+          label="Compact Mode"
+          checked={compact}
+          onChange={(e) => setCompact(e.target.checked)}
+        />
+      )}
+      <PrefToggle
+        label="Show tasks without due date"
+        checked={showUndated}
+        disabled={category === 'admin'}
+        onChange={(e) => setTransactionShowUndated(e.target.checked)}
+      />
+      <PrefToggle
+        label="Show Completed"
+        checked={showCompleted}
+        onChange={(e) => setShowCompleted(e.target.checked)}
+      />
+    </div>
+  );
+
+  const emptyState = (
+    <div className="p-8 md:p-10 text-center">
+      <p className="text-on-surface-variant mb-4">
+        {data.tasks.length === 0
+          ? 'No tasks match this filter.'
+          : 'No dated tasks to show.'}
+      </p>
+      {!showUndated && data.tasks.some((t) => !t.due_date) && (
+        <p className="text-sm text-on-surface-variant mb-4">
+          Turn on &quot;Show tasks without due date&quot; in Preferences to see undated tasks.
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={() => setShowCreate(true)}
+        className="text-sm font-semibold text-secondary hover:underline"
+      >
+        {category === 'admin' ? 'Create an admin task' : 'Create a transaction task'}
+      </button>
+    </div>
+  );
+
+  const desktopTable = (
+    <div className="m-6 bg-white border border-outline-variant/20 rounded-xl shadow-executive overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-separate border-spacing-0">
+          <thead className="sticky top-0 bg-surface-container-low z-10">
+            <tr>
+              {isAdmin ? (
+                <>
+                  <th className="pl-10 pr-4 py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30 w-12" />
+                  <th className="px-4 py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30">
+                    Task Description
+                  </th>
+                  {showPriorityColumn && (
+                    <th className="px-4 py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30 w-28">
+                      Priority
+                    </th>
+                  )}
+                  <th className="pl-4 pr-4 py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30 text-right whitespace-nowrap min-w-[9.5rem]">
+                    Due Date
+                  </th>
+                  <th className="pl-4 pr-10 py-4 border-b border-outline-variant/30 w-24" />
+                </>
+              ) : (
+                ['', 'Task Description', 'Property', 'Due Date', ''].map((h, i) => (
+                  <th
+                    key={h || 'actions'}
+                    className={`${i === 0 ? 'pl-10 pr-4' : i === 4 ? 'pl-4 pr-10 text-right' : i === 3 ? 'px-4 min-w-[9.5rem] w-[9.5rem]' : 'px-4'} py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30`}
+                  >
+                    {h}
+                  </th>
+                ))
+              )}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-outline-variant/20">
+            {displayedTasks.map((task) => {
+              const isComplete = task.status === 'complete';
+              const dueLabel = renderDueLabel(task);
+              const expanded = expandedId === task.id;
+              return (
+                <Fragment key={task.id}>
+                  <tr
+                    onClick={() => setEditTask(task)}
+                    className={`hover:bg-surface-container-low/60 transition-colors group cursor-pointer ${
+                      isComplete ? 'opacity-65 hover:opacity-100 bg-surface-container-low/20' : 'bg-white'
+                    }`}
+                  >
+                    <td className={`pl-10 pr-4 ${rowPad}`} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isComplete}
+                        onChange={(e) => toggleTask(task, e)}
+                        className="rounded-sm border-outline-variant/50 text-secondary focus:ring-0 w-4 h-4"
+                      />
+                    </td>
+                    <td className={`px-4 ${rowPad}`}>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className={`text-sm font-semibold ${isComplete ? 'text-on-surface-variant line-through' : 'text-on-surface'}`}>
+                          {task.title}
+                        </p>
+                        {isAdmin && recurrenceLabel(task.recurrence) && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wide bg-sky/15 text-sky border border-sky/25">
+                            {recurrenceLabel(task.recurrence)}
+                          </span>
+                        )}
+                      </div>
+                      {task.description && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedId(expanded ? null : task.id);
+                          }}
+                          className="text-[11px] text-secondary hover:underline mt-0.5"
+                        >
+                          {expanded ? 'Hide details' : 'Show details'}
+                        </button>
+                      )}
+                    </td>
+                    {isAdmin ? (
+                      <>
+                        {showPriorityColumn && (
+                          <td className={`px-4 ${rowPad} text-sm align-top`}>
+                            {task.priority === 'high' && !isComplete ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wide bg-error/10 text-error">
+                                High
+                              </span>
+                            ) : (
+                              <span className="text-on-surface-variant/30">—</span>
+                            )}
+                          </td>
+                        )}
+                        <td className={`pl-4 pr-4 ${rowPad} whitespace-nowrap text-right min-w-[9.5rem]`}>
+                          <span className={`inline-flex items-center justify-end gap-1.5 text-xs font-semibold whitespace-nowrap ${dueCellClass(task)}`}>
+                            {dueLabel}
+                            {task.is_overdue && task.status !== 'complete' && task.due_date && (
+                              <span className="text-[10px] uppercase tracking-wide text-error/90">Overdue</span>
+                            )}
+                          </span>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className={`px-4 ${rowPad} text-sm align-top min-w-0 whitespace-normal`}>
+                          {task.transaction_id ? (
+                            <TwoLineFitText
+                              as={Link}
+                              to={`/transactions/${task.transaction_id}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-on-surface-variant/80 hover:text-secondary hover:underline"
+                            >
+                              {shortAddress(task.transaction_address)}
+                            </TwoLineFitText>
+                          ) : (
+                            <TwoLineFitText className="text-on-surface-variant/80">
+                              {shortAddress(task.transaction_address) || '—'}
+                            </TwoLineFitText>
+                          )}
+                        </td>
+                        <td className={`px-4 ${rowPad} whitespace-nowrap min-w-[9.5rem]`}>
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap ${dueCellClass(task)}`}>
+                            {dueLabel}
+                            {task.is_overdue && task.status !== 'complete' && task.due_date && (
+                              <span className="text-[10px] uppercase tracking-wide text-error/90">Overdue</span>
+                            )}
+                          </span>
+                        </td>
+                      </>
+                    )}
+                    <td className={`pl-4 pr-10 ${rowPad} text-right`} onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={() => setEditTask(task)}
+                          className="p-1 text-on-surface-variant/40 hover:text-primary"
+                          title="Edit task"
+                        >
+                          <Icon name="edit" className="!text-[18px]" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => deleteTask(task, e)}
+                          className="p-1 text-on-surface-variant/40 hover:text-error"
+                          title="Delete task"
+                        >
+                          <Icon name="delete" className="!text-[18px]" />
+                        </button>
+                        {task.transaction_id && (
+                          <Link
+                            to={`/transactions/${task.transaction_id}`}
+                            className="p-1 text-on-surface-variant/40 hover:text-primary inline-flex"
+                            title="View transaction"
+                          >
+                            <Icon name="open_in_new" className="!text-[18px]" />
+                          </Link>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  {expanded && task.description && (
+                    <tr className="bg-surface-container-low/20">
+                      <td colSpan={tableColCount} className="px-10 pb-4 pt-0 text-sm text-on-surface-variant whitespace-pre-wrap">
+                        {task.description}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <ListPagination
+        page={page}
+        total={data.total ?? displayedTasks.length}
+        onPageChange={setPage}
+      />
+    </div>
+  );
+
   return (
     <DashboardLayout
       title={member ? `${member.name}'s Task Hub` : 'Task Hub'}
@@ -300,13 +547,13 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
             profile={profile}
             showBorder={false}
           >
-            <div className="flex items-center gap-2 flex-wrap pb-4">
+            <div className="flex items-center gap-2 flex-wrap pb-3 md:pb-4 pt-1">
               {FILTERS.map((f) => (
                 <button
                   key={f.key}
                   type="button"
                   onClick={() => selectFilter(f.key)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide transition-colors ${filterPillClass(f.key)}`}
+                  className={`px-3 md:px-4 py-1.5 rounded-full text-[11px] md:text-xs font-semibold uppercase tracking-wide transition-colors ${filterPillClass(f.key)}`}
                 >
                   {filterLabel(f.key, f.label)}
                 </button>
@@ -315,295 +562,122 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
           </TaskHubPersonHeader>
         </div>
 
-        <div className="sticky top-0 z-10 h-[calc(100vh-4.25rem)] overflow-hidden flex flex-col lg:flex-row border-t border-sky bg-surface-container-lowest">
-          <section className="flex-1 min-h-0 overflow-y-auto custom-scrollbar bg-surface-container-lowest">
-          {viewMode === 'calendar' ? (
-            loading ? (
-              <p className="p-10 text-on-surface-variant">Loading tasks…</p>
-            ) : (
-              <TaskCalendarView tasks={displayedTasks} onTaskClick={setEditTask} />
-            )
-          ) : loading ? (
-            <p className="p-10 text-on-surface-variant">Loading tasks…</p>
-          ) : displayedTasks.length === 0 ? (
-            <div className="p-10 text-center">
-              <p className="text-on-surface-variant mb-4">
-                {data.tasks.length === 0
-                  ? 'No tasks match this filter.'
-                  : 'No dated tasks to show.'}
-              </p>
-              {!showUndated && data.tasks.some((t) => !t.due_date) && (
-                <p className="text-sm text-on-surface-variant mb-4">
-                  Turn on &quot;Show tasks without due date&quot; in Preferences to see undated tasks.
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowCreate(true)}
-                className="text-sm font-semibold text-secondary hover:underline"
-              >
-                {category === 'admin' ? 'Create an admin task' : 'Create a transaction task'}
-              </button>
-            </div>
-          ) : (
-            <div className="m-6 bg-white border border-outline-variant/20 rounded-xl shadow-executive overflow-hidden">
-            <div className="overflow-x-auto">
-            <table className="w-full text-left border-separate border-spacing-0">
-              <thead className="sticky top-0 bg-surface-container-low z-10">
-                <tr>
-                  {isAdmin ? (
-                    <>
-                      <th className="pl-10 pr-4 py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30 w-12" />
-                      <th className="px-4 py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30">
-                        Task Description
-                      </th>
-                      {showPriorityColumn && (
-                        <th className="px-4 py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30 w-28">
-                          Priority
-                        </th>
-                      )}
-                      <th className="pl-4 pr-4 py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30 text-right whitespace-nowrap min-w-[9.5rem]">
-                        Due Date
-                      </th>
-                      <th className="pl-4 pr-10 py-4 border-b border-outline-variant/30 w-24" />
-                    </>
-                  ) : (
-                    ['', 'Task Description', 'Property', 'Due Date', ''].map((h, i) => (
-                      <th
-                        key={h || 'actions'}
-                        className={`${i === 0 ? 'pl-10 pr-4' : i === 4 ? 'pl-4 pr-10 text-right' : i === 3 ? 'px-4 min-w-[9.5rem] w-[9.5rem]' : 'px-4'} py-4 text-[11px] text-on-surface-variant uppercase tracking-widest font-semibold border-b border-outline-variant/30`}
-                      >
-                        {h}
-                      </th>
-                    ))
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/20">
-                {displayedTasks.map((task) => {
-                  const isComplete = task.status === 'complete';
-                  const dueLabel = renderDueLabel(task);
-                  const expanded = expandedId === task.id;
-                  return (
-                    <Fragment key={task.id}>
-                      <tr
-                        onClick={() => setEditTask(task)}
-                        className={`hover:bg-surface-container-low/60 transition-colors group cursor-pointer ${
-                          isComplete ? 'opacity-65 hover:opacity-100 bg-surface-container-low/20' : 'bg-white'
-                        }`}
-                      >
-                        <td className={`pl-10 pr-4 ${rowPad}`} onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={isComplete}
-                            onChange={(e) => toggleTask(task, e)}
-                            className="rounded-sm border-outline-variant/50 text-secondary focus:ring-0 w-4 h-4"
-                          />
-                        </td>
-                        <td className={`px-4 ${rowPad}`}>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className={`text-sm font-semibold ${isComplete ? 'text-on-surface-variant line-through' : 'text-on-surface'}`}>
-                              {task.title}
-                            </p>
-                            {isAdmin && recurrenceLabel(task.recurrence) && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wide bg-sky/15 text-sky border border-sky/25">
-                                {recurrenceLabel(task.recurrence)}
-                              </span>
-                            )}
-                          </div>
-                          {task.description && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedId(expanded ? null : task.id);
-                              }}
-                              className="text-[11px] text-secondary hover:underline mt-0.5"
-                            >
-                              {expanded ? 'Hide details' : 'Show details'}
-                            </button>
-                          )}
-                        </td>
-                        {isAdmin ? (
-                          <>
-                            {showPriorityColumn && (
-                              <td className={`px-4 ${rowPad} text-sm align-top`}>
-                                {task.priority === 'high' && !isComplete ? (
-                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wide bg-error/10 text-error">
-                                    High
-                                  </span>
-                                ) : (
-                                  <span className="text-on-surface-variant/30">—</span>
-                                )}
-                              </td>
-                            )}
-                            <td className={`pl-4 pr-4 ${rowPad} whitespace-nowrap text-right min-w-[9.5rem]`}>
-                              <span className={`inline-flex items-center justify-end gap-1.5 text-xs font-semibold whitespace-nowrap ${dueCellClass(task)}`}>
-                                {dueLabel}
-                                {task.is_overdue && task.status !== 'complete' && task.due_date && (
-                                  <span className="text-[10px] uppercase tracking-wide text-error/90">Overdue</span>
-                                )}
-                              </span>
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td className={`px-4 ${rowPad} text-sm align-top min-w-0 whitespace-normal`}>
-                              {task.transaction_id ? (
-                                <TwoLineFitText
-                                  as={Link}
-                                  to={`/transactions/${task.transaction_id}`}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-on-surface-variant/80 hover:text-secondary hover:underline"
-                                >
-                                  {shortAddress(task.transaction_address)}
-                                </TwoLineFitText>
-                              ) : (
-                                <TwoLineFitText className="text-on-surface-variant/80">
-                                  {shortAddress(task.transaction_address) || '—'}
-                                </TwoLineFitText>
-                              )}
-                            </td>
-                            <td className={`px-4 ${rowPad} whitespace-nowrap min-w-[9.5rem]`}>
-                              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap ${dueCellClass(task)}`}>
-                                {dueLabel}
-                                {task.is_overdue && task.status !== 'complete' && task.due_date && (
-                                  <span className="text-[10px] uppercase tracking-wide text-error/90">Overdue</span>
-                                )}
-                              </span>
-                            </td>
-                          </>
-                        )}
-                        <td className={`pl-4 pr-10 ${rowPad} text-right`} onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={() => setEditTask(task)}
-                              className="p-1 text-on-surface-variant/40 hover:text-primary"
-                              title="Edit task"
-                            >
-                              <Icon name="edit" className="!text-[18px]" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => deleteTask(task, e)}
-                              className="p-1 text-on-surface-variant/40 hover:text-error"
-                              title="Delete task"
-                            >
-                              <Icon name="delete" className="!text-[18px]" />
-                            </button>
-                            {task.transaction_id && (
-                              <Link
-                                to={`/transactions/${task.transaction_id}`}
-                                className="p-1 text-on-surface-variant/40 hover:text-primary inline-flex"
-                                title="View transaction"
-                              >
-                                <Icon name="open_in_new" className="!text-[18px]" />
-                              </Link>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                      {expanded && task.description && (
-                        <tr className="bg-surface-container-low/20">
-                          <td colSpan={tableColCount} className="px-10 pb-4 pt-0 text-sm text-on-surface-variant whitespace-pre-wrap">
-                            {task.description}
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
-            <ListPagination
-              page={page}
-              total={data.total ?? displayedTasks.length}
-              onPageChange={setPage}
-            />
-            </div>
-          )}
-        </section>
-
-        <aside className="w-80 bg-surface border-l border-outline-variant/20 p-8 flex flex-col shrink-0 h-full">
-          <section className="shrink-0">
+        <div className="border-t border-sky bg-surface-container-lowest flex flex-col lg:sticky lg:top-0 lg:z-10 lg:h-[calc(100vh-4.25rem)] lg:overflow-hidden lg:flex-row">
+          {/* Mobile toolbar */}
+          <div className="lg:hidden shrink-0 border-b border-outline-variant/15 bg-surface px-4 py-3 space-y-3">
             <button
               type="button"
               onClick={() => setShowCreate(true)}
-              className="w-full bg-primary text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 shadow-lg shadow-primary/10 hover:shadow-primary/20 transition-all hover:-translate-y-0.5"
+              className="w-full bg-primary text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/10"
             >
-              <Icon name="add" className="!text-[24px]" />
+              <Icon name="add" className="!text-[22px]" />
               <span className="text-sm">{category === 'admin' ? 'Add Admin Task' : 'Add Transaction Task'}</span>
             </button>
-            <div className="mt-6 flex flex-col gap-1">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setViewMode((m) => (m === 'calendar' ? 'list' : 'calendar'))}
-                className={`flex items-center gap-3 px-2 py-2 font-medium text-sm text-left rounded-lg transition-colors ${
+                className={`flex-1 flex items-center justify-center gap-2 min-h-11 px-3 rounded-lg text-sm font-medium transition-colors ${
                   viewMode === 'calendar'
                     ? 'bg-secondary/10 text-secondary'
-                    : 'text-on-surface-variant hover:bg-surface-container-high'
+                    : 'bg-surface-container-low text-on-surface-variant'
                 }`}
               >
-                <Icon name="calendar_month" className="!text-[20px]" />
-                {viewMode === 'calendar' ? 'List View' : 'Calendar View'}
+                <Icon name="calendar_month" className="!text-[18px]" />
+                {viewMode === 'calendar' ? 'List' : 'Calendar'}
               </button>
               <button
                 type="button"
-                disabled
-                title="Coming soon"
-                className="flex items-center gap-3 px-2 py-2 text-on-surface-variant/50 font-medium text-sm text-left cursor-not-allowed"
+                onClick={() => setPrefsOpen((o) => !o)}
+                className={`flex-1 flex items-center justify-center gap-2 min-h-11 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  prefsOpen
+                    ? 'bg-secondary/10 text-secondary'
+                    : 'bg-surface-container-low text-on-surface-variant'
+                }`}
               >
-                <Icon name="file_download" className="!text-[20px]" /> Export List
-                <span className="text-[10px] uppercase ml-auto">Soon</span>
+                <Icon name="tune" className="!text-[18px]" />
+                Preferences
               </button>
             </div>
+            {prefsOpen && (
+              <div className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-4">
+                {preferences}
+              </div>
+            )}
+          </div>
+
+          <section className="flex-1 min-h-0 lg:overflow-y-auto custom-scrollbar bg-surface-container-lowest">
+            {viewMode === 'calendar' ? (
+              loading ? (
+                <p className="p-8 md:p-10 text-on-surface-variant">Loading tasks…</p>
+              ) : (
+                <TaskCalendarView tasks={displayedTasks} onTaskClick={setEditTask} />
+              )
+            ) : loading ? (
+              <p className="p-8 md:p-10 text-on-surface-variant">Loading tasks…</p>
+            ) : displayedTasks.length === 0 ? (
+              emptyState
+            ) : !isMdUp ? (
+              <div className="pt-4 pb-2">
+                <UserTaskMobileCards
+                  tasks={displayedTasks}
+                  isAdmin={isAdmin}
+                  onOpen={setEditTask}
+                  onToggle={toggleTask}
+                  onDelete={deleteTask}
+                />
+                <ListPagination
+                  page={page}
+                  total={data.total ?? displayedTasks.length}
+                  onPageChange={setPage}
+                  className="mx-4 mb-4 rounded-xl border border-outline-variant/10 overflow-hidden !px-3"
+                />
+              </div>
+            ) : (
+              desktopTable
+            )}
           </section>
 
-          <section className="mt-10 overflow-y-auto custom-scrollbar min-h-0 pr-1">
-            <h3 className="text-[11px] text-on-surface-variant/60 uppercase tracking-widest mb-4 font-semibold">Preferences</h3>
-            <div className="space-y-4">
-              <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-on-surface-variant font-medium">Compact Mode</span>
-                <input
-                  type="checkbox"
-                  checked={compact}
-                  onChange={(e) => setCompact(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className={`w-9 h-5 rounded-full relative transition-colors ${compact ? 'bg-secondary' : 'bg-outline-variant/30'}`}>
-                  <div className={`absolute top-[2px] h-4 w-4 rounded-full bg-white transition-all ${compact ? 'left-[18px]' : 'left-[2px]'}`} />
-                </div>
-              </label>
-              <label className={`flex items-center justify-between ${category === 'admin' ? 'cursor-default' : 'cursor-pointer'}`}>
-                <span className="text-sm text-on-surface-variant font-medium">Show tasks without due date</span>
-                <input
-                  type="checkbox"
-                  checked={showUndated}
-                  disabled={category === 'admin'}
-                  onChange={(e) => setTransactionShowUndated(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className={`w-9 h-5 rounded-full relative transition-colors ${showUndated ? 'bg-secondary' : 'bg-outline-variant/30'}`}>
-                  <div className={`absolute top-[2px] h-4 w-4 rounded-full bg-white transition-all ${showUndated ? 'left-[18px]' : 'left-[2px]'}`} />
-                </div>
-              </label>
-              <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-on-surface-variant font-medium">Show Completed</span>
-                <input
-                  type="checkbox"
-                  checked={showCompleted}
-                  onChange={(e) => setShowCompleted(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className={`w-9 h-5 rounded-full relative transition-colors ${showCompleted ? 'bg-secondary' : 'bg-outline-variant/30'}`}>
-                  <div className={`absolute top-[2px] h-4 w-4 rounded-full bg-white transition-all ${showCompleted ? 'left-[18px]' : 'left-[2px]'}`} />
-                </div>
-              </label>
-            </div>
-          </section>
-        </aside>
+          <aside className="hidden lg:flex w-80 bg-surface border-l border-outline-variant/20 p-8 flex-col shrink-0 h-full">
+            <section className="shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowCreate(true)}
+                className="w-full bg-primary text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 shadow-lg shadow-primary/10 hover:shadow-primary/20 transition-all hover:-translate-y-0.5"
+              >
+                <Icon name="add" className="!text-[24px]" />
+                <span className="text-sm">{category === 'admin' ? 'Add Admin Task' : 'Add Transaction Task'}</span>
+              </button>
+              <div className="mt-6 flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => setViewMode((m) => (m === 'calendar' ? 'list' : 'calendar'))}
+                  className={`flex items-center gap-3 px-2 py-2 font-medium text-sm text-left rounded-lg transition-colors ${
+                    viewMode === 'calendar'
+                      ? 'bg-secondary/10 text-secondary'
+                      : 'text-on-surface-variant hover:bg-surface-container-high'
+                  }`}
+                >
+                  <Icon name="calendar_month" className="!text-[20px]" />
+                  {viewMode === 'calendar' ? 'List View' : 'Calendar View'}
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  title="Coming soon"
+                  className="flex items-center gap-3 px-2 py-2 text-on-surface-variant/50 font-medium text-sm text-left cursor-not-allowed"
+                >
+                  <Icon name="file_download" className="!text-[20px]" /> Export List
+                  <span className="text-[10px] uppercase ml-auto">Soon</span>
+                </button>
+              </div>
+            </section>
+
+            <section className="mt-10 overflow-y-auto custom-scrollbar min-h-0 pr-1">
+              <h3 className="text-[11px] text-on-surface-variant/60 uppercase tracking-widest mb-4 font-semibold">Preferences</h3>
+              {preferences}
+            </section>
+          </aside>
         </div>
       </div>
 

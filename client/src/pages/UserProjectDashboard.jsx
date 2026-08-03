@@ -103,13 +103,13 @@ export default function UserProjectDashboard() {
           profile={profile}
         />
 
-        <div className="border-t border-sky bg-surface-container-lowest px-6 lg:px-8 lg:pl-10 py-6">
+        <div className="border-t border-sky bg-surface-container-lowest px-4 md:px-6 lg:px-8 lg:pl-10 py-5 md:py-6">
           {loading ? (
             <p className="text-sm text-on-surface-variant">Loading…</p>
           ) : (
             <>
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-                <div className="min-w-[12rem] flex-1 max-w-sm">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 mb-5">
+                <div className="w-full sm:min-w-[12rem] sm:flex-1 sm:max-w-sm">
                   {showAddProject ? (
                     <AddProjectForm
                       onSave={handleCreateProject}
@@ -122,13 +122,13 @@ export default function UserProjectDashboard() {
                     />
                   )}
                 </div>
-                <p className="text-xs font-bold uppercase tracking-widest text-primary">
+                <p className="text-xs font-bold uppercase tracking-widest text-primary sm:text-right">
                   {projects.length} {projects.length === 1 ? 'project' : 'projects'}
                 </p>
               </div>
 
               {projects.length === 0 && !showAddProject ? (
-                <div className="flex flex-col items-center justify-center text-center py-20 px-4">
+                <div className="flex flex-col items-center justify-center text-center py-14 md:py-20 px-2">
                   <p className="text-lg font-semibold text-primary mb-1">No projects yet</p>
                   <p className="text-sm text-on-surface-variant mb-5 max-w-sm">
                     Track bigger initiatives here with an optional date and priority. Day-to-day work lives under Admin Tasks.
@@ -137,7 +137,7 @@ export default function UserProjectDashboard() {
                     <button
                       type="button"
                       onClick={() => setShowAddProject(true)}
-                      className="text-sm font-bold bg-primary text-white px-4 py-2 rounded-lg hover:opacity-90 transition-opacity"
+                      className="text-sm font-bold bg-primary text-white px-4 py-2.5 min-h-11 rounded-lg hover:opacity-90 transition-opacity"
                     >
                       + Add a project
                     </button>
