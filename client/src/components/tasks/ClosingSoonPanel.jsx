@@ -2,8 +2,21 @@ import { Link } from 'react-router-dom';
 import Icon from '../shared/Icon';
 import DateText from '../shared/DateText';
 
-/** Visible body height: 3 rows + 2 gaps + vertical padding. */
-const BODY_MAX_H = 'max-h-[11.75rem]';
+const ROW_PX = 52; // h-[3.25rem]
+const GAP_PX = 6; // gap-1.5
+const PAD_Y_PX = 20; // py-2.5
+
+/** Body height for 1–3 visible rows (scroll beyond that). */
+function bodyStyle(itemCount, columns, { loading = false } = {}) {
+  const rawRows = loading
+    ? 3
+    : itemCount <= 0
+      ? 1
+      : Math.ceil(itemCount / columns);
+  const rows = Math.min(3, Math.max(1, rawRows));
+  const height = PAD_Y_PX + rows * ROW_PX + (rows - 1) * GAP_PX;
+  return { height: `${height}px`, maxHeight: `${height}px` };
+}
 
 function CompactMilestoneCard({ milestone, todayStr }) {
   const isToday = milestone.date === todayStr;
@@ -66,6 +79,7 @@ export default function ClosingSoonPanel({
 
   if (layout === 'horizontal') {
     const headerClass = 'flex items-center gap-2 px-4 h-11 border-b border-primary/5 bg-surface-container-high shrink-0';
+    const columns = isCompactHorizontal ? 1 : 2;
     const listClass = isCompactHorizontal
       ? 'grid grid-cols-1 gap-1.5'
       : 'grid grid-cols-1 sm:grid-cols-2 gap-1.5';
@@ -95,7 +109,10 @@ export default function ClosingSoonPanel({
           </Link>
         </div>
 
-        <div className={`px-2.5 py-2.5 overflow-y-auto custom-scrollbar ${BODY_MAX_H}`}>
+        <div
+          className="px-2.5 py-2.5 overflow-y-auto custom-scrollbar"
+          style={bodyStyle(milestones.length, columns, { loading })}
+        >
           {loading ? (
             <div className={listClass}>
               {(isCompactHorizontal ? [0, 1, 2] : [0, 1, 2, 3, 4, 5]).map((i) => (
