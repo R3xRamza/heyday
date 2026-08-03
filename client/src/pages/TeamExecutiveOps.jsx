@@ -701,7 +701,7 @@ export default function TeamExecutiveOps() {
           ))}
         </div>
 
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 items-stretch">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 items-start">
           <ClosingSoonPanel
             milestones={closings}
             loading={loadingClosings}
