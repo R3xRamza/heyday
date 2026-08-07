@@ -495,7 +495,14 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
     const amount = round2(postSplit * split.rate);
     teamSplitsTotal = round2(teamSplitsTotal + amount);
     const pct = round2(split.rate * 100);
-    teamSplitDetails.push({ id: split.id, label: split.label, rate: split.rate, amount });
+    const userId = split.userId != null && split.userId !== '' ? Number(split.userId) : null;
+    teamSplitDetails.push({
+      id: split.id,
+      label: split.label,
+      userId: Number.isFinite(userId) ? userId : null,
+      rate: split.rate,
+      amount,
+    });
     if (/tessa/i.test(split.label)) tessa = amount;
     if (/margaret/i.test(split.label)) margaret = amount;
     lines.push({

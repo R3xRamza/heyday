@@ -283,7 +283,7 @@ function DealsTable({ title, icon, headerClass, deals, emptyText, onSaveGci, pro
 }
 
 function MonthlyChart({ monthly }) {
-  const max = Math.max(1, ...monthly.map((m) => m.gci));
+  const max = Math.max(1, ...monthly.map((m) => Math.max(m.gci || 0, m.net || 0)));
   const [hovered, setHovered] = useState(null);
 
   return (
@@ -305,11 +305,16 @@ function MonthlyChart({ monthly }) {
               onMouseEnter={() => setHovered(i)}
               onMouseLeave={() => setHovered(null)}
             >
-              {hovered === i && m.gci > 0 && (
+              {hovered === i && (m.gci > 0 || m.net > 0) && (
                 <div className="absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full z-10 whitespace-nowrap rounded-lg bg-feather text-white text-[10px] px-2.5 py-1.5 shadow-executive">
                   <span className="font-bold">{MONTH_NAMES[i]}</span>
                   {' · '}GCI {formatMoney(m.gci)}
                   {' · '}Net <span className="font-bold text-lemon">{formatMoney(m.net)}</span>
+                  {m.incomingSplit > 0 && (
+                    <>
+                      {' · '}Splits {formatMoney(m.incomingSplit)}
+                    </>
+                  )}
                 </div>
               )}
               <div className="w-full relative flex items-end justify-center h-full">
@@ -337,8 +342,10 @@ function DistributionPanel({ summary }) {
   const netLabel = summary?.agent_label
     ? `Net to ${summary.agent_label}`
     : 'Net';
+  // Use directNet so incoming team-split income (from other agents' GCI) doesn't break the donut.
+  const ownNet = summary?.directNet ?? summary?.net ?? 0;
   const rows = [
-    { label: netLabel, amount: summary?.net ?? 0, className: 'bg-secondary', emphasis: true },
+    { label: netLabel, amount: ownNet, className: 'bg-secondary', emphasis: true },
     { label: 'eXp splits & fees', amount: (summary?.expSplit ?? 0) + (summary?.fees ?? 0), className: 'bg-feather' },
     { label: 'Team splits', amount: summary?.teamSplits ?? ((summary?.tessa ?? 0) + (summary?.margaret ?? 0)), className: 'bg-sky' },
   ];
@@ -377,6 +384,115 @@ function DistributionPanel({ summary }) {
           <span className="font-black text-primary">{formatMoney(summary?.gci ?? 0)}</span>
         </div>
       </div>
+    </section>
+  );
+}
+
+function IncomingSplitsTable({ title, icon, headerClass, rows, emptyText, projected }) {
+  const navigate = useNavigate();
+  const isMdUp = useIsMdUp();
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [rows]);
+
+  const visible = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return rows.slice(start, start + PAGE_SIZE);
+  }, [rows, page]);
+
+  if (!rows.length) return null;
+
+  return (
+    <section className="bg-white rounded-xl border border-outline-variant/15 shadow-executive overflow-hidden">
+      <div className={`${headerClass} px-4 py-2.5 flex items-center justify-between`}>
+        <h3 className="text-sm font-bold flex items-center gap-1.5">
+          <Icon name={icon} className="text-lemon !text-[18px]" />
+          {title}
+        </h3>
+        <span className="text-[9px] font-bold uppercase tracking-widest opacity-80">{rows.length}</span>
+      </div>
+      {!isMdUp ? (
+        <div className="divide-y divide-outline-variant/10">
+          {visible.map((row) => (
+            <button
+              key={`${row.transaction_id}-${row.split_id}`}
+              type="button"
+              onClick={() => navigate(`/transactions/${row.transaction_id}`)}
+              className="w-full text-left px-4 py-3 hover:bg-surface-container-low/50"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm text-primary truncate">{shortAddress(row.address)}</p>
+                  <p className="text-[11px] text-on-surface-variant mt-0.5 truncate">
+                    From {row.source_agent_name || 'agent'} · {row.split_label}
+                    {row.split_rate != null ? ` (${Math.round(row.split_rate * 1000) / 10}%)` : ''}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-black text-secondary tabular-nums">{formatMoney(row.amount)}</p>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant mt-0.5">
+                    {projected ? 'Projected' : 'Split'}
+                  </p>
+                </div>
+              </div>
+              <p className="mt-1 text-[11px] text-on-surface-variant">
+                Close: {row.close_date ? <DateText value={row.close_date} /> : '—'}
+              </p>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wider text-on-surface-variant border-b border-outline-variant/10">
+                <th className="px-4 py-2 font-bold">Property</th>
+                <th className="px-4 py-2 font-bold">From</th>
+                <th className="px-4 py-2 font-bold">Split</th>
+                <th className="px-4 py-2 font-bold">Close</th>
+                <th className="px-4 py-2 font-bold text-right">{projected ? 'Projected' : 'Amount'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((row) => (
+                <tr
+                  key={`${row.transaction_id}-${row.split_id}`}
+                  className="border-b border-outline-variant/10 hover:bg-surface-container-low/40 cursor-pointer"
+                  onClick={() => navigate(`/transactions/${row.transaction_id}`)}
+                >
+                  <td className="px-4 py-2.5">
+                    <p className="text-sm font-semibold text-primary">{shortAddress(row.address)}</p>
+                    <p className="text-[11px] text-on-surface-variant">{row.client_name || row.city || '—'}</p>
+                  </td>
+                  <td className="px-4 py-2.5 text-sm text-on-surface-variant">{row.source_agent_name || '—'}</td>
+                  <td className="px-4 py-2.5 text-sm text-on-surface-variant">
+                    {row.split_label}
+                    {row.split_rate != null ? (
+                      <span className="text-on-surface-variant/70"> · {Math.round(row.split_rate * 1000) / 10}%</span>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-2.5 text-sm text-on-surface-variant">
+                    {row.close_date ? <DateText value={row.close_date} /> : '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-sm font-black text-secondary text-right tabular-nums">
+                    {formatMoney(row.amount)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {rows.length > PAGE_SIZE && (
+        <ListPagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={rows.length}
+          onPageChange={setPage}
+        />
+      )}
     </section>
   );
 }
@@ -465,7 +581,13 @@ export default function RevenueAnalytics() {
                 </span>
                 <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Net Income {s?.year}</p>
                 <h2 className="text-2xl font-bold text-primary leading-tight mt-0.5">{formatMoney(s?.net ?? 0)}</h2>
-                <p className="text-[11px] text-on-surface-variant mt-1">{s?.closedCount ?? 0} closed · {formatCurrency(s?.closedVolume ?? 0)} volume</p>
+                {(s?.incomingTeamSplitIncome ?? 0) > 0 ? (
+                  <p className="text-[11px] text-on-surface-variant mt-1">
+                    {formatMoney(s?.directNet ?? 0)} own deals + {formatMoney(s.incomingTeamSplitIncome)} team splits
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-on-surface-variant mt-1">{s?.closedCount ?? 0} closed · {formatCurrency(s?.closedVolume ?? 0)} volume</p>
+                )}
               </div>
 
               <div className="relative overflow-hidden bg-gradient-to-br from-feather/15 to-sky/10 p-4 rounded-xl border border-white/60 shadow-executive">
@@ -475,7 +597,9 @@ export default function RevenueAnalytics() {
                 <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Gross Commission</p>
                 <h2 className="text-2xl font-bold text-primary leading-tight mt-0.5">{formatMoney(s?.gci ?? 0)}</h2>
                 <p className="text-[11px] text-on-surface-variant mt-1">
-                  {s?.gci > 0 ? `${Math.round(((s?.net ?? 0) / s.gci) * 100)}% kept after splits & fees` : 'No closings yet'}
+                  {s?.gci > 0
+                    ? `${Math.round(((s?.directNet ?? s?.net ?? 0) / s.gci) * 100)}% kept after splits & fees`
+                    : 'No closings yet'}
                 </p>
               </div>
 
@@ -513,9 +637,15 @@ export default function RevenueAnalytics() {
                 </span>
                 <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Pipeline (Pending)</p>
                 <h2 className="text-2xl font-bold text-primary leading-tight mt-0.5">{formatMoney(s?.pipelineNet ?? 0)}</h2>
-                <p className="text-[11px] text-on-surface-variant mt-1">
-                  {s?.pipelineCount ?? 0} under contract · {formatMoney(s?.pipelineGci ?? 0)} GCI
-                </p>
+                {(s?.pipelineIncomingTeamSplitIncome ?? 0) > 0 ? (
+                  <p className="text-[11px] text-on-surface-variant mt-1">
+                    {formatMoney(s?.pipelineDirectNet ?? 0)} own + {formatMoney(s.pipelineIncomingTeamSplitIncome)} splits
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-on-surface-variant mt-1">
+                    {s?.pipelineCount ?? 0} under contract · {formatMoney(s?.pipelineGci ?? 0)} GCI
+                  </p>
+                )}
               </div>
             </div>
 
@@ -546,6 +676,14 @@ export default function RevenueAnalytics() {
               onSaveGci={saveGci}
             />
 
+            <IncomingSplitsTable
+              title="Team Split Income"
+              icon="group"
+              headerClass="bg-secondary text-white"
+              rows={data?.incomingSplits ?? []}
+              emptyText="No team split income this year."
+            />
+
             <DealsTable
               title="Pipeline — Under Contract"
               icon="hourglass_top"
@@ -553,6 +691,15 @@ export default function RevenueAnalytics() {
               deals={data?.pipeline ?? []}
               emptyText="Nothing under contract."
               onSaveGci={saveGci}
+              projected
+            />
+
+            <IncomingSplitsTable
+              title="Pipeline — Team Split Income"
+              icon="group"
+              headerClass="bg-tertiary/90 text-white"
+              rows={data?.pipelineIncomingSplits ?? []}
+              emptyText="No projected team split income."
               projected
             />
           </>
