@@ -3,8 +3,10 @@ import db from '../db.js';
 import {
   computeYearCommissions,
   anniversaryWindowForEndYear,
+  settingsProgressMeta,
+  round2,
 } from '../lib/commissionPlans.js';
-import { parseAgentScope, transactionAgentScopeClause, agentScopeUserId } from '../lib/agentScope.js';
+import { parseAgentScope, agentScopeUserId } from '../lib/agentScope.js';
 import {
   getTemplateSettings,
   getTemplateSettingsForAgentId,
@@ -16,7 +18,6 @@ import {
   TEMPLATE_AGENT_LABELS,
   agentKeyFromUserId,
 } from '../lib/revenueTemplates.js';
-import { settingsProgressMeta } from '../lib/commissionPlans.js';
 
 const router = Router();
 
@@ -27,6 +28,78 @@ const DEAL_SELECT = `
   FROM transactions t
   LEFT JOIN users u ON u.id = t.agent_id
 `;
+
+function splitMatchesRecipient(split, recipientUserId, recipientName) {
+  if (recipientUserId == null) return false;
+  if (split.userId != null && split.userId !== '') {
+    return Number(split.userId) === Number(recipientUserId);
+  }
+  const label = String(split.label || '').trim().toLowerCase();
+  const name = String(recipientName || '').trim().toLowerCase();
+  return Boolean(label && name && label === name);
+}
+
+/** Pull incoming team-split credits for a recipient from computed source deals. */
+function extractIncomingSplits(computedResults, recipientUserId, recipientName) {
+  if (recipientUserId == null) return [];
+  const rows = [];
+  for (const deal of computedResults) {
+    if (!deal.hasGci || !deal.breakdown?.teamSplitDetails?.length) continue;
+    // Don't credit someone for splits on their own deal (already in their net as a deduction to another person)
+    if (Number(deal.agent_id) === Number(recipientUserId)) continue;
+    for (const split of deal.breakdown.teamSplitDetails) {
+      if (!splitMatchesRecipient(split, recipientUserId, recipientName)) continue;
+      const amount = round2(Number(split.amount) || 0);
+      if (amount <= 0) continue;
+      rows.push({
+        transaction_id: deal.id,
+        address: deal.address,
+        city: deal.city,
+        state: deal.state,
+        close_date: deal.close_date,
+        value: deal.value,
+        client_name: deal.client_name,
+        source_agent_id: deal.agent_id,
+        source_agent_name: deal.agent_name,
+        split_id: split.id,
+        split_label: split.label,
+        split_rate: split.rate,
+        amount,
+        stage: deal.stage,
+      });
+    }
+  }
+  rows.sort((a, b) => {
+    const ad = a.close_date || '';
+    const bd = b.close_date || '';
+    if (ad !== bd) return ad < bd ? -1 : 1;
+    return Number(a.transaction_id) - Number(b.transaction_id);
+  });
+  return rows;
+}
+
+function sumIncoming(rows) {
+  return round2(rows.reduce((acc, r) => acc + (Number(r.amount) || 0), 0));
+}
+
+function ytdTotalsForAgent(deals, agentId) {
+  const group = deals
+    .filter((d) => Number(d.agent_id) === Number(agentId))
+    .sort((a, b) => {
+      const ad = a.close_date || '';
+      const bd = b.close_date || '';
+      if (ad !== bd) return ad < bd ? -1 : 1;
+      return Number(a.id) - Number(b.id);
+    });
+  const settings = getTemplateSettingsForAgentId(db, agentId);
+  const run = computeYearCommissions(group, 0, settings);
+  return {
+    capPaid: run.capPaid,
+    riskPaid: run.riskPaid,
+    cappedFeesPaid: run.cappedFeesPaid,
+    settings,
+  };
+}
 
 /** Run deals through each agent's own template + YTD (caps are per agent). */
 function computeByAgentTemplates(deals) {
@@ -200,41 +273,71 @@ router.get('/', (req, res) => {
   const year = Math.min(2100, Math.max(2000, parseInt(req.query.year, 10) || new Date().getFullYear()));
   const { start: yearStart, end: yearEnd } = anniversaryWindowForEndYear(year);
   const agentScope = parseAgentScope(req.query);
-  const { sql: agentFilter, params: agentParams } = transactionAgentScopeClause(agentScope, 't');
+  const scopeUserId = agentScopeUserId(agentScope);
 
-  const closedDeals = db.prepare(`
+  // Full anniversary ledger (all agents) so recipient splits can be attributed.
+  const allClosedDeals = db.prepare(`
     ${DEAL_SELECT}
     WHERE t.stage = 'closed'
       AND t.close_date >= ? AND t.close_date <= ?
-      ${agentFilter}
     ORDER BY t.close_date ASC, t.id ASC
-  `).all(yearStart, yearEnd, ...agentParams);
+  `).all(yearStart, yearEnd);
 
-  const closed = computeByAgentTemplates(closedDeals);
-  const closedYtdMap = closedYtdByAgent(closedDeals);
+  const allClosed = computeByAgentTemplates(allClosedDeals);
+  const closedYtdMap = closedYtdByAgent(allClosedDeals);
 
-  const pendingDeals = db.prepare(`
+  const allPendingDeals = db.prepare(`
     ${DEAL_SELECT}
     WHERE t.stage = 'pending' AND t.close_date IS NOT NULL
       AND t.close_date >= ? AND t.close_date <= ?
-      ${agentFilter}
     ORDER BY t.close_date ASC, t.id ASC
-  `).all(yearStart, yearEnd, ...agentParams);
+  `).all(yearStart, yearEnd);
 
-  const pipeline = computePipelineByAgent(pendingDeals, closedYtdMap);
+  const allPipeline = computePipelineByAgent(allPendingDeals, closedYtdMap);
 
-  const sum = (rows, fn) => Math.round(rows.reduce((acc, r) => acc + (r.hasGci ? fn(r.breakdown) : 0), 0) * 100) / 100;
+  const closedResults = scopeUserId != null
+    ? allClosed.results.filter((d) => Number(d.agent_id) === Number(scopeUserId))
+    : allClosed.results;
+  const pipelineResults = scopeUserId != null
+    ? allPipeline.results.filter((d) => Number(d.agent_id) === Number(scopeUserId))
+    : allPipeline.results;
 
-  const scopeUserId = agentScopeUserId(agentScope);
+  const recipientName = scopeUserId != null
+    ? (db.prepare('SELECT name FROM users WHERE id = ?').get(scopeUserId)?.name || null)
+    : null;
+
+  // Incoming team-split income only for a single person (All would double-count).
+  const incomingSplits = scopeUserId != null
+    ? extractIncomingSplits(allClosed.results, scopeUserId, recipientName)
+    : [];
+  const pipelineIncomingSplits = scopeUserId != null
+    ? extractIncomingSplits(allPipeline.results, scopeUserId, recipientName)
+    : [];
+
+  const sum = (rows, fn) => round2(rows.reduce((acc, r) => acc + (r.hasGci ? fn(r.breakdown) : 0), 0));
+
   const scopeAgentKey = scopeUserId != null ? agentKeyFromUserId(db, scopeUserId) : null;
+  const agentYtd = scopeUserId != null ? ytdTotalsForAgent(allClosedDeals, scopeUserId) : null;
   const settings = scopeAgentKey
     ? getTemplateSettings(db, scopeAgentKey)
-    : (closed.settings || getTemplateSettings(db, 'meredith'));
+    : (allClosed.settings || getTemplateSettings(db, 'meredith'));
   const progressMeta = settingsProgressMeta(settings);
-  const multiAgent = agentScope === 'all' || closed.multiAgent;
+  const multiAgent = agentScope === 'all' || (scopeUserId == null && allClosed.multiAgent);
   const agentLabel = scopeAgentKey
     ? (getTemplateMeta(db, scopeAgentKey).label)
     : (agentScope === 'all' ? 'All agents' : 'Agent');
+
+  const directNet = sum(closedResults, (b) => b.net);
+  const incomingTeamSplitIncome = sumIncoming(incomingSplits);
+  const net = scopeUserId != null ? round2(directNet + incomingTeamSplitIncome) : directNet;
+
+  const pipelineDirectNet = sum(pipelineResults, (b) => b.net);
+  const pipelineIncomingTeamSplitIncome = sumIncoming(pipelineIncomingSplits);
+  const pipelineNet = scopeUserId != null
+    ? round2(pipelineDirectNet + pipelineIncomingTeamSplitIncome)
+    : pipelineDirectNet;
+
+  const closedVolume = closedResults.reduce((acc, d) => acc + (Number(d.value) || 0), 0);
 
   const summary = {
     year,
@@ -243,37 +346,59 @@ router.get('/', (req, res) => {
     agent_key: scopeAgentKey,
     agent_label: agentLabel,
     multi_agent: multiAgent,
-    closedCount: closedDeals.length,
-    closedVolume: closedDeals.reduce((acc, d) => acc + (Number(d.value) || 0), 0),
-    gci: sum(closed.results, (b) => b.gci),
-    net: sum(closed.results, (b) => b.net),
-    expSplit: sum(closed.results, (b) => b.expSplit),
-    tessa: sum(closed.results, (b) => b.tessa),
-    margaret: sum(closed.results, (b) => b.margaret),
-    teamSplits: sum(closed.results, (b) => b.teamSplits),
-    fees: sum(closed.results, (b) => b.fixedFees + (b.customSum || 0)),
-    missingGci: closed.results.filter((r) => !r.hasGci).length,
-    capPaid: multiAgent ? null : closed.capPaid,
-    riskPaid: multiAgent ? null : closed.riskPaid,
-    cappedFeesPaid: multiAgent ? null : closed.cappedFeesPaid,
+    closedCount: closedResults.length,
+    closedVolume,
+    gci: sum(closedResults, (b) => b.gci),
+    directNet,
+    incomingTeamSplitIncome,
+    net,
+    expSplit: sum(closedResults, (b) => b.expSplit),
+    tessa: sum(closedResults, (b) => b.tessa),
+    margaret: sum(closedResults, (b) => b.margaret),
+    teamSplits: sum(closedResults, (b) => b.teamSplits),
+    fees: sum(closedResults, (b) => b.fixedFees + (b.customSum || 0)),
+    missingGci: closedResults.filter((r) => !r.hasGci).length,
+    capPaid: multiAgent ? null : (agentYtd?.capPaid ?? allClosed.capPaid),
+    riskPaid: multiAgent ? null : (agentYtd?.riskPaid ?? allClosed.riskPaid),
+    cappedFeesPaid: multiAgent ? null : (agentYtd?.cappedFeesPaid ?? allClosed.cappedFeesPaid),
     capAmount: multiAgent ? null : progressMeta.capAmount,
     riskCap: multiAgent ? null : progressMeta.riskCap,
     cappedFeesStepDownAt: multiAgent ? null : progressMeta.cappedFeesStepDownAt,
-    capped: multiAgent ? false : closed.capPaid >= (progressMeta.capAmount || 0),
+    capped: multiAgent ? false : (agentYtd?.capPaid ?? 0) >= (progressMeta.capAmount || 0),
     settings,
-    pipelineGci: sum(pipeline.results, (b) => b.gci),
-    pipelineNet: sum(pipeline.results, (b) => b.net),
-    pipelineCount: pendingDeals.length,
+    pipelineGci: sum(pipelineResults, (b) => b.gci),
+    pipelineDirectNet,
+    pipelineIncomingTeamSplitIncome,
+    pipelineNet,
+    pipelineCount: pipelineResults.length,
+    incomingSplitCount: incomingSplits.length,
+    pipelineIncomingSplitCount: pipelineIncomingSplits.length,
   };
 
-  const monthly = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, gci: 0, net: 0, count: 0 }));
-  for (const r of closed.results) {
+  const monthly = Array.from({ length: 12 }, (_, i) => ({
+    month: i + 1,
+    gci: 0,
+    net: 0,
+    directNet: 0,
+    incomingSplit: 0,
+    count: 0,
+  }));
+  for (const r of closedResults) {
     if (!r.hasGci || !r.close_date) continue;
     const m = Number(String(r.close_date).slice(5, 7));
     if (m >= 1 && m <= 12) {
-      monthly[m - 1].gci = Math.round((monthly[m - 1].gci + r.breakdown.gci) * 100) / 100;
-      monthly[m - 1].net = Math.round((monthly[m - 1].net + r.breakdown.net) * 100) / 100;
+      monthly[m - 1].gci = round2(monthly[m - 1].gci + r.breakdown.gci);
+      monthly[m - 1].directNet = round2(monthly[m - 1].directNet + r.breakdown.net);
+      monthly[m - 1].net = round2(monthly[m - 1].net + r.breakdown.net);
       monthly[m - 1].count += 1;
+    }
+  }
+  for (const split of incomingSplits) {
+    if (!split.close_date) continue;
+    const m = Number(String(split.close_date).slice(5, 7));
+    if (m >= 1 && m <= 12) {
+      monthly[m - 1].incomingSplit = round2(monthly[m - 1].incomingSplit + split.amount);
+      monthly[m - 1].net = round2(monthly[m - 1].net + split.amount);
     }
   }
 
@@ -292,8 +417,10 @@ router.get('/', (req, res) => {
 
   res.json({
     summary,
-    deals: closed.results,
-    pipeline: pipeline.results,
+    deals: closedResults,
+    pipeline: pipelineResults,
+    incomingSplits,
+    pipelineIncomingSplits,
     monthly,
     years,
   });
