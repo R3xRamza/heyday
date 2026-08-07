@@ -28,6 +28,7 @@ import hubDocsRoutes from './routes/hub-docs.js';
 import opportunitiesRoutes from './routes/opportunities.js';
 import vendorsRoutes from './routes/vendors.js';
 import userPrefsRoutes from './routes/user-prefs.js';
+import exportRoutes from './routes/export.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const autoClosed = closePastDueTransactions(db);
@@ -70,6 +71,7 @@ app.use('/api/hub-docs', authMiddleware, hubDocsRoutes);
 app.use('/api/opportunities', authMiddleware, opportunitiesRoutes);
 app.use('/api/vendors', authMiddleware, vendorsRoutes);
 app.use('/api/user-prefs', authMiddleware, userPrefsRoutes);
+app.use('/api/export', authMiddleware, exportRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, '..', 'client', 'dist');
