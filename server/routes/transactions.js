@@ -711,7 +711,13 @@ router.put('/:id', (req, res) => {
   const stageChangingToPending = nextStageExplicit === 'pending' && before.stage !== 'pending';
   const closeDateChanging = 'close_date' in req.body
     && String(req.body.close_date || '') !== String(before.close_date || '');
-  if (stageChangingToPending || (closeDateChanging && nextCloseDate && derivedStage === 'pending')) {
+  // Setup (details/template/assign) saves Client name + close_date before parties exist.
+  // Pending/active party gates run after setup via complete-setup and the workspace.
+  const stayingInSetup = before.workflow_status !== 'active' && nextWorkflow !== 'active';
+  if (
+    !stayingInSetup
+    && (stageChangingToPending || (closeDateChanging && nextCloseDate && derivedStage === 'pending'))
+  ) {
     if (!nextCloseDate) {
       return res.status(400).json({
         error: 'Add a Closing date before moving this transaction to Pending.',
