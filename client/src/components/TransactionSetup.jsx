@@ -151,6 +151,39 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
     }
   }
 
+  async function persistSetupParties() {
+    const agentUser = users.find((u) => Number(u.id) === Number(form.agent_id));
+    const parties = buildFallbackParties(
+      {
+        ...transaction,
+        ...form,
+        sale_type: form.sale_type,
+        representing: form.representing,
+        client_name: form.client_name,
+        owner_name: form.owner_name,
+        agent_id: form.agent_id,
+      },
+      agentUser?.name || '',
+    ).map((p) => (
+      p.role === 'client'
+        ? { ...p, name: form.client_name || form.owner_name || p.name || '' }
+        : p
+    ));
+    const res = await fetch(appendAgentScope(`/api/transactions/${transaction.id}/parties`, scope), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        parties: parties.map(({ role, name, user_id }) => ({ role, name, user_id })),
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(json.error || 'Could not save parties.');
+    }
+    return json;
+  }
+
   async function saveDetails() {
     const validation = validateTransactionFields(form);
     if (!validation.ok) {
@@ -159,50 +192,31 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
     }
     setValidationError('');
     setSaving(true);
-    const res = await fetch(appendAgentScope(`/api/transactions/${transaction.id}`, scope), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        ...form,
-        value: form.value != null && form.value !== '' ? Number(form.value) : null,
-        agent_id: form.agent_id ? Number(form.agent_id) : null,
-        workflow_status: 'template',
-      }),
-    });
-    const json = await res.json();
-    setSaving(false);
-    if (res.ok) {
-      const tx = json.transaction;
-      onUpdate(tx);
-      const agentUser = users.find((u) => Number(u.id) === Number(form.agent_id));
-      const parties = buildFallbackParties(
-        {
-          ...tx,
-          sale_type: form.sale_type,
-          representing: form.representing,
-          client_name: form.client_name,
-          owner_name: form.owner_name,
-          agent_id: form.agent_id,
-        },
-        agentUser?.name || '',
-      ).map((p) => (
-        p.role === 'client'
-          ? { ...p, name: form.client_name || form.owner_name || p.name || '' }
-          : p
-      ));
-      await fetch(appendAgentScope(`/api/transactions/${transaction.id}/parties`, scope), {
+    try {
+      await persistSetupParties();
+      const res = await fetch(appendAgentScope(`/api/transactions/${transaction.id}`, scope), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          parties: parties.map(({ role, name, user_id }) => ({ role, name, user_id })),
+          ...form,
+          value: form.value != null && form.value !== '' ? Number(form.value) : null,
+          agent_id: form.agent_id ? Number(form.agent_id) : null,
+          workflow_status: 'template',
         }),
       });
+      const json = await res.json();
+      if (!res.ok) {
+        setValidationError(json.error || 'Could not save transaction details.');
+        return;
+      }
+      onUpdate(json.transaction);
       blurActiveElement();
       setStep('template');
-    } else {
-      setValidationError(json.error || 'Could not save transaction details.');
+    } catch (err) {
+      setValidationError(err.message || 'Could not save transaction details.');
+    } finally {
+      setSaving(false);
     }
   }
 

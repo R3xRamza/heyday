@@ -408,5 +408,11 @@ export function assertPartiesForIntent(db, transactionId, intent) {
   const tx = db.prepare('SELECT * FROM transactions WHERE id = ?').get(transactionId);
   if (!tx) return { ok: false, message: 'Not found' };
   const parties = getPartiesForTransaction(db, transactionId);
-  return validateParties(parties, tx.sale_type, tx.representing, intent);
+  const clientFallback = externalNameFromTransaction(tx);
+  const hydrated = (parties || []).map((p) => {
+    if (normalizePartyRole(p.role) !== 'client') return p;
+    if (String(p.name || '').trim()) return p;
+    return clientFallback ? { ...p, name: clientFallback } : p;
+  });
+  return validateParties(hydrated, tx.sale_type, tx.representing, intent);
 }
