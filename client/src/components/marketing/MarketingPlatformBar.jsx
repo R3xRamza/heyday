@@ -10,6 +10,7 @@ export const BAR_PLATFORM_NAMES = [
   'IG Grid',
   'IG Story',
   'Pop By',
+  'Shine Squad',
 ];
 
 export function sortBarPlatforms(goals) {
