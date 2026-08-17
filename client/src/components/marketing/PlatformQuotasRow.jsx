@@ -27,6 +27,7 @@ const SHORT_LABELS = {
   'IG Story': 'Story',
   'Pop By': 'Pop By',
   Newsletters: 'News',
+  'Shine Squad': 'Shine',
 };
 
 function loadJson(key, fallback) {

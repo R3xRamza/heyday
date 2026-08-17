@@ -673,6 +673,7 @@ const DEFAULT_PLATFORM_GOALS = [
   { platform: 'Blog', frequency: '2 posts/month', goal: 'SEO + lead capture', color: '#7f1d1d', sort_order: 8 },
   { platform: 'Pop By', frequency: '2 events/month', goal: 'Sphere touchpoints', color: '#d4a574', sort_order: 9 },
   { platform: 'Newsletters', frequency: '2 posts/week', goal: 'Consistent nurture', color: '#053e3f', sort_order: 10 },
+  { platform: 'Shine Squad', frequency: 'as needed', goal: 'Listing shine content', color: '#d4af37', sort_order: 11 },
 ];
 
 function migrateMarketingTables(db) {

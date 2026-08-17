@@ -9,6 +9,7 @@ const FALLBACK = {
   'IG Story': '#38bdf8',
   Blog: '#7f1d1d',
   'Pop By': '#d4a574',
+  'Shine Squad': '#d4af37',
 };
 
 const PASTEL_CHIP = {
@@ -23,6 +24,7 @@ const PASTEL_CHIP = {
   Blog: { bg: 'bg-rose-200', text: 'text-rose-950', border: 'border border-rose-300', icon: 'article' },
   'Pop By': { bg: 'bg-orange-200', text: 'text-orange-950', border: 'border border-orange-300', icon: 'celebration' },
   Newsletters: { bg: 'bg-violet-200', text: 'text-violet-950', border: 'border border-violet-300', icon: 'mail' },
+  'Shine Squad': { bg: 'bg-amber-200', text: 'text-amber-950', border: 'border border-amber-300', icon: 'auto_awesome' },
 };
 
 export function colorForPlatform(platform, goals = []) {
