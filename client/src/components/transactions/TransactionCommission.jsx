@@ -195,6 +195,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   const [gciMode, setGciMode] = useState('percent');
   const [gciAmount, setGciAmount] = useState(null);
   const [gciPercent, setGciPercent] = useState(3);
+  const [referralFee, setReferralFee] = useState({ amount: 0, unit: 'amount' });
   const [customFees, setCustomFees] = useState([]);
   const [feeAmounts, setFeeAmounts] = useState({});
   const saveTimer = useRef(null);
@@ -204,6 +205,9 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
     setGciMode(json.gci_mode === 'percent' ? 'percent' : 'amount');
     setGciAmount(json.gross_commission);
     setGciPercent(json.gci_percent != null ? json.gci_percent : 3);
+    setReferralFee(json.referral_fee
+      ? { amount: json.referral_fee.amount ?? 0, unit: json.referral_fee.unit === 'percent' ? 'percent' : 'amount' }
+      : { amount: 0, unit: 'amount' });
     setCustomFees(json.custom_fees?.length ? json.custom_fees : []);
     setFeeAmounts(json.fee_amounts && typeof json.fee_amounts === 'object' ? json.fee_amounts : {});
   }, []);
@@ -281,8 +285,11 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   const netLabel = data?.agent_label ? `Net to ${data.agent_label}` : 'Net';
 
   const planLines = (breakdown?.lines || []).filter((line) => !String(line.key).startsWith('custom_'));
-  const customLines = breakdown?.customLines
-    || (breakdown?.lines || []).filter((line) => String(line.key).startsWith('custom_'));
+  const customLines = (breakdown?.customLines
+    || (breakdown?.lines || []).filter((line) => String(line.key).startsWith('custom_')))
+    .filter((line) => !/referral/i.test(String(line.label || '')));
+  const referralDollars = breakdown?.referralFee || 0;
+  const adjustedCommission = breakdown?.commissionBase ?? breakdown?.gci;
 
   function displayFeeValue(line) {
     if (feeAmounts[line.key] != null) return feeAmounts[line.key];
@@ -328,6 +335,22 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
     return `Sales price ${formatCurrency(price)}`;
   }
 
+  function referralHelper() {
+    if (!breakdown?.gci) return '% is calculated from gross commission.';
+    if (referralFee.unit === 'percent' && referralFee.amount != null) {
+      return `${referralFee.amount}% of GCI → ${formatMoney(referralDollars)}`;
+    }
+    if (referralDollars > 0) {
+      return `Adjusted commission ${formatMoney(adjustedCommission)}`;
+    }
+    return 'Deducted from gross before other fees.';
+  }
+
+  function persistReferral(next) {
+    setReferralFee(next);
+    persist({ referral_fee: next });
+  }
+
   return (
     <div className="space-y-6">
       {error && (
@@ -364,6 +387,26 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                 }
               }}
             />
+            <div className="mt-5 pt-4 border-t border-outline-variant/10">
+              <UnitValueField
+                label="Referral fee"
+                unit={referralFee.unit}
+                value={referralFee.amount}
+                placeholder={referralFee.unit === 'percent' ? 'e.g. 25' : '0'}
+                helper={referralHelper()}
+                onUnitChange={(unit) => {
+                  const next = { ...referralFee, unit };
+                  persistReferral(next);
+                }}
+                onChange={(n) => {
+                  setReferralFee((prev) => ({ ...prev, amount: n == null ? 0 : n }));
+                }}
+                onBlur={(n) => {
+                  const next = { ...referralFee, amount: n == null ? 0 : n };
+                  persistReferral(next);
+                }}
+              />
+            </div>
           </div>
 
           {appliesPlan && (
@@ -447,6 +490,18 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                   <span>Gross commission</span>
                   <span className="tabular-nums">{formatMoney(breakdown.gci)}</span>
                 </div>
+                {referralDollars > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-on-surface-variant">Referral</span>
+                      <span className="tabular-nums font-semibold text-error">{formatDeduction(referralDollars)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-bold text-primary mb-3 pb-3 border-b border-outline-variant/10">
+                      <span>Adjusted commission</span>
+                      <span className="tabular-nums">{formatMoney(adjustedCommission)}</span>
+                    </div>
+                  </>
+                )}
                 {appliesPlan && planLines.length > 0 && (
                   <ul className="space-y-2.5 border-t border-outline-variant/10 pt-3">
                     {planLines.map((line) => (
@@ -482,7 +537,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                   </button>
                 </div>
                 <p className="text-[11px] text-on-surface-variant mb-2">
-                  % fees are calculated from GCI.
+                  % fees are calculated from adjusted commission after referral.
                 </p>
                 {customFees.length === 0 ? (
                   <p className="text-xs text-on-surface-variant">No custom fees yet.</p>
@@ -558,6 +613,18 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                   <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Gross Commission</span>
                   <span className="tabular-nums font-bold text-primary">{formatMoney(breakdown.gci)}</span>
                 </div>
+                {referralDollars > 0 && (
+                  <>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Referral</span>
+                      <span className="tabular-nums font-bold text-primary">{formatDeduction(referralDollars)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Adjusted Commission</span>
+                      <span className="tabular-nums font-bold text-primary">{formatMoney(adjustedCommission)}</span>
+                    </div>
+                  </>
+                )}
                 {appliesPlan && (
                   <div className="flex justify-between text-xs">
                     <span className="text-on-surface-variant uppercase tracking-wide font-semibold">eXp Fees</span>
@@ -569,7 +636,9 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                 <div>
                   <div className="flex justify-between text-xs">
                     <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Custom Fees</span>
-                    <span className="tabular-nums font-bold text-primary">{formatDeduction(breakdown.customSum || 0)}</span>
+                    <span className="tabular-nums font-bold text-primary">
+                      {formatDeduction(breakdown.nonReferralCustomSum ?? breakdown.customSum ?? 0)}
+                    </span>
                   </div>
                   {customLines.length > 0 && (
                     <ul className="mt-1.5 space-y-1 pl-3">

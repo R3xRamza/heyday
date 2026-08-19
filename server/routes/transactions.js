@@ -40,6 +40,8 @@ import {
   anniversaryWindowForDate,
   parseCustomFees,
   serializeCustomFees,
+  splitReferralCustomFees,
+  mergeReferralCustomFees,
   parseFeeAmounts,
   serializeFeeAmounts,
   dealSortsBefore,
@@ -296,6 +298,10 @@ function buildCommissionSummary(tx) {
         : progressMeta.cappedTransactionFee)
       : (breakdown?.cappedFee || 0);
 
+  const { referral: referralFee, customFees: customFeesOnly } = splitReferralCustomFees(
+    tx.commission_custom_fees,
+  );
+
   return {
     settings,
     agent_key: agentKey,
@@ -313,7 +319,8 @@ function buildCommissionSummary(tx) {
     gci_percent: gciMode === 'percent' && gciPercent != null && !Number.isNaN(gciPercent) ? gciPercent : null,
     gross_commission: hasGci ? gci : null,
     sales_price: tx.value != null ? Number(tx.value) : null,
-    custom_fees: parseCustomFees(tx.commission_custom_fees),
+    referral_fee: referralFee || { id: 'referral', label: 'Referral', amount: 0, unit: 'amount' },
+    custom_fees: customFeesOnly,
     fee_amounts: feeAmounts,
     breakdown,
     progress: {
@@ -675,12 +682,29 @@ router.patch('/:id/commission', (req, res) => {
     }
   }
 
-  if ('commission_custom_fees' in req.body || 'custom_fees' in req.body) {
-    const raw = 'commission_custom_fees' in req.body ? req.body.commission_custom_fees : req.body.custom_fees;
-    if (raw != null && !Array.isArray(raw) && typeof raw !== 'string') {
+  if ('commission_custom_fees' in req.body || 'custom_fees' in req.body || 'referral_fee' in req.body) {
+    let fees;
+    if ('referral_fee' in req.body) {
+      const rawCustom = 'custom_fees' in req.body || 'commission_custom_fees' in req.body
+        ? ('commission_custom_fees' in req.body ? req.body.commission_custom_fees : req.body.custom_fees)
+        : before.commission_custom_fees;
+      const { customFees: existingCustom } = splitReferralCustomFees(rawCustom);
+      const nextCustom = 'custom_fees' in req.body || 'commission_custom_fees' in req.body
+        ? parseCustomFees('commission_custom_fees' in req.body ? req.body.commission_custom_fees : req.body.custom_fees)
+        : existingCustom;
+      const ref = req.body.referral_fee;
+      if (ref != null && typeof ref !== 'object') {
+        return res.status(400).json({ error: 'referral_fee must be an object' });
+      }
+      fees = parseCustomFees(mergeReferralCustomFees(ref, nextCustom));
+    } else {
+      const raw = 'commission_custom_fees' in req.body ? req.body.commission_custom_fees : req.body.custom_fees;
+      const { referral: existingReferral } = splitReferralCustomFees(before.commission_custom_fees);
+      fees = parseCustomFees(mergeReferralCustomFees(existingReferral, raw));
+    }
+    if (!Array.isArray(fees)) {
       return res.status(400).json({ error: 'custom_fees must be an array' });
     }
-    const fees = parseCustomFees(raw);
     for (const fee of fees) {
       if (Number.isNaN(Number(fee.amount)) || Number(fee.amount) < 0) {
         return res.status(400).json({ error: 'custom fee amounts must be non-negative numbers' });
