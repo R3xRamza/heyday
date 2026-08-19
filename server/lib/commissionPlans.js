@@ -393,11 +393,17 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
     ...fee,
     dollars: customFeeDollars(fee, gciN),
   }));
-  const customSum = round2(resolvedCustom.reduce((sum, f) => sum + f.dollars, 0));
+  const referralCustom = resolvedCustom.filter((fee) => /referral/i.test(String(fee.label || '')));
+  const nonReferralCustom = resolvedCustom.filter((fee) => !/referral/i.test(String(fee.label || '')));
+  const referralFee = round2(referralCustom.reduce((sum, f) => sum + f.dollars, 0));
+  const nonReferralCustomSum = round2(nonReferralCustom.reduce((sum, f) => sum + f.dollars, 0));
+  const customSum = round2(referralFee + nonReferralCustomSum);
+  // Referral fee comes off the top before split/fees/team calculations.
+  const commissionBase = round2(Math.max(0, gciN - referralFee));
 
   if (!applyPlanFees) {
     const lines = [];
-    for (const fee of resolvedCustom) {
+    for (const fee of [...referralCustom, ...nonReferralCustom]) {
       if (!fee.label && !(fee.dollars > 0)) continue;
       const pctLabel = fee.unit === 'percent' ? ` (${fee.amount}%)` : '';
       lines.push({
@@ -410,8 +416,10 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
       plan: null,
       applyPlanFees: false,
       gci: gciN,
+      referralFee,
+      commissionBase,
       expSplit: 0,
-      postSplit: gciN,
+      postSplit: commissionBase,
       riskFee: 0,
       brokerReview: 0,
       cappedFee: 0,
@@ -421,7 +429,7 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
       fixedFees: 0,
       teamSplits: 0,
       teamSplitDetails: [],
-      net: round2(gciN - customSum),
+      net: round2(commissionBase - nonReferralCustomSum),
       capPaidAfter: 0,
       riskPaidAfter: 0,
       cappedFeesPaidAfter: 0,
@@ -436,19 +444,27 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
 
   const capRemaining = Math.max(0, round2(settings.capAmount - capPaidBefore));
   const beforeCap = capRemaining > 0;
-  const expSplit = beforeCap ? Math.min(round2(gciN * settings.splitRate), capRemaining) : 0;
-  const postSplit = round2(gciN - expSplit);
+  const expSplit = beforeCap ? Math.min(round2(commissionBase * settings.splitRate), capRemaining) : 0;
+  const postSplit = round2(commissionBase - expSplit);
   const splitPct = round2(settings.splitRate * 100);
 
-  const lines = [
-    {
-      key: 'exp_split',
-      label: beforeCap
-        ? `eXp split (${splitPct}% sliding scale)`
-        : 'eXp split (capped)',
-      amount: -expSplit,
-    },
-  ];
+  const lines = [];
+  for (const fee of referralCustom) {
+    if (!fee.label && !(fee.dollars > 0)) continue;
+    const pctLabel = fee.unit === 'percent' ? ` (${fee.amount}%)` : '';
+    lines.push({
+      key: `custom_${fee.id}`,
+      label: `${fee.label || 'Custom fee'}${pctLabel}`,
+      amount: -fee.dollars,
+    });
+  }
+  lines.push({
+    key: 'exp_split',
+    label: beforeCap
+      ? `eXp split (${splitPct}% sliding scale)`
+      : 'eXp split (capped)',
+    amount: -expSplit,
+  });
 
   const feePaidAfter = { ...ytd.feePaid };
   let fixedFees = 0;
@@ -463,7 +479,7 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
     if (!applies) continue;
 
     const paidBefore = Number(feePaidAfter[fee.id]) || 0;
-    const dollars = feeLineDollars(fee, gciN, postSplit, paidBefore);
+    const dollars = feeLineDollars(fee, commissionBase, postSplit, paidBefore);
     if (!(dollars > 0) && !fee.label) continue;
 
     feePaidAfter[fee.id] = round2(paidBefore + dollars);
@@ -512,7 +528,7 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
     });
   }
 
-  for (const fee of resolvedCustom) {
+  for (const fee of nonReferralCustom) {
     if (!fee.label && !(fee.dollars > 0)) continue;
     const pctLabel = fee.unit === 'percent' ? ` (${fee.amount}%)` : '';
     lines.push({
@@ -563,8 +579,8 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
   }
   Object.assign(feePaidAfter, feePaidRecomputed);
 
-  const postSplitOut = round2(gciN - expSplitOut);
-  const net = round2(postSplitOut - fixedFeesOut - teamSplitsOut - customSum);
+  const postSplitOut = round2(commissionBase - expSplitOut);
+  const net = round2(postSplitOut - fixedFeesOut - teamSplitsOut - nonReferralCustomSum);
   const riskPaidAfter = round2(feePaidAfter.risk_mgmt || 0);
   const cappedFeesPaidAfter = round2(feePaidAfter.capped_trans || 0);
 
@@ -577,6 +593,8 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
     plan: beforeCap ? 'before_cap' : 'after_cap',
     applyPlanFees: true,
     gci: gciN,
+    referralFee,
+    commissionBase,
     expSplit: expSplitOut,
     postSplit: postSplitOut,
     riskFee,

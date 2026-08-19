@@ -5,8 +5,10 @@ const DEFAULT_VIEW = {
   filter: 'active_transactions',
   page: 1,
   search: '',
+  city: '',
   sortKey: 'date',
   sortDir: 'desc',
+  closedYear: null,
 };
 
 /** Build /transactions URL preserving list tab, pagination, search, and sort. */
@@ -14,10 +16,14 @@ export function transactionsListPath({
   filter = 'active_transactions',
   page,
   search,
+  city,
   sortKey,
   sortDir,
+  closedYear,
 } = {}) {
-  const params = buildTransactionsListSearchParams({ filter, page, search, sortKey, sortDir });
+  const params = buildTransactionsListSearchParams({
+    filter, page, search, city, sortKey, sortDir, closedYear,
+  });
   const qs = params.toString();
   return qs ? `/transactions?${qs}` : '/transactions';
 }
@@ -26,8 +32,10 @@ export function buildTransactionsListSearchParams({
   filter = 'active_transactions',
   page,
   search,
+  city,
   sortKey,
   sortDir,
+  closedYear,
 } = {}) {
   const params = new URLSearchParams();
   if (filter && filter !== 'active_transactions') {
@@ -39,11 +47,17 @@ export function buildTransactionsListSearchParams({
   if (search?.trim()) {
     params.set('search', search.trim());
   }
+  if (filter === 'closed' && city?.trim()) {
+    params.set('city', city.trim());
+  }
   if (sortKey && sortKey !== 'date') {
     params.set('sort', sortKey);
   }
   if (sortDir && sortDir !== 'desc') {
     params.set('order', sortDir);
+  }
+  if (filter === 'closed' && closedYear != null && Number(closedYear) > 0) {
+    params.set('year', String(closedYear));
   }
   return params;
 }
@@ -63,13 +77,15 @@ export function parseTransactionsListSearchParams(searchParams) {
     filter: resolvedFilter || 'active_transactions',
     page: Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1,
     search: searchParams.get('search') || '',
+    city: searchParams.get('city') || '',
     sortKey: searchParams.get('sort') || 'date',
     sortDir: searchParams.get('order') === 'asc' ? 'asc' : 'desc',
+    closedYear: Number.parseInt(searchParams.get('year'), 10) || null,
   };
 }
 
 export function hasTransactionsListQuery(searchParams) {
-  return ['filter', 'page', 'search', 'sort', 'order'].some((key) => searchParams.has(key));
+  return ['filter', 'page', 'search', 'city', 'sort', 'order', 'year'].some((key) => searchParams.has(key));
 }
 
 export function readTransactionsListView() {
