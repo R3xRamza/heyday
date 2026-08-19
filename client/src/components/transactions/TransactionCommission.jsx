@@ -73,6 +73,7 @@ function UnitValueField({
   onUnitChange,
   placeholder = '0',
   helper,
+  compact = false,
 }) {
   const [text, setText] = useState(value == null || value === '' ? '' : String(value));
 
@@ -83,7 +84,12 @@ function UnitValueField({
   return (
     <label className="block">
       {label && (
-        <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">{label}</span>
+        <span className={`font-bold text-on-surface-variant uppercase tracking-widest ${
+          compact ? 'text-[9px]' : 'text-[10px]'
+        }`}
+        >
+          {label}
+        </span>
       )}
       <div className={`flex items-stretch gap-2 ${label ? 'mt-1.5' : ''}`}>
         <div className="relative flex-1 min-w-0">
@@ -106,17 +112,19 @@ function UnitValueField({
               if (!Number.isNaN(n)) onChange(n);
             }}
             onBlur={() => onBlur?.(text === '' || text === '.' ? null : Number(text))}
-            className={`w-full py-2.5 rounded-lg bg-surface-container-low border border-outline-variant/15 text-sm text-primary font-semibold focus:outline-none focus:ring-2 focus:ring-secondary/30 ${
-              unit === 'amount' ? 'pl-7 pr-3' : 'pl-3 pr-8'
-            }`}
+            className={`w-full rounded-lg bg-surface-container-low border border-outline-variant/15 text-primary font-semibold focus:outline-none focus:ring-2 focus:ring-secondary/30 ${
+              compact ? 'py-1.5 text-xs' : 'py-2.5 text-sm'
+            } ${unit === 'amount' ? 'pl-7 pr-3' : 'pl-3 pr-8'}`}
           />
           {unit === 'percent' ? (
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">%</span>
+            <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant ${compact ? 'text-xs' : 'text-sm'}`}>%</span>
           ) : null}
         </div>
         {onUnitChange && <UnitToggle value={unit} onChange={onUnitChange} />}
       </div>
-      {helper && <p className="text-[11px] text-on-surface-variant mt-1">{helper}</p>}
+      {helper && (
+        <p className={`text-on-surface-variant mt-1 ${compact ? 'text-[10px]' : 'text-[11px]'}`}>{helper}</p>
+      )}
     </label>
   );
 }
@@ -196,6 +204,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   const [gciAmount, setGciAmount] = useState(null);
   const [gciPercent, setGciPercent] = useState(3);
   const [referralFee, setReferralFee] = useState({ amount: 0, unit: 'amount' });
+  const [referralExpanded, setReferralExpanded] = useState(false);
   const [customFees, setCustomFees] = useState([]);
   const [feeAmounts, setFeeAmounts] = useState({});
   const saveTimer = useRef(null);
@@ -208,6 +217,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
     setReferralFee(json.referral_fee
       ? { amount: json.referral_fee.amount ?? 0, unit: json.referral_fee.unit === 'percent' ? 'percent' : 'amount' }
       : { amount: 0, unit: 'amount' });
+    setReferralExpanded(Number(json.referral_fee?.amount ?? 0) > 0);
     setCustomFees(json.custom_fees?.length ? json.custom_fees : []);
     setFeeAmounts(json.fee_amounts && typeof json.fee_amounts === 'object' ? json.fee_amounts : {});
   }, []);
@@ -290,6 +300,8 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
     .filter((line) => !/referral/i.test(String(line.label || '')));
   const referralDollars = breakdown?.referralFee || 0;
   const adjustedCommission = breakdown?.commissionBase ?? breakdown?.gci;
+  const hasReferralValue = referralDollars > 0 || Number(referralFee.amount) > 0;
+  const showReferralField = referralExpanded || hasReferralValue;
 
   function displayFeeValue(line) {
     if (feeAmounts[line.key] != null) return feeAmounts[line.key];
@@ -336,14 +348,11 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   }
 
   function referralHelper() {
-    if (!breakdown?.gci) return '% is calculated from gross commission.';
+    if (!hasReferralValue || !breakdown?.gci) return null;
     if (referralFee.unit === 'percent' && referralFee.amount != null) {
       return `${referralFee.amount}% of GCI → ${formatMoney(referralDollars)}`;
     }
-    if (referralDollars > 0) {
-      return `Adjusted commission ${formatMoney(adjustedCommission)}`;
-    }
-    return 'Deducted from gross before other fees.';
+    return `Adjusted commission ${formatMoney(adjustedCommission)}`;
   }
 
   function persistReferral(next) {
@@ -387,26 +396,52 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                 }
               }}
             />
-            <div className="mt-5 pt-4 border-t border-outline-variant/10">
-              <UnitValueField
-                label="Referral fee"
-                unit={referralFee.unit}
-                value={referralFee.amount}
-                placeholder={referralFee.unit === 'percent' ? 'e.g. 25' : '0'}
-                helper={referralHelper()}
-                onUnitChange={(unit) => {
-                  const next = { ...referralFee, unit };
-                  persistReferral(next);
-                }}
-                onChange={(n) => {
-                  setReferralFee((prev) => ({ ...prev, amount: n == null ? 0 : n }));
-                }}
-                onBlur={(n) => {
-                  const next = { ...referralFee, amount: n == null ? 0 : n };
-                  persistReferral(next);
-                }}
-              />
-            </div>
+            {!showReferralField ? (
+              <button
+                type="button"
+                onClick={() => setReferralExpanded(true)}
+                className="mt-3 text-[11px] font-semibold text-on-surface-variant/75 hover:text-secondary"
+              >
+                + Referral fee <span className="font-normal">(optional)</span>
+              </button>
+            ) : (
+              <div className="mt-3 pt-3 border-t border-outline-variant/5">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-[9px] font-bold text-on-surface-variant/70 uppercase tracking-widest">
+                    Referral fee
+                  </span>
+                  {!hasReferralValue && (
+                    <button
+                      type="button"
+                      onClick={() => setReferralExpanded(false)}
+                      className="text-[10px] text-on-surface-variant hover:text-primary"
+                    >
+                      Hide
+                    </button>
+                  )}
+                </div>
+                <UnitValueField
+                  compact
+                  unit={referralFee.unit}
+                  value={referralFee.amount ?? 0}
+                  placeholder="0"
+                  helper={referralHelper()}
+                  onUnitChange={(unit) => {
+                    const next = { ...referralFee, unit };
+                    persistReferral(next);
+                  }}
+                  onChange={(n) => {
+                    setReferralFee((prev) => ({ ...prev, amount: n == null ? 0 : n }));
+                  }}
+                  onBlur={(n) => {
+                    const amount = n == null ? 0 : n;
+                    const next = { ...referralFee, amount };
+                    persistReferral(next);
+                    if (amount === 0) setReferralExpanded(false);
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {appliesPlan && (
@@ -537,7 +572,9 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                   </button>
                 </div>
                 <p className="text-[11px] text-on-surface-variant mb-2">
-                  % fees are calculated from adjusted commission after referral.
+                  {referralDollars > 0
+                    ? '% fees are calculated from adjusted commission after referral.'
+                    : '% fees are calculated from GCI.'}
                 </p>
                 {customFees.length === 0 ? (
                   <p className="text-xs text-on-surface-variant">No custom fees yet.</p>
