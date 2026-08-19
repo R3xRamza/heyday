@@ -52,7 +52,7 @@ const VOLUME_BOX_BY_FILTER = {
   coming_soon: { label: 'Coming Soon Volume', sub: (n) => `${n} future listing${n === 1 ? '' : 's'}` },
   expiring_soon: { label: 'Expiring Volume', sub: (n) => `${n} expiring soon` },
   pending: { label: 'Total Pending Volume', sub: (n) => `${n} under contract` },
-  closed: { label: 'Closed YTD', sub: (n) => `${n} closing${n === 1 ? '' : 's'}` },
+  closed: { label: 'Closed Volume', sub: (n) => `${n} closing${n === 1 ? '' : 's'}` },
 };
 
 const FOOTER_VOLUME_LABEL = {
@@ -62,14 +62,14 @@ const FOOTER_VOLUME_LABEL = {
   coming_soon: 'coming soon volume',
   expiring_soon: 'expiring volume',
   pending: 'total pending volume',
-  closed: 'closed YTD',
+  closed: 'closed volume',
 };
 
 function filterVolume(stats, filter) {
   if (filter === 'closed') {
     return {
-      volume: stats?.closedYtd?.volume ?? 0,
-      count: stats?.closedYtd?.count ?? 0,
+      volume: stats?.closedPeriod?.volume ?? 0,
+      count: stats?.closedPeriod?.count ?? 0,
     };
   }
   return {
@@ -236,8 +236,11 @@ export default function TransactionsList() {
 
   const listView = resolveTransactionsListView(searchParams);
   const filter = filterFromSearchParams(searchParams, VALID_FILTER_KEYS);
+  const urlClosedYear = Number.parseInt(searchParams.get('year'), 10);
+  const resolvedClosedYear = Number.isFinite(urlClosedYear) ? urlClosedYear : (listView.closedYear || null);
 
   const [search, setSearch] = useState(() => listView.search);
+  const [city, setCity] = useState(() => listView.city || '');
   const [data, setData] = useState({ transactions: [], stats: {}, total: 0 });
   const [loadedFilter, setLoadedFilter] = useState(filter);
   const [loading, setLoading] = useState(true);
@@ -250,11 +253,20 @@ export default function TransactionsList() {
   const [createError, setCreateError] = useState('');
   const [sortKey, setSortKey] = useState(() => listView.sortKey);
   const [sortDir, setSortDir] = useState(() => listView.sortDir);
+  const [closedYear, setClosedYear] = useState(() => resolvedClosedYear);
   const fetchIdRef = useRef(0);
 
   useEffect(() => {
-    writeTransactionsListView({ filter, page, search, sortKey, sortDir });
-  }, [filter, page, search, sortKey, sortDir]);
+    writeTransactionsListView({
+      filter,
+      page,
+      search,
+      city,
+      sortKey,
+      sortDir,
+      closedYear: filter === 'closed' ? closedYear : null,
+    });
+  }, [filter, page, search, city, sortKey, sortDir, closedYear]);
 
   // Keep local page/search/sort in sync when the URL changes (filters, back/forward, hub links).
   useEffect(() => {
@@ -263,13 +275,17 @@ export default function TransactionsList() {
       : (readTransactionsListView() || {
         page: 1,
         search: '',
+        city: '',
         sortKey: 'date',
         sortDir: 'desc',
+        closedYear: null,
       });
     setPage(view.page);
     setSearch(view.search);
+    setCity(view.city || '');
     setSortKey(view.sortKey);
     setSortDir(view.sortDir);
+    setClosedYear(view.closedYear || null);
   }, [searchParams]);
 
   useEffect(() => {
@@ -293,19 +309,25 @@ export default function TransactionsList() {
     filter: nextFilter = filter,
     page: nextPage = page,
     search: nextSearch = search,
+    city: nextCity = city,
     sortKey: nextSortKey = sortKey,
     sortDir: nextSortDir = sortDir,
+    closedYear: nextClosedYear = closedYear,
   }) {
     setPage(nextPage);
     setSearch(nextSearch);
+    setCity(nextCity);
     setSortKey(nextSortKey);
     setSortDir(nextSortDir);
+    setClosedYear(nextClosedYear);
     setSearchParams(buildTransactionsListSearchParams({
       filter: nextFilter,
       page: nextPage,
       search: nextSearch,
+      city: nextCity,
       sortKey: nextSortKey,
       sortDir: nextSortDir,
+      closedYear: nextFilter === 'closed' ? nextClosedYear : null,
     }), { replace: true });
   }
 
@@ -317,11 +339,20 @@ export default function TransactionsList() {
       page: 1,
       sortKey: nextSort.sortKey,
       sortDir: nextSort.sortDir,
+      closedYear: key === 'closed' ? closedYear : null,
     });
+  }
+
+  function handleClosedYearChange(year) {
+    commitListView({ closedYear: year, page: 1 });
   }
 
   function handleSearchChange(value) {
     commitListView({ search: value, page: 1 });
+  }
+
+  function handleCityChange(value) {
+    commitListView({ city: value, page: 1 });
   }
 
   function clearSearch() {
@@ -354,7 +385,11 @@ export default function TransactionsList() {
       sort: sortKey,
       order: sortDir,
     });
+    if (requestedFilter === 'closed' && closedYear) {
+      params.set('year', String(closedYear));
+    }
     if (search) params.set('search', search);
+    if (requestedFilter === 'closed' && city.trim()) params.set('city', city.trim());
     appendAgentScope(params, scope);
     try {
       const res = await fetch(`/api/transactions?${params}`, { credentials: 'include' });
@@ -368,7 +403,7 @@ export default function TransactionsList() {
         setRefreshing(false);
       }
     }
-  }, [filter, search, page, sortKey, sortDir, scope]);
+  }, [filter, search, city, page, sortKey, sortDir, scope, closedYear]);
 
   useEffect(() => {
     const t = setTimeout(fetchData, search ? 300 : 0);
@@ -406,7 +441,9 @@ export default function TransactionsList() {
       setCreateError('');
       navigate(`/transactions/${json.transaction.id}`, {
         state: {
-          transactionsList: { filter, page, search, sortKey, sortDir },
+          transactionsList: {
+            filter, page, search, city, sortKey, sortDir, closedYear,
+          },
         },
       });
     } else {
@@ -418,6 +455,13 @@ export default function TransactionsList() {
   const { volume, count: filterCount } = filterVolume(stats, statsFilter);
   const volumeBox = VOLUME_BOX_BY_FILTER[statsFilter] || VOLUME_BOX_BY_FILTER.all;
   const footerVolumeLabel = FOOTER_VOLUME_LABEL[statsFilter] || FOOTER_VOLUME_LABEL.all;
+  const closedYears = Array.isArray(stats?.closedYears) ? stats.closedYears : [];
+  const closedYearOptions = closedYears.includes(closedYear)
+    ? closedYears
+    : [closedYear, ...closedYears].filter(Boolean);
+  const closedVolumeSub = closedYear
+    ? `${filterCount} closing${filterCount === 1 ? '' : 's'} in ${closedYear}`
+    : `${filterCount} closing${filterCount === 1 ? '' : 's'} across all years`;
   const showInitialLoading = loading && data.transactions.length === 0;
 
   return (
@@ -482,9 +526,9 @@ export default function TransactionsList() {
             />
           ))}
           <StatCard
-            label={volumeBox.label}
+            label={statsFilter === 'closed' ? (closedYear ? `Closed ${closedYear}` : 'Closed (All Years)') : volumeBox.label}
             value={formatCurrency(volume)}
-            sub={volumeBox.sub(filterCount)}
+            sub={statsFilter === 'closed' ? closedVolumeSub : volumeBox.sub(filterCount)}
           />
         </div>
 
@@ -503,6 +547,42 @@ export default function TransactionsList() {
           ))}
         </nav>
 
+        {filter === 'closed' && (
+          <div className="mb-4 md:mb-6 flex flex-wrap items-center gap-3">
+            <label htmlFor="closed-year" className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+              Year
+            </label>
+            <select
+              id="closed-year"
+              value={closedYear ? String(closedYear) : ''}
+              onChange={(e) => {
+                const parsed = Number.parseInt(e.target.value, 10);
+                handleClosedYearChange(Number.isFinite(parsed) ? parsed : null);
+              }}
+              className="bg-white border border-outline-variant/30 rounded-lg px-3 py-2 text-sm text-on-surface"
+            >
+              <option value="">All years</option>
+              {closedYearOptions.map((year) => (
+                <option key={year} value={String(year)}>{year}</option>
+              ))}
+            </select>
+            <label htmlFor="closed-city" className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+              City
+            </label>
+            <select
+              id="closed-city"
+              value={city}
+              onChange={(e) => handleCityChange(e.target.value)}
+              className="bg-white border border-outline-variant/30 rounded-lg px-3 py-2 text-sm text-on-surface"
+            >
+              <option value="">All cities</option>
+              {(Array.isArray(stats?.closedCities) ? stats.closedCities : []).map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="bg-white border border-outline-variant/20 shadow-executive rounded-xl overflow-hidden">
           {!isMdUp ? (
             <div className="divide-y divide-outline-variant/10">
@@ -519,7 +599,9 @@ export default function TransactionsList() {
                     dateColumn={DATE_COLUMN_BY_FILTER[filter] || DATE_COLUMN_BY_FILTER.all}
                     onOpen={() => navigate(`/transactions/${tx.id}`, {
                       state: {
-                        transactionsList: { filter, page, search, sortKey, sortDir },
+                        transactionsList: {
+                          filter, page, search, city, sortKey, sortDir, closedYear,
+                        },
                       },
                     })}
                   />
@@ -562,7 +644,9 @@ export default function TransactionsList() {
                           key={tx.id}
                           onClick={() => navigate(`/transactions/${tx.id}`, {
                             state: {
-                              transactionsList: { filter, page, search, sortKey, sortDir },
+                              transactionsList: {
+                                filter, page, search, city, sortKey, sortDir, closedYear,
+                              },
                             },
                           })}
                           className="hover:bg-secondary/5 transition-colors cursor-pointer group"

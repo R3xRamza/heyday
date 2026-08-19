@@ -96,6 +96,99 @@ function closedYtdStatsForSearch(db, agentScope, search) {
   return db.prepare(query).get(...bind);
 }
 
+function yearWindow(year) {
+  return {
+    start: `${year}-01-01`,
+    end: `${year}-12-31`,
+  };
+}
+
+function parseClosedYear(value) {
+  if (value == null || value === '') return null;
+  const year = Number.parseInt(value, 10);
+  if (!Number.isFinite(year) || year < 2000 || year > 2100) return null;
+  return year;
+}
+
+function closedPeriodStatsForSearch(db, agentScope, search, city, year) {
+  const { sql, params } = transactionAgentScopeClause(agentScope, '');
+  let query = `
+    SELECT COUNT(*) as count, COALESCE(SUM(value), 0) as volume
+    FROM transactions
+    WHERE stage = 'closed'${sql}
+  `;
+  const bind = [...params];
+  if (year != null) {
+    const { start, end } = yearWindow(year);
+    query += ' AND close_date >= ? AND close_date <= ?';
+    bind.push(start, end);
+  }
+  if (search) {
+    query += ` AND ${transactionSearchClause('')}`;
+    bind.push(...transactionSearchParams(search));
+  }
+  if (city) {
+    query += ` AND ${transactionCityClause('')}`;
+    bind.push(...transactionCityParams(city));
+  }
+  return db.prepare(query).get(...bind);
+}
+
+function closedYearsForScope(db, agentScope) {
+  const { sql, params } = transactionAgentScopeClause(agentScope, '');
+  const rows = db.prepare(`
+    SELECT DISTINCT CAST(strftime('%Y', close_date) AS INTEGER) as year
+    FROM transactions
+    WHERE stage = 'closed' AND close_date IS NOT NULL${sql}
+    ORDER BY year DESC
+  `).all(...params);
+  return rows.map((r) => r.year).filter(Boolean);
+}
+
+function toTitleCase(text) {
+  return String(text || '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function normalizeCityForLookup(city) {
+  if (!city) return '';
+  let value = String(city).replace(/\|/g, ' ').trim();
+  value = value.replace(/\s{2,}/g, ' ');
+  value = value.split(',')[0] || value;
+  value = value.replace(/\b[A-Z]{2}\b/g, '').trim();
+  value = value.replace(/\b\d{5}(?:-\d{4})?\b/g, '').trim();
+  return toTitleCase(value);
+}
+
+function transactionCityClause(alias = 't') {
+  const p = alias ? `${alias}.` : '';
+  return `(LOWER(TRIM(COALESCE(${p}city, ''))) = ? OR LOWER(COALESCE(${p}city, '')) LIKE ?)`;
+}
+
+function transactionCityParams(city) {
+  const normalized = String(city || '').trim().toLowerCase();
+  return [normalized, `${normalized},%`];
+}
+
+function closedCitiesForScope(db, agentScope) {
+  const { sql, params } = transactionAgentScopeClause(agentScope, '');
+  const rows = db.prepare(`
+    SELECT city
+    FROM transactions
+    WHERE stage = 'closed'${sql}
+  `).all(...params);
+  const set = new Set();
+  for (const row of rows) {
+    const city = normalizeCityForLookup(row.city);
+    if (city) set.add(city);
+  }
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
 const TX_FIELDS = [
   'address', 'city', 'state', 'zip', 'value', 'owner_name', 'representing', 'listing_visibility', 'stage',
   'important_date', 'important_date_label', 'close_date', 'listing_date',
@@ -314,20 +407,29 @@ router.get('/', (req, res) => {
   closePastDueTransactions(db);
   const filter = req.query.filter || 'all';
   const search = (req.query.search || '').trim().toLowerCase();
+  const city = filter === 'closed' ? (req.query.city || '').trim().toLowerCase() : '';
   const where = VIEW_MAP[filter] || VIEW_MAP.all;
   const { page, limit, offset } = parsePagination(req.query);
   const sortKey = req.query.sort || 'date';
   const sortDir = req.query.order === 'asc' ? 'asc' : 'desc';
   const dateField = DATE_FIELD_BY_FILTER[filter] || 'created_at';
   const agentScope = parseAgentScope(req.query);
+  const closedYear = parseClosedYear(req.query.year);
   const { sql: scopeSql, params: scopeParams } = transactionAgentScopeClause(agentScope, 't');
   const { sql: scopeSqlBare, params: scopeParamsBare } = transactionAgentScopeClause(agentScope, '');
+  const closedYearSql = filter === 'closed' && closedYear != null
+    ? ` AND t.close_date >= '${yearWindow(closedYear).start}' AND t.close_date <= '${yearWindow(closedYear).end}'`
+    : '';
 
-  let countSql = `SELECT COUNT(*) as c FROM transactions t WHERE ${where}${scopeSql}`;
+  let countSql = `SELECT COUNT(*) as c FROM transactions t WHERE ${where}${scopeSql}${closedYearSql}`;
   const params = [...scopeParams];
   if (search) {
     countSql += ` AND ${transactionSearchClause('t')}`;
     params.push(...transactionSearchParams(search));
+  }
+  if (city) {
+    countSql += ` AND ${transactionCityClause('t')}`;
+    params.push(...transactionCityParams(city));
   }
   const total = db.prepare(countSql).get(...params).c;
 
@@ -337,10 +439,13 @@ router.get('/', (req, res) => {
       (SELECT COUNT(*) FROM tasks tk WHERE tk.transaction_id = t.id AND tk.status = 'complete') as done_tasks
     FROM transactions t
     LEFT JOIN users u ON u.id = t.agent_id
-    WHERE ${where}${scopeSql}
+    WHERE ${where}${scopeSql}${closedYearSql}
   `;
   if (search) {
     sql += ` AND ${transactionSearchClause('t')}`;
+  }
+  if (city) {
+    sql += ` AND ${transactionCityClause('t')}`;
   }
   sql += ` ORDER BY ${transactionOrderClause(sortKey, sortDir, dateField)} LIMIT ? OFFSET ?`;
   const transactions = db.prepare(sql).all(...params, limit, offset);
@@ -357,11 +462,18 @@ router.get('/', (req, res) => {
     portfolioSql += ` AND ${transactionSearchClause('')}`;
     portfolioParams.push(...transactionSearchParams(search));
   }
+  if (city) {
+    portfolioSql += ` AND ${transactionCityClause('')}`;
+    portfolioParams.push(...transactionCityParams(city));
+  }
   const portfolioStats = db.prepare(portfolioSql).get(...portfolioParams);
 
-  let filteredSql = `SELECT COUNT(*) as count, COALESCE(SUM(t.value), 0) as volume FROM transactions t WHERE ${where}${scopeSql}`;
+  let filteredSql = `SELECT COUNT(*) as count, COALESCE(SUM(t.value), 0) as volume FROM transactions t WHERE ${where}${scopeSql}${closedYearSql}`;
   if (search) {
     filteredSql += ` AND ${transactionSearchClause('t')}`;
+  }
+  if (city) {
+    filteredSql += ` AND ${transactionCityClause('t')}`;
   }
   const filtered = db.prepare(filteredSql).get(...params);
 
@@ -374,6 +486,9 @@ router.get('/', (req, res) => {
       ...portfolioStats,
       filtered,
       closedYtd: closedYtdStatsForSearch(db, agentScope, search),
+      closedPeriod: closedPeriodStatsForSearch(db, agentScope, search, city, closedYear),
+      closedYears: closedYearsForScope(db, agentScope),
+      closedCities: closedCitiesForScope(db, agentScope),
     },
   });
 });
