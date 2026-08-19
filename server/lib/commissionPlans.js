@@ -125,6 +125,48 @@ export function serializeCustomFees(fees) {
   return JSON.stringify(parseCustomFees(fees));
 }
 
+const REFERRAL_FEE_ID = 'referral';
+
+function isReferralFeeLabel(label) {
+  return /referral/i.test(String(label || ''));
+}
+
+/** Split stored custom fees into referral (at most one) and everything else. */
+export function splitReferralCustomFees(fees) {
+  const parsed = parseCustomFees(fees);
+  let referral = null;
+  const rest = [];
+  for (const fee of parsed) {
+    if (!referral && (fee.id === REFERRAL_FEE_ID || isReferralFeeLabel(fee.label))) {
+      referral = {
+        id: REFERRAL_FEE_ID,
+        label: 'Referral',
+        amount: fee.amount,
+        unit: fee.unit,
+      };
+    } else {
+      rest.push(fee);
+    }
+  }
+  return { referral, customFees: rest };
+}
+
+/** Merge referral fee back into custom_fees JSON for storage. */
+export function mergeReferralCustomFees(referral, customFees) {
+  const rest = parseCustomFees(customFees).filter(
+    (fee) => fee.id !== REFERRAL_FEE_ID && !isReferralFeeLabel(fee.label),
+  );
+  const ref = referral && Number(referral.amount) > 0
+    ? [{
+      id: REFERRAL_FEE_ID,
+      label: 'Referral',
+      amount: Math.max(0, Number(referral.amount) || 0),
+      unit: referral.unit === 'percent' ? 'percent' : 'amount',
+    }]
+    : [];
+  return serializeCustomFees([...ref, ...rest]);
+}
+
 /** Deal-level dollar overrides for plan fee lines (keys like exp_split, fee_*, split_*). */
 export function parseFeeAmounts(raw) {
   if (raw == null || raw === '') return {};
@@ -387,20 +429,25 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
   const ytd = normalizeYtd(startingYtd);
   const capPaidBefore = applyPlanFees ? ytd.capPaid : 0;
 
-  const customFees = parseCustomFees(overrides.customFees);
+  const { referral: referralInput, customFees: nonReferralFees } = splitReferralCustomFees(
+    overrides.customFees,
+  );
   const gciN = round2(Number(gci) || 0);
-  const resolvedCustom = customFees.map((fee) => ({
-    ...fee,
-    dollars: customFeeDollars(fee, gciN),
-  }));
-  const referralCustom = resolvedCustom.filter((fee) => /referral/i.test(String(fee.label || '')));
-  const nonReferralCustom = resolvedCustom.filter((fee) => !/referral/i.test(String(fee.label || '')));
+  const referralCustom = referralInput && (referralInput.amount > 0 || referralInput.label)
+    ? [{
+      ...referralInput,
+      dollars: customFeeDollars(referralInput, gciN),
+    }]
+    : [];
   const referralFee = round2(referralCustom.reduce((sum, f) => sum + f.dollars, 0));
+  // Referral comes off gross; all other fees use the adjusted commission base.
+  const commissionBase = round2(Math.max(0, gciN - referralFee));
+  const nonReferralCustom = nonReferralFees.map((fee) => ({
+    ...fee,
+    dollars: customFeeDollars(fee, commissionBase),
+  }));
   const nonReferralCustomSum = round2(nonReferralCustom.reduce((sum, f) => sum + f.dollars, 0));
   const customSum = round2(referralFee + nonReferralCustomSum);
-  // Referral fee comes off the top before split/fees/team calculations.
-  const commissionBase = round2(Math.max(0, gciN - referralFee));
-
   if (!applyPlanFees) {
     const lines = [];
     for (const fee of [...referralCustom, ...nonReferralCustom]) {
@@ -426,6 +473,7 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
       tessa: 0,
       margaret: 0,
       customSum,
+      nonReferralCustomSum,
       fixedFees: 0,
       teamSplits: 0,
       teamSplitDetails: [],
@@ -603,6 +651,7 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
     tessa: tessaOut,
     margaret: margaretOut,
     customSum,
+    nonReferralCustomSum,
     fixedFees: fixedFeesOut,
     teamSplits: teamSplitsOut,
     teamSplitDetails: teamSplitDetailsOut.length ? teamSplitDetailsOut : teamSplitDetails,
