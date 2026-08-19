@@ -38,18 +38,47 @@ function PlanBadge({ plan }) {
   );
 }
 
+function formatDeduction(value) {
+  const n = Math.abs(Number(value) || 0);
+  if (n === 0) return '$0';
+  return formatMoney(-n);
+}
+
 function BreakdownLines({ breakdown, netLabel = 'Net' }) {
+  const referralDollars = breakdown.referralFee || 0;
+  const adjustedCommission = breakdown.commissionBase ?? breakdown.gci;
+  const referralLine = (breakdown.lines || []).find((line) => /referral/i.test(String(line.label || '')));
+  const referralLabel = referralLine?.label?.replace(/\s*\(-?\$[\d,.]+\)\s*$/, '') || 'Referral';
+  const planLines = (breakdown.lines || []).filter(
+    (line) => !/referral/i.test(String(line.label || '')),
+  );
+
   return (
     <div className="rounded-lg bg-surface-container-low/60 border border-primary/5 px-4 py-3">
       <div className="flex justify-between text-xs font-bold text-primary mb-2">
         <span>Gross commission</span>
-        <span>{formatMoney(breakdown.gci)}</span>
+        <span className="tabular-nums">{formatMoney(breakdown.gci)}</span>
       </div>
+      {referralDollars > 0 && (
+        <div className="rounded-md bg-error/5 border border-error/15 px-3 py-2 mb-2 space-y-1.5">
+          <div className="flex justify-between text-[11px]">
+            <span className="font-semibold text-error">{referralLabel}</span>
+            <span className="tabular-nums font-bold text-error">{formatDeduction(referralDollars)}</span>
+          </div>
+          <div className="flex justify-between text-xs font-bold text-primary border-t border-error/10 pt-1.5">
+            <span>Adjusted commission</span>
+            <span className="tabular-nums">{formatMoney(adjustedCommission)}</span>
+          </div>
+          <p className="text-[10px] text-on-surface-variant">
+            eXp and team fees below are calculated from adjusted commission.
+          </p>
+        </div>
+      )}
       <ul className="space-y-1 border-t border-primary/5 pt-2">
-        {breakdown.lines.map((line) => (
-          <li key={line.key} className="flex justify-between text-[11px]">
-            <span className="text-on-surface-variant">{line.label}</span>
-            <span className={line.amount < 0 ? 'text-error font-semibold' : 'text-on-surface-variant'}>
+        {planLines.map((line) => (
+          <li key={line.key} className="flex justify-between text-[11px] gap-3">
+            <span className="text-on-surface-variant min-w-0">{line.label}</span>
+            <span className={`tabular-nums shrink-0 ${line.amount < 0 ? 'text-error font-semibold' : 'text-on-surface-variant'}`}>
               {line.amount === 0 ? '$0' : formatMoney(line.amount)}
             </span>
           </li>
@@ -57,7 +86,7 @@ function BreakdownLines({ breakdown, netLabel = 'Net' }) {
       </ul>
       <div className="flex justify-between text-sm font-black text-secondary border-t border-primary/10 mt-2 pt-2">
         <span>{netLabel}</span>
-        <span>{formatMoney(breakdown.net)}</span>
+        <span className="tabular-nums">{formatMoney(breakdown.net)}</span>
       </div>
     </div>
   );
