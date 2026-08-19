@@ -39,88 +39,115 @@ function TeamMemberCardSkeleton() {
   );
 }
 
-function TeamMemberTaskCard({ member, profile, onOpenTasks }) {
-  const { stats } = member;
-  const hasWeekTasks = stats.thisWeekTotal > 0;
-  const hasAnyTasks = hasWeekTasks || stats.overdue > 0;
-
+function TaskStatRow({ label, thisWeekCount, overdueCount, onThisWeekClick, onOverdueClick }) {
   return (
-    <button
-      type="button"
-      onClick={onOpenTasks}
-      className="group w-full bg-white p-4 rounded-xl border border-outline-variant/15 shadow-executive hover:border-secondary/40 hover:-translate-y-0.5 transition-all text-left flex flex-col items-stretch"
-    >
-      <div className="flex items-start gap-2.5 mb-3">
-        <TeamAvatar
-          email={member.email}
-          name={member.name}
-          size="md"
-          borderClassName="border-2 border-surface-container"
-        />
-        <div className="min-w-0 flex-1">
-          <p className="font-bold text-base text-primary truncate group-hover:text-secondary transition-colors">
-            {member.name}
-          </p>
-          <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant truncate">
-            {profile.role}
-          </p>
-        </div>
-      </div>
-
-      <div className="mb-3">
-        <div className="flex justify-between items-baseline text-[10px] mb-1">
-          <span className="text-on-surface-variant font-bold uppercase tracking-wide">Progress</span>
-          <span className="text-secondary font-black tabular-nums">
-            {hasWeekTasks ? `${stats.thisWeekComplete}/${stats.thisWeekTotal}` : '—'}
-          </span>
-        </div>
-        {hasWeekTasks ? (
-          <div className="w-full bg-surface-container-low h-1.5 rounded-full overflow-hidden">
-            <div
-              className="bg-secondary h-full rounded-full transition-all"
-              style={{ width: `${stats.progress}%` }}
-            />
-          </div>
-        ) : (
-          <p className="text-[10px] text-on-surface-variant">{hasAnyTasks ? 'No tasks this week' : 'No tasks'}</p>
-        )}
-      </div>
-
+    <div>
+      <p className="text-[8px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">{label}</p>
       <div className="flex gap-1.5">
-        <div className="flex-1 rounded-md bg-secondary/10 px-2 py-1.5 text-center">
-          <div className="text-lg font-black text-secondary leading-none tabular-nums">{stats.thisWeek}</div>
+        <button
+          type="button"
+          onClick={onThisWeekClick}
+          className="flex-1 rounded-md bg-secondary/10 px-2 py-1.5 text-center hover:bg-secondary/15 transition-colors"
+        >
+          <div className="text-lg font-black text-secondary leading-none tabular-nums">{thisWeekCount}</div>
           <div className="text-[8px] uppercase font-bold text-on-surface-variant mt-0.5">This Week</div>
-        </div>
-        <div
-          className={`flex-1 rounded-md px-2 py-1.5 text-center ${
-            stats.overdue > 0 ? 'bg-error/10' : 'bg-surface-container-low'
+        </button>
+        <button
+          type="button"
+          onClick={onOverdueClick}
+          className={`flex-1 rounded-md px-2 py-1.5 text-center transition-colors hover:opacity-90 ${
+            overdueCount > 0 ? 'bg-error/10' : 'bg-surface-container-low'
           }`}
         >
           <div
             className={`text-lg font-black leading-none tabular-nums ${
-              stats.overdue > 0 ? 'text-error' : 'text-primary'
+              overdueCount > 0 ? 'text-error' : 'text-primary'
             }`}
           >
-            {stats.overdue}
+            {overdueCount}
           </div>
           <div
             className={`text-[8px] uppercase font-bold mt-0.5 ${
-              stats.overdue > 0 ? 'text-error' : 'text-on-surface-variant'
+              overdueCount > 0 ? 'text-error' : 'text-on-surface-variant'
             }`}
           >
             Overdue
           </div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TeamMemberTaskCard({ member, profile, onOpenTasks, onOpenCategory }) {
+  const { stats, transaction, admin } = member;
+  const hasWeekTasks = stats.thisWeekTotal > 0;
+  const hasAnyTasks = hasWeekTasks || stats.overdue > 0;
+
+  return (
+    <div className="group w-full bg-white p-4 rounded-xl border border-outline-variant/15 shadow-executive hover:border-secondary/40 transition-all flex flex-col items-stretch">
+      <button
+        type="button"
+        onClick={onOpenTasks}
+        className="text-left w-full"
+      >
+        <div className="flex items-start gap-2.5 mb-3">
+          <TeamAvatar
+            email={member.email}
+            name={member.name}
+            size="md"
+            borderClassName="border-2 border-surface-container"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-base text-primary truncate group-hover:text-secondary transition-colors">
+              {member.name}
+            </p>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant truncate">
+              {profile.role}
+            </p>
+          </div>
         </div>
+
+        <div className="mb-3">
+          <div className="flex justify-between items-baseline text-[10px] mb-1">
+            <span className="text-on-surface-variant font-bold uppercase tracking-wide">Progress</span>
+            <span className="text-secondary font-black tabular-nums">
+              {hasWeekTasks ? `${stats.thisWeekComplete}/${stats.thisWeekTotal}` : '—'}
+            </span>
+          </div>
+          {hasWeekTasks ? (
+            <div className="w-full bg-surface-container-low h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-secondary h-full rounded-full transition-all"
+                style={{ width: `${stats.progress}%` }}
+              />
+            </div>
+          ) : (
+            <p className="text-[10px] text-on-surface-variant">{hasAnyTasks ? 'No tasks this week' : 'No tasks'}</p>
+          )}
+        </div>
+      </button>
+
+      <div className="space-y-2">
+        <TaskStatRow
+          label="Transaction tasks"
+          thisWeekCount={transaction?.thisWeek ?? 0}
+          overdueCount={transaction?.overdue ?? 0}
+          onThisWeekClick={() => onOpenCategory('transaction', 'week')}
+          onOverdueClick={() => onOpenCategory('transaction', 'overdue')}
+        />
+        <TaskStatRow
+          label="Admin tasks"
+          thisWeekCount={admin?.thisWeek ?? 0}
+          overdueCount={admin?.overdue ?? 0}
+          onThisWeekClick={() => onOpenCategory('admin', 'week')}
+          onOverdueClick={() => onOpenCategory('admin', 'overdue')}
+        />
       </div>
 
-      <div
-        className="mt-3 pt-3 border-t border-outline-variant/15 flex items-center justify-between gap-2"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <div className="mt-3 pt-3 border-t border-outline-variant/15 flex items-center justify-between gap-2">
         <Link
           to={`/tasks/${member.id}/projects`}
-          onClick={(e) => e.stopPropagation()}
           className="inline-flex items-center gap-1 text-xs font-semibold text-secondary hover:underline shrink-0"
         >
           <Icon name="folder" className="!text-[14px]" />
@@ -128,14 +155,13 @@ function TeamMemberTaskCard({ member, profile, onOpenTasks }) {
         </Link>
         <Link
           to={`/tasks/${member.id}/admin`}
-          onClick={(e) => e.stopPropagation()}
           className="inline-flex items-center gap-1 text-xs font-semibold text-secondary hover:underline shrink-0"
         >
           <Icon name="assignment" className="!text-[14px]" />
           Admin tasks
         </Link>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -209,6 +235,11 @@ export default function TeamTaskOverview() {
                     member={member}
                     profile={getTeamProfile(member.email)}
                     onOpenTasks={() => navigate(`/tasks/${member.id}`)}
+                    onOpenCategory={(cat, filterKey) => {
+                      const base = cat === 'admin' ? `/tasks/${member.id}/admin` : `/tasks/${member.id}`;
+                      const qs = filterKey && filterKey !== 'all' ? `?filter=${filterKey}` : '';
+                      navigate(`${base}${qs}`);
+                    }}
                   />
                 ))}
               </div>
