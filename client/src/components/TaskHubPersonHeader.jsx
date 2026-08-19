@@ -3,7 +3,16 @@ import TaskHubTabs from './TaskHubTabs';
 import TeamAvatar from './TeamAvatar';
 import { APP_HEADER_BORDER_CLASS } from '../constants/appHeader';
 
-export default function TaskHubPersonHeader({ userId, title, member, profile, children, showBorder = true }) {
+export default function TaskHubPersonHeader({
+  userId,
+  title,
+  member,
+  profile,
+  children,
+  showBorder = true,
+  transactionOverdue = 0,
+  adminOverdue = 0,
+}) {
   return (
     <section
       className={`relative bg-surface px-4 md:px-10 py-4 md:py-6 shrink-0${
@@ -12,7 +21,11 @@ export default function TaskHubPersonHeader({ userId, title, member, profile, ch
     >
       <div className="flex flex-col gap-4 md:block">
         <div className="order-2 md:order-none md:absolute md:right-10 md:top-6 z-10 w-full md:w-auto">
-          <TaskHubTabs userId={userId} />
+          <TaskHubTabs
+            userId={userId}
+            transactionOverdue={transactionOverdue}
+            adminOverdue={adminOverdue}
+          />
         </div>
 
         <div className="order-1 md:pr-72 md:min-h-[6.5rem]">

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { isOverdue, computeDueDate, resolveAnchorDate } from '../lib/timing.js';
+import { isOverdue, computeDueDate, resolveAnchorDate, localTodayYmd } from '../lib/timing.js';
 import { recalculateTemplateTaskDueDate } from '../lib/recalculateTasks.js';
 import { resolveAssigneeId, resolveTaskRole } from '../lib/taskAssignment.js';
 import { logActivity, formatFieldChange, actorLabel } from '../lib/activity.js';
@@ -59,13 +59,13 @@ function enrich(task) {
 }
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return localTodayYmd();
 }
 
 function weekEndStr() {
   const d = new Date();
   d.setDate(d.getDate() + 7);
-  return d.toISOString().slice(0, 10);
+  return localTodayYmd(d);
 }
 
 function computeStats(tasks) {

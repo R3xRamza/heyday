@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
-import { useParams, Link, Navigate } from 'react-router-dom';
+import { useParams, Link, Navigate, useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import Icon from '../components/shared/Icon';
 import ListPagination from '../components/shared/ListPagination';
@@ -24,6 +24,8 @@ const FILTERS = [
   { key: 'week', label: 'This Week' },
   { key: 'overdue', label: 'Overdue' },
 ];
+
+const VALID_FILTERS = new Set(FILTERS.map((f) => f.key));
 
 const PAGE_SIZE = 50;
 
@@ -65,11 +67,15 @@ function renderDueLabel(task) {
 
 export default function UserTaskDashboard({ category = 'transaction' }) {
   const { userId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlFilter = searchParams.get('filter');
   const { scope } = useAgentScope();
   const [member, setMember] = useState(null);
   const [users, setUsers] = useState([]);
   const [transactions, setTransactions] = useState([]);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState(() => (
+    VALID_FILTERS.has(urlFilter) ? urlFilter : 'all'
+  ));
   const [showCompleted, setShowCompleted] = useState(false);
   const [transactionShowUndated, setTransactionShowUndated] = useState(false);
   const showUndated = category === 'admin' || transactionShowUndated;
@@ -93,12 +99,18 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
   }, []);
 
   const fetchMember = useCallback(async () => {
-    const res = await fetch(`/api/team/${userId}`, { credentials: 'include' });
+    const res = await fetch(appendAgentScope(`/api/team/${userId}`, scope), { credentials: 'include' });
     if (res.ok) {
       const json = await res.json();
       setMember(json.member);
     }
-  }, [userId]);
+  }, [userId, scope]);
+
+  useEffect(() => {
+    if (VALID_FILTERS.has(urlFilter) && urlFilter !== filter) {
+      setFilter(urlFilter);
+    }
+  }, [urlFilter, filter]);
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
@@ -272,6 +284,10 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
   function selectFilter(key) {
     setPage(1);
     setFilter(key);
+    const next = new URLSearchParams(searchParams);
+    if (key === 'all') next.delete('filter');
+    else next.set('filter', key);
+    setSearchParams(next, { replace: true });
   }
 
   const filterLabel = (key, base) => {
@@ -282,10 +298,23 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
   };
 
   function filterPillClass(key) {
-    if (filter !== key) return 'text-on-surface-variant hover:bg-surface-container-high';
-    if (key === 'overdue') return 'bg-error/10 text-error';
+    if (filter !== key) {
+      if (key === 'overdue' && stats.overdueCount > 0) {
+        return 'text-error bg-error/10 hover:bg-error/15';
+      }
+      return 'text-on-surface-variant hover:bg-surface-container-high';
+    }
+    if (key === 'overdue') return 'bg-error text-white';
     return 'bg-primary text-white';
   }
+
+  const otherCategoryOverdue = category === 'admin'
+    ? member?.transaction?.overdue ?? 0
+    : member?.admin?.overdue ?? 0;
+  const otherCategoryLabel = category === 'admin' ? 'Transaction Tasks' : 'Admin Tasks';
+  const otherCategoryPath = category === 'admin'
+    ? `/tasks/${userId}`
+    : `/tasks/${userId}/admin`;
 
   const rowPad = compact ? 'py-2' : 'py-4';
 
@@ -333,10 +362,21 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
   const emptyState = (
     <div className="p-8 md:p-10 text-center">
       <p className="text-on-surface-variant mb-4">
-        {data.tasks.length === 0
-          ? 'No tasks match this filter.'
-          : 'No dated tasks to show.'}
+        {filter === 'overdue' && stats.overdueCount === 0
+          ? `No overdue ${category === 'admin' ? 'admin' : 'transaction'} tasks.`
+          : data.tasks.length === 0
+            ? 'No tasks match this filter.'
+            : 'No dated tasks to show.'}
       </p>
+      {filter === 'overdue' && stats.overdueCount === 0 && otherCategoryOverdue > 0 && (
+        <p className="text-sm text-on-surface-variant mb-4">
+          {otherCategoryOverdue} overdue on{' '}
+          <Link to={`${otherCategoryPath}?filter=overdue`} className="font-semibold text-error hover:underline">
+            {otherCategoryLabel}
+          </Link>
+          .
+        </p>
+      )}
       {!showUndated && data.tasks.some((t) => !t.due_date) && (
         <p className="text-sm text-on-surface-variant mb-4">
           Turn on &quot;Show tasks without due date&quot; in Preferences to see undated tasks.
@@ -546,6 +586,8 @@ export default function UserTaskDashboard({ category = 'transaction' }) {
             member={member}
             profile={profile}
             showBorder={false}
+            transactionOverdue={member?.transaction?.overdue ?? 0}
+            adminOverdue={member?.admin?.overdue ?? 0}
           >
             <div className="flex items-center gap-2 flex-wrap pb-3 md:pb-4 pt-1">
               {FILTERS.map((f) => (

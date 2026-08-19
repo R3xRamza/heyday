@@ -33,6 +33,15 @@ export function isOverdue(dueDate, status) {
   return new Date(`${dueDate}T12:00:00`) < today;
 }
 
+/** Local calendar date YYYY-MM-DD (matches isOverdue / member task stats). */
+export function localTodayYmd(refDate = new Date()) {
+  const d = new Date(refDate);
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${day}`;
+}
+
 /** Sun–Sat week containing refDate (default today). */
 export function weekRangeSunday(refDate = new Date()) {
   const start = new Date(refDate);
