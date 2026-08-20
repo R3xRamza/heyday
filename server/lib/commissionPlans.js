@@ -113,12 +113,16 @@ export function parseCustomFees(raw) {
     }
   }
   if (!Array.isArray(parsed)) return [];
-  return parsed.map((f, i) => ({
-    id: f?.id != null ? String(f.id) : `fee_${i}`,
-    label: String(f?.label ?? '').trim(),
-    amount: Math.max(0, Number(f?.amount) || 0),
-    unit: f?.unit === 'percent' ? 'percent' : 'amount',
-  }));
+  return parsed.map((f, i) => {
+    const paidTo = String(f?.paid_to ?? f?.paidTo ?? '').trim();
+    return {
+      id: f?.id != null ? String(f.id) : `fee_${i}`,
+      label: String(f?.label ?? '').trim(),
+      amount: Math.max(0, Number(f?.amount) || 0),
+      unit: f?.unit === 'percent' ? 'percent' : 'amount',
+      ...(paidTo ? { paid_to: paidTo } : {}),
+    };
+  });
 }
 
 export function serializeCustomFees(fees) {
@@ -128,7 +132,25 @@ export function serializeCustomFees(fees) {
 const REFERRAL_FEE_ID = 'referral';
 
 function isReferralFeeLabel(label) {
-  return /referral/i.test(String(label || ''));
+  return /^referral\b/i.test(String(label || '').trim());
+}
+
+/** Pull "Lisa Harrell" from "Referral: Lisa Harrell" / "Referral: Lisa Harrell (25%)". */
+export function paidToFromReferralLabel(label, paidTo) {
+  const explicit = String(paidTo ?? '').trim();
+  if (explicit) return explicit;
+  const m = String(label || '').match(/^referral\s*:\s*(.+?)(?:\s*\([\d.]+%\))?\s*$/i);
+  return m ? m[1].trim() : '';
+}
+
+/** Display label e.g. "Referral: Lisa Harrell (25%)". */
+export function referralDisplayLabel(fee) {
+  const paidTo = paidToFromReferralLabel(fee?.label, fee?.paid_to);
+  const base = paidTo ? `Referral: ${paidTo}` : 'Referral';
+  if (fee?.unit === 'percent' && Number(fee?.amount) > 0) {
+    return `${base} (${fee.amount}%)`;
+  }
+  return base;
 }
 
 /** Split stored custom fees into referral (at most one) and everything else. */
@@ -138,11 +160,13 @@ export function splitReferralCustomFees(fees) {
   const rest = [];
   for (const fee of parsed) {
     if (!referral && (fee.id === REFERRAL_FEE_ID || isReferralFeeLabel(fee.label))) {
+      const paidTo = paidToFromReferralLabel(fee.label, fee.paid_to);
       referral = {
         id: REFERRAL_FEE_ID,
-        label: 'Referral',
+        label: paidTo ? `Referral: ${paidTo}` : 'Referral',
         amount: fee.amount,
         unit: fee.unit,
+        ...(paidTo ? { paid_to: paidTo } : {}),
       };
     } else {
       rest.push(fee);
@@ -156,12 +180,14 @@ export function mergeReferralCustomFees(referral, customFees) {
   const rest = parseCustomFees(customFees).filter(
     (fee) => fee.id !== REFERRAL_FEE_ID && !isReferralFeeLabel(fee.label),
   );
+  const paidTo = paidToFromReferralLabel(referral?.label, referral?.paid_to);
   const ref = referral && Number(referral.amount) > 0
     ? [{
       id: REFERRAL_FEE_ID,
-      label: 'Referral',
+      label: paidTo ? `Referral: ${paidTo}` : 'Referral',
       amount: Math.max(0, Number(referral.amount) || 0),
       unit: referral.unit === 'percent' ? 'percent' : 'amount',
+      ...(paidTo ? { paid_to: paidTo } : {}),
     }]
     : [];
   return serializeCustomFees([...ref, ...rest]);
@@ -450,7 +476,15 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
   const customSum = round2(referralFee + nonReferralCustomSum);
   if (!applyPlanFees) {
     const lines = [];
-    for (const fee of [...referralCustom, ...nonReferralCustom]) {
+    for (const fee of referralCustom) {
+      if (!fee.label && !(fee.dollars > 0)) continue;
+      lines.push({
+        key: `custom_${fee.id}`,
+        label: referralDisplayLabel(fee),
+        amount: -fee.dollars,
+      });
+    }
+    for (const fee of nonReferralCustom) {
       if (!fee.label && !(fee.dollars > 0)) continue;
       const pctLabel = fee.unit === 'percent' ? ` (${fee.amount}%)` : '';
       lines.push({
@@ -464,6 +498,7 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
       applyPlanFees: false,
       gci: gciN,
       referralFee,
+      referralPaidTo: paidToFromReferralLabel(referralInput?.label, referralInput?.paid_to) || null,
       commissionBase,
       expSplit: 0,
       postSplit: commissionBase,
@@ -499,10 +534,9 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
   const lines = [];
   for (const fee of referralCustom) {
     if (!fee.label && !(fee.dollars > 0)) continue;
-    const pctLabel = fee.unit === 'percent' ? ` (${fee.amount}%)` : '';
     lines.push({
       key: `custom_${fee.id}`,
-      label: `${fee.label || 'Custom fee'}${pctLabel}`,
+      label: referralDisplayLabel(fee),
       amount: -fee.dollars,
     });
   }
@@ -642,6 +676,7 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
     applyPlanFees: true,
     gci: gciN,
     referralFee,
+    referralPaidTo: paidToFromReferralLabel(referralInput?.label, referralInput?.paid_to) || null,
     commissionBase,
     expSplit: expSplitOut,
     postSplit: postSplitOut,

@@ -319,7 +319,7 @@ function buildCommissionSummary(tx) {
     gci_percent: gciMode === 'percent' && gciPercent != null && !Number.isNaN(gciPercent) ? gciPercent : null,
     gross_commission: hasGci ? gci : null,
     sales_price: tx.value != null ? Number(tx.value) : null,
-    referral_fee: referralFee || { id: 'referral', label: 'Referral', amount: 0, unit: 'amount' },
+    referral_fee: referralFee || { id: 'referral', label: 'Referral', amount: 0, unit: 'amount', paid_to: '' },
     custom_fees: customFeesOnly,
     fee_amounts: feeAmounts,
     breakdown,

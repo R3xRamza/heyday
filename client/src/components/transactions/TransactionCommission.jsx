@@ -203,7 +203,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   const [gciMode, setGciMode] = useState('percent');
   const [gciAmount, setGciAmount] = useState(null);
   const [gciPercent, setGciPercent] = useState(3);
-  const [referralFee, setReferralFee] = useState({ amount: 0, unit: 'amount' });
+  const [referralFee, setReferralFee] = useState({ amount: 0, unit: 'amount', paid_to: '' });
   const [referralExpanded, setReferralExpanded] = useState(false);
   const [customFees, setCustomFees] = useState([]);
   const [feeAmounts, setFeeAmounts] = useState({});
@@ -215,9 +215,15 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
     setGciAmount(json.gross_commission);
     setGciPercent(json.gci_percent != null ? json.gci_percent : 3);
     setReferralFee(json.referral_fee
-      ? { amount: json.referral_fee.amount ?? 0, unit: json.referral_fee.unit === 'percent' ? 'percent' : 'amount' }
-      : { amount: 0, unit: 'amount' });
-    setReferralExpanded(Number(json.referral_fee?.amount ?? 0) > 0);
+      ? {
+        amount: json.referral_fee.amount ?? 0,
+        unit: json.referral_fee.unit === 'percent' ? 'percent' : 'amount',
+        paid_to: json.referral_fee.paid_to || '',
+      }
+      : { amount: 0, unit: 'amount', paid_to: '' });
+    setReferralExpanded(
+      Number(json.referral_fee?.amount ?? 0) > 0 || Boolean(String(json.referral_fee?.paid_to || '').trim()),
+    );
     setCustomFees(json.custom_fees?.length ? json.custom_fees : []);
     setFeeAmounts(json.fee_amounts && typeof json.fee_amounts === 'object' ? json.fee_amounts : {});
   }, []);
@@ -300,8 +306,14 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
     .filter((line) => !/referral/i.test(String(line.label || '')));
   const referralDollars = breakdown?.referralFee || 0;
   const adjustedCommission = breakdown?.commissionBase ?? breakdown?.gci;
+  const referralPaidTo = String(
+    breakdown?.referralPaidTo
+    || referralFee.paid_to
+    || '',
+  ).trim();
+  const referralLabel = referralPaidTo ? `Referral: ${referralPaidTo}` : 'Referral';
   const hasReferralValue = referralDollars > 0 || Number(referralFee.amount) > 0;
-  const showReferralField = referralExpanded || hasReferralValue;
+  const showReferralField = referralExpanded || hasReferralValue || Boolean(referralPaidTo);
 
   function displayFeeValue(line) {
     if (feeAmounts[line.key] != null) return feeAmounts[line.key];
@@ -437,9 +449,33 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                     const amount = n == null ? 0 : n;
                     const next = { ...referralFee, amount };
                     persistReferral(next);
-                    if (amount === 0) setReferralExpanded(false);
+                    if (amount === 0 && !String(referralFee.paid_to || '').trim()) {
+                      setReferralExpanded(false);
+                    }
                   }}
                 />
+                <label className="block mt-2">
+                  <span className="text-[9px] font-bold text-on-surface-variant/70 uppercase tracking-widest">
+                    Paid to
+                  </span>
+                  <input
+                    type="text"
+                    value={referralFee.paid_to || ''}
+                    placeholder="e.g. Lisa Harrell"
+                    onChange={(e) => {
+                      setReferralFee((prev) => ({ ...prev, paid_to: e.target.value }));
+                    }}
+                    onBlur={(e) => {
+                      const paid_to = e.target.value.trim();
+                      const next = { ...referralFee, paid_to };
+                      setReferralFee(next);
+                      if (Number(referralFee.amount) > 0 || paid_to) {
+                        persistReferral(next);
+                      }
+                    }}
+                    className="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-surface-container-low border border-outline-variant/15 text-xs text-primary font-medium focus:outline-none focus:ring-2 focus:ring-secondary/30"
+                  />
+                </label>
               </div>
             )}
           </div>
@@ -528,7 +564,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                 {referralDollars > 0 && (
                   <>
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-on-surface-variant">Referral</span>
+                      <span className="text-on-surface-variant">{referralLabel}</span>
                       <span className="tabular-nums font-semibold text-error">{formatDeduction(referralDollars)}</span>
                     </div>
                     <div className="flex justify-between text-sm font-bold text-primary mb-3 pb-3 border-b border-outline-variant/10">
@@ -653,7 +689,9 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                 {referralDollars > 0 && (
                   <>
                     <div className="flex justify-between text-xs">
-                      <span className="text-on-surface-variant uppercase tracking-wide font-semibold">Referral</span>
+                      <span className="text-on-surface-variant uppercase tracking-wide font-semibold">
+                        {referralLabel}
+                      </span>
                       <span className="tabular-nums font-bold text-primary">{formatDeduction(referralDollars)}</span>
                     </div>
                     <div className="flex justify-between text-xs">
