@@ -218,6 +218,8 @@ export const FIELD_LABELS = {
   state: 'State',
   zip: 'ZIP',
   agent_id: 'Agent',
+  client_name: 'Client name',
+  buyer_party_name: 'Client name (buyer)',
   listing_date: 'Listing date',
   important_date: 'Expiration date',
   close_date: 'Closing date',
@@ -228,18 +230,23 @@ export const FIELD_LABELS = {
 };
 
 export function getRequiredTransactionFields(representing, listingVisibility, saleType) {
+  // Client name is always required in setup so launch isn't blocked later by empty parties.
   if (normalizeListingVisibility(listingVisibility) === 'coming_soon') {
-    return [...BASE_REQUIRED];
+    return [...BASE_REQUIRED, 'client_name'];
   }
   if (normalizeSaleType(saleType, representing) === SALE_TYPE_REFERRAL) {
-    return [...BASE_REQUIRED];
+    return [...BASE_REQUIRED, 'client_name'];
   }
   const r = normalizeRepresenting(representing);
-  return [...BASE_REQUIRED, ...(REQUIRED_BY_REPRESENTING[r] || [])];
+  return [...BASE_REQUIRED, 'client_name', ...(REQUIRED_BY_REPRESENTING[r] || [])];
 }
 
 function isEmpty(value) {
   return value === undefined || value === null || String(value).trim() === '';
+}
+
+function hasClientName(form) {
+  return !isEmpty(form.client_name) || !isEmpty(form.owner_name);
 }
 
 export function validateCreateTransaction(form) {
@@ -261,7 +268,13 @@ export function validateTransactionFields(form) {
     ...getRequiredTransactionFields(form.representing, form.listing_visibility, form.sale_type),
     'agent_id',
   ];
-  const missing = required.filter((key) => isEmpty(form[key]));
+  const missing = required.filter((key) => {
+    if (key === 'client_name') return !hasClientName(form);
+    return isEmpty(form[key]);
+  });
+  if (isDualCounterpartyRepresenting(form.representing) && isEmpty(form.buyer_party_name)) {
+    missing.push('buyer_party_name');
+  }
   if (missing.length === 0) {
     return { ok: true, missing: [] };
   }

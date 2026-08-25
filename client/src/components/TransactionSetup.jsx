@@ -288,6 +288,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
 
   async function finishAssign() {
     setSaving(true);
+    setValidationError('');
     await fetch('/api/tasks/bulk/assign', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -300,12 +301,14 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
       }),
     });
     const res = await fetch(appendAgentScope(`/api/transactions/${transaction.id}/complete-setup`, scope), { method: 'POST', credentials: 'include' });
-    const json = await res.json();
+    const json = await res.json().catch(() => ({}));
     setSaving(false);
     if (res.ok) {
       onComplete(json.transaction);
     } else {
-      setValidationError(json.error || 'Could not complete setup. Fill Agent and Client under parties.');
+      setValidationError(
+        json.error || 'Could not launch. Go back and fill in Client name (required), then try again.',
+      );
     }
   }
 
@@ -420,12 +423,16 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-on-surface-variant">Client name</label>
+              <label className="text-xs font-semibold text-on-surface-variant">
+                {fieldLabel('client_name', isDual ? 'Seller / landlord name' : 'Client name')}
+              </label>
               <input
+                required={isRequired('client_name')}
                 value={isDual
                   ? (form.seller_party_name ?? form.client_name ?? form.owner_name ?? '')
                   : (form.client_name || form.owner_name || '')}
                 onChange={(e) => {
+                  setValidationError('');
                   if (isDual) {
                     setForm({
                       ...form,
@@ -439,17 +446,25 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
                 }}
                 autoComplete={CHROME_AUTOCOMPLETE}
                 className="w-full mt-1 px-3 py-2 border rounded text-sm"
+                placeholder={isDual ? 'Seller or landlord name' : 'Buyer / client name'}
               />
             </div>
             {agentSelect()}
             {isDual && (
               <div className="col-span-2">
-                <label className="text-xs font-semibold text-on-surface-variant">Client name</label>
+                <label className="text-xs font-semibold text-on-surface-variant">
+                  {fieldLabel('buyer_party_name', 'Client name (buyer)')}
+                </label>
                 <input
+                  required
                   value={form.buyer_party_name ?? ''}
-                  onChange={(e) => setForm({ ...form, buyer_party_name: e.target.value })}
+                  onChange={(e) => {
+                    setValidationError('');
+                    setForm({ ...form, buyer_party_name: e.target.value });
+                  }}
                   autoComplete={CHROME_AUTOCOMPLETE}
                   className="w-full mt-1 px-3 py-2 border rounded text-sm"
+                  placeholder="Buyer name"
                 />
               </div>
             )}
@@ -629,6 +644,11 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
         <div className="w-full bg-white border border-outline-variant/20 rounded-xl p-6 shadow-executive space-y-4">
           <h2 className="text-xl font-bold text-primary">Assign Tasks</h2>
           <p className="text-sm text-on-surface-variant">Assign each task to a team member before launching the transaction dashboard.</p>
+          {validationError && (
+            <p className="text-sm text-error font-medium bg-error/10 border border-error/20 rounded-lg px-3 py-2" role="alert">
+              {validationError}
+            </p>
+          )}
           {appliedChecklists.length > 1 && (
             <div className="flex flex-wrap gap-2 border-b border-outline-variant/20 pb-3">
               {appliedChecklists.map((cl) => (

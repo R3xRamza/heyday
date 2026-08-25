@@ -15,6 +15,7 @@ export const FIELD_LABELS = {
   state: 'State',
   zip: 'ZIP',
   agent_id: 'Agent',
+  client_name: 'Client name',
   listing_date: 'Listing date',
   important_date: 'Expiry date',
   close_date: 'Closing date',
@@ -38,18 +39,23 @@ export function normalizeListingVisibility(value) {
 }
 
 export function getRequiredTransactionFields(representing, listingVisibility, saleType) {
+  // Client name is always required so complete-setup isn't blocked by an empty Client party.
   if (normalizeListingVisibility(listingVisibility) === 'coming_soon') {
-    return [...BASE_REQUIRED];
+    return [...BASE_REQUIRED, 'client_name'];
   }
   if (normalizeSaleType(saleType, representing) === SALE_TYPE_REFERRAL) {
-    return [...BASE_REQUIRED];
+    return [...BASE_REQUIRED, 'client_name'];
   }
   const r = normalizeRepresenting(representing);
-  return [...BASE_REQUIRED, ...(REQUIRED_BY_REPRESENTING[r] || [])];
+  return [...BASE_REQUIRED, 'client_name', ...(REQUIRED_BY_REPRESENTING[r] || [])];
 }
 
 function isEmpty(value) {
   return value === undefined || value === null || String(value).trim() === '';
+}
+
+function hasClientName(record) {
+  return !isEmpty(record.client_name) || !isEmpty(record.owner_name);
 }
 
 export function validateTransactionFields(record) {
@@ -57,7 +63,10 @@ export function validateTransactionFields(record) {
     ...getRequiredTransactionFields(record.representing, record.listing_visibility, record.sale_type),
     'agent_id',
   ];
-  const missing = required.filter((key) => isEmpty(record[key]));
+  const missing = required.filter((key) => {
+    if (key === 'client_name') return !hasClientName(record);
+    return isEmpty(record[key]);
+  });
   if (missing.length === 0) {
     return { ok: true, missing: [] };
   }
@@ -86,7 +95,7 @@ export function mergeTransactionForValidation(before, body) {
   const keys = [
     'address', 'city', 'state', 'zip', 'representing', 'listing_visibility', 'sale_type',
     'listing_date', 'important_date', 'close_date', 'acceptance_date', 'option_end_date',
-    'agent_id',
+    'agent_id', 'client_name', 'owner_name',
   ];
   for (const key of keys) {
     if (key in body) {
