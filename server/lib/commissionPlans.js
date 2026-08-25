@@ -5,7 +5,18 @@
  */
 
 export function round2(n) {
-  return Math.round(n * 100) / 100;
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 0;
+  // Half-up via exponential form — avoids Math.round(n * 100) FP traps
+  // (e.g. 1.005 → 1.00) that were understating referral deal nets by a cent.
+  const s = String(x);
+  if (!s.includes('e') && !s.includes('E')) {
+    return Number(`${Math.round(Number(`${x}e2`))}e-2`);
+  }
+  const [coeff, expRaw] = s.toLowerCase().split('e');
+  const exp = Number(expRaw) + 2;
+  const sig = exp >= 0 ? '+' : '';
+  return Number(`${Math.round(Number(`${coeff}e${sig}${exp}`))}e-2`);
 }
 
 function newId(prefix) {
@@ -662,7 +673,16 @@ export function computeDealCommission(gci, startingYtd = {}, overrides = {}, raw
   Object.assign(feePaidAfter, feePaidRecomputed);
 
   const postSplitOut = round2(commissionBase - expSplitOut);
-  const net = round2(postSplitOut - fixedFeesOut - teamSplitsOut - nonReferralCustomSum);
+  // Round the net once from unrounded team % totals. Rounding Tessa/Margaret
+  // separately was stacking half-cents (common on referral deals after the
+  // adjusted commission lands on .x0/.x5) and understating net by $0.01.
+  const teamOverridden = lines.some((l) => String(l.key).startsWith('split_') && l.overridden);
+  const rawTeamSplits = settings.teamSplits.reduce(
+    (sum, split) => sum + postSplitOut * (Number(split.rate) || 0),
+    0,
+  );
+  const teamForNet = teamOverridden ? teamSplitsOut : rawTeamSplits;
+  const net = round2(postSplitOut - fixedFeesOut - teamForNet - nonReferralCustomSum);
   const riskPaidAfter = round2(feePaidAfter.risk_mgmt || 0);
   const cappedFeesPaidAfter = round2(feePaidAfter.capped_trans || 0);
 
