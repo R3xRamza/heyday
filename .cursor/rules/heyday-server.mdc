@@ -59,6 +59,7 @@ alwaysApply: false
 
 - `marketing_posts`, `marketing_platform_goals`, `marketing_birthday_pins`
 - `PATCH /api/crm/:id` — `birthday`, `anniversary` for marketing modals
+- Weekly touch-base: `GET /api/crm/weekly-touch`, `POST /api/crm/weekly-touch/skip`, `POST /api/crm/weekly-touch/reach` — Meredith Closed roster, 5 picks, 6-month cooldown after reached
 
 ## Team hub
 

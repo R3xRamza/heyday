@@ -55,6 +55,12 @@ Add routes in `App.jsx` + nav in `Sidebar.jsx`.
 - `HubFeedback.jsx` — `DashboardLayout` title "Feedback"
 - `HubDocList.jsx` — fetch `/api/hub-docs?section=feedback`, inline edit, Enter adds bullet
 
+## Weekly Touch-Base (CRM Hub)
+
+- `WeeklyTouchBase.jsx` — 5 pick cards in the CRM Hub KPI row, same chrome as Sphere/Closed cards; leave Total Contacts
+- Card: 10px gray uppercase label (`Since {Mon YYYY}` / `Reached out {Mon YYYY}`), smaller teal name, phone (email fallback), Replace, check mark
+- Refreshes Sunday 6:00 PM America/Chicago
+
 ## Checklist editor
 
 - `ChecklistEditor.jsx` — textarea title, nickname, default assignee select, timing row

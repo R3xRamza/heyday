@@ -2,6 +2,11 @@ import { Router } from 'express';
 import db from '../db.js';
 import { seedContactActivitiesFromNotes } from '../lib/contactActivitySeed.js';
 import { CRM_LIST_STAGE_SQL } from '../lib/crmContactScope.js';
+import {
+  getWeeklyTouchList,
+  skipWeeklyTouchPick,
+  setWeeklyTouchReached,
+} from '../lib/weeklyTouch.js';
 
 const router = Router();
 
@@ -81,6 +86,37 @@ router.get('/filters', (_req, res) => {
   `).all();
 
   res.json({ stages, leadSources, assigned });
+});
+
+router.get('/weekly-touch', (_req, res) => {
+  try {
+    res.json(getWeeklyTouchList());
+  } catch (err) {
+    console.error('[weekly-touch]', err);
+    res.status(500).json({ error: 'Could not load weekly touch-base list' });
+  }
+});
+
+router.post('/weekly-touch/skip', (req, res) => {
+  try {
+    const result = skipWeeklyTouchPick(req.body.contactId, req.user.id);
+    if (result.error) return res.status(result.status || 400).json({ error: result.error });
+    res.json(result.list);
+  } catch (err) {
+    console.error('[weekly-touch skip]', err);
+    res.status(500).json({ error: 'Could not skip that contact' });
+  }
+});
+
+router.post('/weekly-touch/reach', (req, res) => {
+  try {
+    const result = setWeeklyTouchReached(req.body.contactId, req.body.reached, req.user.id);
+    if (result.error) return res.status(result.status || 400).json({ error: result.error });
+    res.json(result.list);
+  } catch (err) {
+    console.error('[weekly-touch reach]', err);
+    res.status(500).json({ error: 'Could not update reached status' });
+  }
 });
 
 router.get('/', (req, res) => {

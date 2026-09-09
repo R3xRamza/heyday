@@ -2,20 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import DashboardLayout from '../components/DashboardLayout';
 import CrmHubTabs from '../components/crm/CrmHubTabs';
+import WeeklyTouchBase from '../components/crm/WeeklyTouchBase';
 import Icon from '../components/shared/Icon';
 import ListPagination from '../components/shared/ListPagination';
 import DateText from '../components/shared/DateText';
 import { useGmailSync } from '../context/GmailSyncContext';
 import { useIsMdUp } from '../hooks/useMediaQuery';
 import { formatDate, formatPhone } from '../utils/format';
-
-const HIGHLIGHT_STAGES = [
-  { key: 'Sphere', label: 'Sphere' },
-  { key: 'Closed', label: 'Closed' },
-  { key: 'Client: Actively Working', label: 'Active Clients' },
-  { key: 'Hot Prospect (0-3 months)', label: 'Hot Prospects' },
-  { key: 'Lead', label: 'Leads' },
-];
 
 function stageBadgeClass(stage) {
   if (!stage) return 'bg-outline-variant/20 text-on-surface-variant';
@@ -139,7 +132,6 @@ export default function CRMHub() {
     fetchContacts();
   }, [fetchContacts]);
 
-  const highlights = data.stats?.stageHighlights || {};
   const hasFilters = !!(stage || leadSource || assignedTo || debouncedSearch || tag || isContacted !== '');
 
   function clearFilters() {
@@ -164,31 +156,7 @@ export default function CRMHub() {
               {data.stats?.total?.toLocaleString() ?? '—'}
             </p>
           </div>
-          {HIGHLIGHT_STAGES.map((s) => {
-            const active = stage === s.key;
-            return (
-              <button
-                key={s.key}
-                type="button"
-                onClick={() => {
-                  setStage(active ? '' : s.key);
-                  setPage(1);
-                }}
-                className={`shrink-0 min-w-[7.5rem] md:min-w-[8.5rem] flex-1 basis-[7.5rem] max-w-[12rem] rounded-xl border px-3 md:px-4 py-3 md:py-3.5 text-left transition-all ${
-                  active
-                    ? 'border-secondary bg-secondary/5 ring-2 ring-secondary/25'
-                    : 'border-outline-variant/15 bg-white hover:border-secondary/40'
-                }`}
-              >
-                <p className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest mb-1 truncate">
-                  {s.label}
-                </p>
-                <p className="text-xl md:text-2xl font-bold text-primary-container tabular-nums">
-                  {highlights[s.key]?.toLocaleString() ?? 0}
-                </p>
-              </button>
-            );
-          })}
+          <WeeklyTouchBase />
         </div>
 
         <div className="rounded-xl border border-outline-variant/15 bg-white p-3 sm:p-4 space-y-2.5 shadow-sm">

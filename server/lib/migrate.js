@@ -166,6 +166,7 @@ export function runMigrations(db, options = {}) {
   addColumnIfMissing(db, 'tasks', 'recurrence', 'TEXT');
   migrateTeamHubTables(db);
   migrateHubDocItemsTable(db);
+  migrateWeeklyTouchTables(db);
   migrateVendorsTable(db);
   migrateVendorLikesTable(db);
   // Only seed when empty — never rewrite vendors from CRM/FUB on routine migrate/sync.
@@ -333,6 +334,31 @@ function migrateVendorsTable(db) {
   // Full unique index (not partial) so ON CONFLICT(external_id) works; SQLite allows multiple NULLs
   db.exec(`DROP INDEX IF EXISTS idx_vendors_external_id`);
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_vendors_external_id ON vendors(external_id)`);
+}
+
+function migrateWeeklyTouchTables(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS weekly_touch_meta (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      cycle_number INTEGER NOT NULL DEFAULT 1,
+      cycle_started_on DATE NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS weekly_touch_picks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      week_start DATE NOT NULL,
+      slot INTEGER NOT NULL CHECK (slot >= 1 AND slot <= 5),
+      contact_id INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+      reached_at DATETIME,
+      reached_by INTEGER REFERENCES users(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (week_start, slot),
+      UNIQUE (week_start, contact_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_weekly_touch_picks_week ON weekly_touch_picks(week_start, slot);
+    CREATE INDEX IF NOT EXISTS idx_weekly_touch_picks_reached ON weekly_touch_picks(contact_id, reached_at);
+  `);
 }
 
 function migrateHubDocItemsTable(db) {

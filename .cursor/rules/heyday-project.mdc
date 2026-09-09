@@ -123,6 +123,7 @@ Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · CR
 - Detail: `/crm/:id`
 - Vendors: standalone `vendors` table; team **likes/dislikes** via `vendor_likes.kind` (`like`|`dislike`, multiple + optional notes per person); any auth user can add/edit/remove any reaction; sort by likes, dislikes, category, name; seeded from `server/data/vendors-seed.json`
 - Full-width CRM content (no content `max-w` caps)
+- **Weekly Touch-Base** — 5 shared Meredith Closed picks in the CRM Hub KPI row (same card chrome as Sphere/Closed); Total Contacts stays. Replace draws another (name returns to pool). Check = reached this week (label **Reached out {Mon YYYY}**) then 6-month cooldown; list refreshes Sunday 6pm Chicago. `GET/POST /api/crm/weekly-touch` `/skip` `/reach`
 
 ## DOMAIN — Checklists
 
