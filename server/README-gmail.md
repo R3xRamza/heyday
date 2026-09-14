@@ -38,7 +38,7 @@ CLIENT_URL=http://localhost:5173
 
 ## Connecting mailboxes
 
-1. Log in as **admin** (an admin user) to connect all three mailboxes.
+1. Log in as an **admin** user to connect all three mailboxes.
 2. Open **CRM** → Gmail mailboxes section → **Connect Gmail** for each address.
 3. Sign in with the **matching** Google account (e.g. connect `meredith@theheydaygroup.com` while signed into that inbox).
 

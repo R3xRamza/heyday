@@ -27,7 +27,7 @@ alwaysApply: true
 ## DEV
 
 - `npm run dev` from repo root
-- Login: use existing team accounts; never put passwords in git, README, or these rules
+- Login: use existing team accounts; **never** put passwords in git, README, or these rules
 - Local DB: `heyday.db` (gitignored); migrations run on server start
 
 ## ROUTES (client)
