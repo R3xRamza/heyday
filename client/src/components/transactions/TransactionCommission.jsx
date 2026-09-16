@@ -194,6 +194,16 @@ function newFeeId() {
   return `fee_${Date.now()}_${feeSeq}`;
 }
 
+function feesSnapshot(fees) {
+  return JSON.stringify((fees || []).map((f) => ({
+    id: f.id,
+    label: f.label,
+    amount: f.amount,
+    unit: f.unit,
+    paid_to: f.paid_to || '',
+  })));
+}
+
 export default function TransactionCommission({ transactionId, salesPrice, onTransactionPatch }) {
   const { scope } = useAgentScope();
   const [data, setData] = useState(null);
@@ -208,6 +218,10 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   const [customFees, setCustomFees] = useState([]);
   const [feeAmounts, setFeeAmounts] = useState({});
   const saveTimer = useRef(null);
+  const customFeesRef = useRef([]);
+  const dirtyCustomFees = useRef(false);
+  const persistSeq = useRef(0);
+  const pendingFocusFeeId = useRef(null);
 
   const applyServer = useCallback((json) => {
     setData(json);
@@ -224,7 +238,11 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
     setReferralExpanded(
       Number(json.referral_fee?.amount ?? 0) > 0 || Boolean(String(json.referral_fee?.paid_to || '').trim()),
     );
-    setCustomFees(json.custom_fees?.length ? json.custom_fees : []);
+    if (!dirtyCustomFees.current) {
+      const fees = json.custom_fees?.length ? json.custom_fees : [];
+      customFeesRef.current = fees;
+      setCustomFees(fees);
+    }
     setFeeAmounts(json.fee_amounts && typeof json.fee_amounts === 'object' ? json.fee_amounts : {});
   }, []);
 
@@ -246,6 +264,9 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   }, [transactionId, scope, applyServer]);
 
   useEffect(() => {
+    dirtyCustomFees.current = false;
+    persistSeq.current += 1;
+    setSaving(false);
     setLoading(true);
     load();
   }, [load]);
@@ -257,28 +278,47 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   }, [salesPrice]);
 
   const persist = useCallback(async (patch) => {
+    const seq = ++persistSeq.current;
+    const body = { ...patch };
+    if ('custom_fees' in body) body.custom_fees = customFeesRef.current;
+    const sentCustom = 'custom_fees' in patch ? feesSnapshot(body.custom_fees) : null;
+
     setSaving(true);
     setError('');
-    const res = await fetch(
-      appendAgentScope(`/api/transactions/${transactionId}/commission`, scope),
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(patch),
-      },
-    );
-    const json = await res.json().catch(() => ({}));
-    setSaving(false);
-    if (!res.ok) {
-      setError(json.error || 'Could not save');
-      return;
-    }
-    applyServer(json);
-    if (onTransactionPatch && json.gross_commission !== undefined) {
-      onTransactionPatch({ gross_commission: json.gross_commission });
+    try {
+      const res = await fetch(
+        appendAgentScope(`/api/transactions/${transactionId}/commission`, scope),
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(body),
+        },
+      );
+      const json = await res.json().catch(() => ({}));
+      if (seq !== persistSeq.current) return;
+      if (!res.ok) {
+        setError(json.error || 'Could not save');
+        return;
+      }
+      if (sentCustom != null) {
+        dirtyCustomFees.current = sentCustom !== feesSnapshot(customFeesRef.current);
+      }
+      applyServer(json);
+      if (onTransactionPatch && json.gross_commission !== undefined) {
+        onTransactionPatch({ gross_commission: json.gross_commission });
+      }
+    } finally {
+      if (seq === persistSeq.current) setSaving(false);
     }
   }, [transactionId, scope, onTransactionPatch, applyServer]);
+
+  function updateCustomFees(next) {
+    dirtyCustomFees.current = true;
+    customFeesRef.current = next;
+    setCustomFees(next);
+    return next;
+  }
 
   function schedulePersist(patch) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -598,8 +638,12 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                   <button
                     type="button"
                     onClick={() => {
-                      const next = [...customFees, { id: newFeeId(), label: '', amount: 0, unit: 'amount' }];
-                      setCustomFees(next);
+                      const id = newFeeId();
+                      pendingFocusFeeId.current = id;
+                      updateCustomFees([
+                        ...customFeesRef.current,
+                        { id, label: '', amount: 0, unit: 'amount' },
+                      ]);
                     }}
                     className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold text-secondary hover:bg-secondary/10"
                   >
@@ -623,13 +667,21 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                           <input
                             type="text"
                             value={fee.label}
+                            ref={(el) => {
+                              if (el && pendingFocusFeeId.current === fee.id) {
+                                el.focus();
+                                pendingFocusFeeId.current = null;
+                              }
+                            }}
                             onChange={(e) => {
-                              const next = customFees.map((f, i) => (i === index ? { ...f, label: e.target.value } : f));
-                              setCustomFees(next);
+                              updateCustomFees(customFeesRef.current.map((f, i) => (
+                                i === index ? { ...f, label: e.target.value } : f
+                              )));
                             }}
                             onBlur={(e) => {
-                              const next = customFees.map((f, i) => (i === index ? { ...f, label: e.target.value } : f));
-                              setCustomFees(next);
+                              const next = updateCustomFees(customFeesRef.current.map((f, i) => (
+                                i === index ? { ...f, label: e.target.value } : f
+                              )));
                               schedulePersist({ custom_fees: next });
                             }}
                             placeholder="Fee name"
@@ -641,21 +693,20 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                             unit={fee.unit === 'percent' ? 'percent' : 'amount'}
                             value={fee.amount}
                             onUnitChange={(unit) => {
-                              const next = customFees.map((f, i) => (i === index ? { ...f, unit } : f));
-                              setCustomFees(next);
+                              const next = updateCustomFees(customFeesRef.current.map((f, i) => (
+                                i === index ? { ...f, unit } : f
+                              )));
                               persist({ custom_fees: next });
                             }}
                             onChange={(amount) => {
-                              const next = customFees.map((f, i) => (
+                              updateCustomFees(customFeesRef.current.map((f, i) => (
                                 i === index ? { ...f, amount: amount == null ? 0 : amount } : f
-                              ));
-                              setCustomFees(next);
+                              )));
                             }}
                             onBlur={(amount) => {
-                              const next = customFees.map((f, i) => (
+                              const next = updateCustomFees(customFeesRef.current.map((f, i) => (
                                 i === index ? { ...f, amount: amount == null ? 0 : amount } : f
-                              ));
-                              setCustomFees(next);
+                              )));
                               schedulePersist({ custom_fees: next });
                             }}
                           />
@@ -663,8 +714,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                         <button
                           type="button"
                           onClick={() => {
-                            const next = customFees.filter((_, i) => i !== index);
-                            setCustomFees(next);
+                            const next = updateCustomFees(customFeesRef.current.filter((_, i) => i !== index));
                             persist({ custom_fees: next });
                           }}
                           className="p-2 rounded-lg text-on-surface-variant hover:text-error hover:bg-error/5"
