@@ -44,6 +44,7 @@ function UnitToggle({ value, onChange }) {
     <div className="inline-flex rounded-lg border border-outline-variant/20 overflow-hidden shrink-0">
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => onChange('amount')}
         className={`px-2.5 py-1.5 text-xs font-bold ${
           value === 'amount' ? 'bg-primary-container text-white' : 'bg-surface-container-low text-on-surface-variant hover:text-primary'
@@ -53,6 +54,7 @@ function UnitToggle({ value, onChange }) {
       </button>
       <button
         type="button"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => onChange('percent')}
         className={`px-2.5 py-1.5 text-xs font-bold ${
           value === 'percent' ? 'bg-primary-container text-white' : 'bg-surface-container-low text-on-surface-variant hover:text-primary'
@@ -82,7 +84,7 @@ function UnitValueField({
   }, [value]);
 
   return (
-    <label className="block">
+    <div className="block">
       {label && (
         <span className={`font-bold text-on-surface-variant uppercase tracking-widest ${
           compact ? 'text-[9px]' : 'text-[10px]'
@@ -92,7 +94,7 @@ function UnitValueField({
         </span>
       )}
       <div className={`flex items-stretch gap-2 ${label ? 'mt-1.5' : ''}`}>
-        <div className="relative flex-1 min-w-0">
+        <label className="relative flex-1 min-w-0">
           {unit === 'amount' ? (
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">$</span>
           ) : null}
@@ -119,13 +121,13 @@ function UnitValueField({
           {unit === 'percent' ? (
             <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant ${compact ? 'text-xs' : 'text-sm'}`}>%</span>
           ) : null}
-        </div>
+        </label>
         {onUnitChange && <UnitToggle value={unit} onChange={onUnitChange} />}
       </div>
       {helper && (
         <p className={`text-on-surface-variant mt-1 ${compact ? 'text-[10px]' : 'text-[11px]'}`}>{helper}</p>
       )}
-    </label>
+    </div>
   );
 }
 
@@ -221,29 +223,41 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   const customFeesRef = useRef([]);
   const dirtyCustomFees = useRef(false);
   const persistSeq = useRef(0);
+  const persistChain = useRef(Promise.resolve());
   const pendingFocusFeeId = useRef(null);
 
-  const applyServer = useCallback((json) => {
+  const applyServer = useCallback((json, opts = {}) => {
+    const syncGci = opts.syncGci !== false;
+    const syncReferral = opts.syncReferral !== false;
+    const syncCustom = opts.syncCustom !== false && !dirtyCustomFees.current;
+    const syncFeeAmounts = opts.syncFeeAmounts !== false;
+
     setData(json);
-    setGciMode(json.gci_mode === 'percent' ? 'percent' : 'amount');
-    setGciAmount(json.gross_commission);
-    setGciPercent(json.gci_percent != null ? json.gci_percent : 3);
-    setReferralFee(json.referral_fee
-      ? {
-        amount: json.referral_fee.amount ?? 0,
-        unit: json.referral_fee.unit === 'percent' ? 'percent' : 'amount',
-        paid_to: json.referral_fee.paid_to || '',
-      }
-      : { amount: 0, unit: 'amount', paid_to: '' });
-    setReferralExpanded(
-      Number(json.referral_fee?.amount ?? 0) > 0 || Boolean(String(json.referral_fee?.paid_to || '').trim()),
-    );
-    if (!dirtyCustomFees.current) {
+    if (syncGci) {
+      setGciMode(json.gci_mode === 'percent' ? 'percent' : 'amount');
+      setGciAmount(json.gross_commission);
+      setGciPercent(json.gci_percent != null ? json.gci_percent : 3);
+    }
+    if (syncReferral) {
+      setReferralFee(json.referral_fee
+        ? {
+          amount: json.referral_fee.amount ?? 0,
+          unit: json.referral_fee.unit === 'percent' ? 'percent' : 'amount',
+          paid_to: json.referral_fee.paid_to || '',
+        }
+        : { amount: 0, unit: 'amount', paid_to: '' });
+      setReferralExpanded(
+        Number(json.referral_fee?.amount ?? 0) > 0 || Boolean(String(json.referral_fee?.paid_to || '').trim()),
+      );
+    }
+    if (syncCustom) {
       const fees = json.custom_fees?.length ? json.custom_fees : [];
       customFeesRef.current = fees;
       setCustomFees(fees);
     }
-    setFeeAmounts(json.fee_amounts && typeof json.fee_amounts === 'object' ? json.fee_amounts : {});
+    if (syncFeeAmounts) {
+      setFeeAmounts(json.fee_amounts && typeof json.fee_amounts === 'object' ? json.fee_amounts : {});
+    }
   }, []);
 
   const load = useCallback(async () => {
@@ -277,40 +291,50 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [salesPrice]);
 
-  const persist = useCallback(async (patch) => {
+  const persist = useCallback((patch) => {
     const seq = ++persistSeq.current;
-    const body = { ...patch };
-    if ('custom_fees' in body) body.custom_fees = customFeesRef.current;
-    const sentCustom = 'custom_fees' in patch ? feesSnapshot(body.custom_fees) : null;
-
     setSaving(true);
     setError('');
-    try {
-      const res = await fetch(
-        appendAgentScope(`/api/transactions/${transactionId}/commission`, scope),
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(body),
-        },
-      );
-      const json = await res.json().catch(() => ({}));
-      if (seq !== persistSeq.current) return;
-      if (!res.ok) {
-        setError(json.error || 'Could not save');
-        return;
+
+    const run = async () => {
+      const body = { ...patch };
+      if ('custom_fees' in body) body.custom_fees = customFeesRef.current;
+      const sentCustom = 'custom_fees' in patch ? feesSnapshot(body.custom_fees) : null;
+      try {
+        const res = await fetch(
+          appendAgentScope(`/api/transactions/${transactionId}/commission`, scope),
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+          },
+        );
+        const json = await res.json().catch(() => ({}));
+        if (seq !== persistSeq.current) return;
+        if (!res.ok) {
+          setError(json.error || 'Could not save');
+          return;
+        }
+        if (sentCustom != null) {
+          dirtyCustomFees.current = sentCustom !== feesSnapshot(customFeesRef.current);
+        }
+        applyServer(json, {
+          syncGci: 'gci_mode' in patch || 'gci_percent' in patch || 'gross_commission' in patch,
+          syncReferral: 'referral_fee' in patch,
+          syncCustom: 'custom_fees' in patch,
+          syncFeeAmounts: 'fee_amounts' in patch,
+        });
+        if (onTransactionPatch && json.gross_commission !== undefined) {
+          onTransactionPatch({ gross_commission: json.gross_commission });
+        }
+      } finally {
+        if (seq === persistSeq.current) setSaving(false);
       }
-      if (sentCustom != null) {
-        dirtyCustomFees.current = sentCustom !== feesSnapshot(customFeesRef.current);
-      }
-      applyServer(json);
-      if (onTransactionPatch && json.gross_commission !== undefined) {
-        onTransactionPatch({ gross_commission: json.gross_commission });
-      }
-    } finally {
-      if (seq === persistSeq.current) setSaving(false);
-    }
+    };
+
+    persistChain.current = persistChain.current.then(run, run);
+    return persistChain.current;
   }, [transactionId, scope, onTransactionPatch, applyServer]);
 
   function updateCustomFees(next) {
