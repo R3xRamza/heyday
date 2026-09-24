@@ -21,6 +21,7 @@ export const FIELD_LABELS = {
   close_date: 'Closing date',
   acceptance_date: 'Acceptance date',
   option_end_date: 'Option end date',
+  leaseback_end_date: 'Leaseback end date',
   representing: 'Representing',
 };
 
@@ -95,6 +96,7 @@ export function mergeTransactionForValidation(before, body) {
   const keys = [
     'address', 'city', 'state', 'zip', 'representing', 'listing_visibility', 'sale_type',
     'listing_date', 'important_date', 'close_date', 'acceptance_date', 'option_end_date',
+    'leaseback_end_date',
     'agent_id', 'client_name', 'owner_name',
   ];
   for (const key of keys) {

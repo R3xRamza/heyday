@@ -194,7 +194,7 @@ function closedCitiesForScope(db, agentScope) {
 const TX_FIELDS = [
   'address', 'city', 'state', 'zip', 'value', 'owner_name', 'representing', 'listing_visibility', 'stage',
   'important_date', 'important_date_label', 'close_date', 'listing_date',
-  'acceptance_date', 'option_end_date', 'workflow_status', 'transaction_name',
+  'acceptance_date', 'option_end_date', 'leaseback_end_date', 'workflow_status', 'transaction_name',
   'sale_type', 'gross_commission', 'commission_custom_fees', 'commission_fee_overrides',
   'commission_gci_mode', 'commission_gci_percent',
   'buyer_agreement_date', 'buyer_expiration_date',

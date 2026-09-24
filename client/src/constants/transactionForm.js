@@ -147,6 +147,7 @@ export const TIMELINE_DATE_KEYS = [
   'acceptance_date',
   'option_end_date',
   'close_date',
+  'leaseback_end_date',
   'important_date',
 ];
 
@@ -156,12 +157,14 @@ export const TIMELINE_BY_REPRESENTING = {
     { key: 'acceptance_date', label: 'Acceptance date', icon: 'verified' },
     { key: 'option_end_date', label: 'Option period end date', icon: 'pending_actions' },
     { key: 'close_date', label: 'Closing date', icon: 'key' },
+    { key: 'leaseback_end_date', label: 'Leaseback end date', icon: 'home' },
     { key: 'important_date', label: 'Expiration date', icon: 'event_busy' },
   ],
   buyer: [
     { key: 'acceptance_date', label: 'Acceptance date', icon: 'verified' },
     { key: 'option_end_date', label: 'Option period end date', icon: 'pending_actions' },
     { key: 'close_date', label: 'Closing date', icon: 'key' },
+    { key: 'leaseback_end_date', label: 'Leaseback end date', icon: 'home' },
   ],
   landlord: [
     { key: 'listing_date', label: 'Listing date', icon: 'event_available' },
@@ -203,6 +206,11 @@ export function showsOptionEndDate(representing) {
   return getTimelineDateKeys(representing).includes('option_end_date');
 }
 
+/** Leaseback end is optional on buyer and seller traditional deals */
+export function showsLeasebackEndDate(representing) {
+  return getTimelineDateKeys(representing).includes('leaseback_end_date');
+}
+
 const BASE_REQUIRED = ['address', 'city', 'state', 'zip'];
 
 const REQUIRED_BY_REPRESENTING = {
@@ -225,6 +233,7 @@ export const FIELD_LABELS = {
   close_date: 'Closing date',
   acceptance_date: 'Acceptance date',
   option_end_date: 'Option end date',
+  leaseback_end_date: 'Leaseback end date',
   representing: 'Representing',
   listing_visibility: 'Listing status',
 };

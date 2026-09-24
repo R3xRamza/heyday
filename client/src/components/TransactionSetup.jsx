@@ -10,6 +10,7 @@ import {
   normalizeListingVisibility,
   isListingSideRepresenting,
   showsOptionEndDate,
+  showsLeasebackEndDate,
   getRequiredTransactionFields,
   validateTransactionFields,
   FIELD_LABELS,
@@ -315,6 +316,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
   const isDual = isDualCounterpartyRepresenting(form.representing);
   const isListingSide = isListingSideRepresenting(form.representing);
   const showOptionEnd = showsOptionEndDate(form.representing);
+  const showLeasebackEnd = showsLeasebackEndDate(form.representing);
 
   return (
     <div className="w-full max-w-3xl mx-auto py-8 px-4">
@@ -525,6 +527,16 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
                 required={isRequired('close_date')}
                 value={form.close_date || ''}
                 onChange={(e) => setForm({ ...form, close_date: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border rounded text-sm"
+              />
+            </div>
+            <div className={showLeasebackEnd ? '' : 'invisible pointer-events-none'} aria-hidden={!showLeasebackEnd}>
+              <label className="text-xs font-semibold text-on-surface-variant">{fieldLabel('leaseback_end_date', 'Leaseback End Date')}</label>
+              <input
+                type="date"
+                tabIndex={showLeasebackEnd ? 0 : -1}
+                value={form.leaseback_end_date || ''}
+                onChange={(e) => setForm({ ...form, leaseback_end_date: e.target.value })}
                 className="w-full mt-1 px-3 py-2 border rounded text-sm"
               />
             </div>

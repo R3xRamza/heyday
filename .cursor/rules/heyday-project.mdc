@@ -93,7 +93,7 @@ Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · CR
 
 - Representing: seller, buyer, landlord, tenant (legacy `seller_and_buyer` normalized)
 - Parties: Traditional = Agent, Title, Cooperating Agent, Client, Lender (+ custom); Rent/lease = Agent, Client (+ custom). Active requires Agent+Client; Traditional pending requires Agent, Client, Cooperating Agent (Title/Lender optional). `workflow_status`: setup via `TransactionSetup` until active
-- Key dates: `listing_date`, `important_date` (expiration), `close_date`, `acceptance_date`, `option_end_date`
+- Key dates: `listing_date`, `important_date` (expiration), `close_date`, `acceptance_date`, `option_end_date`, optional `leaseback_end_date` (buyer/seller only)
 - **List filters** (`TransactionsList.jsx`): Active Transactions, Coming Soon, Current Listings, Pending, Closed, All
 - **Current Listings columns:** Address, Type, Price, Listing Date, **Expiration** (`important_date`) — no Agent column
 - **Listings KPI card** subtitle: **Active**
