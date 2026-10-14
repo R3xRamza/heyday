@@ -215,10 +215,10 @@ function isReferralSale(tx) {
 
 function buildCommissionSummary(tx) {
   const dealDate = tx.close_date || todayYmd();
-  const window = anniversaryWindowForDate(dealDate);
   const agentId = tx.agent_id != null ? Number(tx.agent_id) : null;
   const agentKey = agentKeyFromUserId(db, agentId);
   const settings = getTemplateSettingsForAgentId(db, agentId);
+  const window = anniversaryWindowForDate(dealDate, settings.anniversaryMd);
   // eXp / team fees for any templated agent on non-referral deals
   const appliesPlan = Boolean(agentKey) && !isReferralSale(tx);
   const agentLabel = agentKey ? getTemplateMeta(db, agentKey).label : null;

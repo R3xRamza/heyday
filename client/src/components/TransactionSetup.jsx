@@ -290,6 +290,12 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
   async function finishAssign() {
     setSaving(true);
     setValidationError('');
+    const missing = tasks.filter((task) => !assignments[task.id]);
+    if (missing.length) {
+      setSaving(false);
+      setValidationError('Choose a person for every task before launching.');
+      return;
+    }
     await fetch('/api/tasks/bulk/assign', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -297,7 +303,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
       body: JSON.stringify({
         assignments: Object.entries(assignments).map(([task_id, assigned_to]) => ({
           task_id: Number(task_id),
-          assigned_to: assigned_to ? Number(assigned_to) : null,
+          assigned_to: Number(assigned_to),
         })),
       }),
     });
@@ -699,7 +705,7 @@ export default function TransactionSetup({ transaction, onUpdate, onComplete, on
                   onChange={(e) => setAssignments({ ...assignments, [task.id]: e.target.value })}
                   className="text-sm border rounded px-2 py-1.5 min-w-[140px]"
                 >
-                  <option value="">Unassigned</option>
+                  <option value="">Select a person</option>
                   {users.map((u) => (
                     <option key={u.id} value={String(u.id)}>{u.name}</option>
                   ))}

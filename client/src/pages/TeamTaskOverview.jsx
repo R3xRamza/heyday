@@ -6,6 +6,7 @@ import TeamAvatar from '../components/TeamAvatar';
 import { getTeamProfile } from '../data/teamProfiles';
 import TeamTaskOverviewPanel from '../components/tasks/TeamTaskOverviewPanel';
 import TeamAdminTasksPanel from '../components/tasks/TeamAdminTasksPanel';
+import EditTaskModal from '../components/EditTaskModal';
 import { useAgentScope } from '../context/AgentScopeContext';
 import { appendAgentScope } from '../utils/agentScope';
 
@@ -215,6 +216,36 @@ export default function TeamTaskOverview() {
     () => Object.fromEntries(teamMembers.map((m) => [m.id, m.email])),
     [teamMembers],
   );
+  const [editingTask, setEditingTask] = useState(null);
+
+  async function saveUnassignedTask(formData) {
+    if (!editingTask) return;
+    const res = await fetch(`/api/tasks/${editingTask.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(formData),
+    });
+    if (!res.ok) {
+      window.alert('Could not save task.');
+      return;
+    }
+    setEditingTask(null);
+    fetchOverview();
+    fetchAdmin();
+  }
+
+  async function deleteUnassignedTask(task) {
+    if (!window.confirm(`Delete "${task.title}"?`)) return;
+    const res = await fetch(`/api/tasks/${task.id}`, { method: 'DELETE', credentials: 'include' });
+    if (!res.ok) {
+      window.alert('Could not delete task.');
+      return;
+    }
+    setEditingTask(null);
+    fetchOverview();
+    fetchAdmin();
+  }
 
   return (
     <DashboardLayout title="Team Task Hub" className="p-8">
@@ -252,6 +283,7 @@ export default function TeamTaskOverview() {
                 tasks={overviewTasks}
                 loading={loadingOverview}
                 emailByUserId={emailByUserId}
+                onEditUnassigned={setEditingTask}
               />
             </div>
             <div className="lg:col-span-4">
@@ -259,11 +291,22 @@ export default function TeamTaskOverview() {
                 tasks={adminTasks}
                 teamMembers={teamMembers}
                 loading={loadingAdmin}
+                onEditUnassigned={setEditingTask}
               />
             </div>
           </div>
         </div>
       </div>
+      {editingTask && (
+        <EditTaskModal
+          task={editingTask}
+          users={teamMembers}
+          adminOnly={editingTask.category === 'admin'}
+          onClose={() => setEditingTask(null)}
+          onSave={saveUnassignedTask}
+          onDelete={deleteUnassignedTask}
+        />
+      )}
     </DashboardLayout>
   );
 }

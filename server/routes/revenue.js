@@ -3,6 +3,7 @@ import db from '../db.js';
 import {
   computeYearCommissions,
   anniversaryWindowForEndYear,
+  closeDateInAnniversaryYear,
   settingsProgressMeta,
   round2,
 } from '../lib/commissionPlans.js';
@@ -269,29 +270,43 @@ router.delete('/templates/:agentKey', (req, res) => {
   }
 });
 
+function dealsInAgentAnniversaryYear(deals, year) {
+  const windows = new Map();
+  return deals.filter((deal) => {
+    const key = deal.agent_id != null ? String(deal.agent_id) : 'none';
+    if (!windows.has(key)) {
+      const settings = getTemplateSettingsForAgentId(db, deal.agent_id);
+      windows.set(key, settings.anniversaryMd);
+    }
+    return closeDateInAnniversaryYear(deal.close_date, year, windows.get(key));
+  });
+}
+
 router.get('/', (req, res) => {
   const year = Math.min(2100, Math.max(2000, parseInt(req.query.year, 10) || new Date().getFullYear()));
-  const { start: yearStart, end: yearEnd } = anniversaryWindowForEndYear(year);
   const agentScope = parseAgentScope(req.query);
   const scopeUserId = agentScopeUserId(agentScope);
+  // Wide enough for every anniversary that ends in `year` (Jan 1 through Dec 1).
+  const spanStart = `${year - 1}-01-01`;
+  const spanEnd = `${year}-12-31`;
 
   // Full anniversary ledger (all agents) so recipient splits can be attributed.
-  const allClosedDeals = db.prepare(`
+  const allClosedDeals = dealsInAgentAnniversaryYear(db.prepare(`
     ${DEAL_SELECT}
     WHERE t.stage = 'closed'
       AND t.close_date >= ? AND t.close_date <= ?
     ORDER BY t.close_date ASC, t.id ASC
-  `).all(yearStart, yearEnd);
+  `).all(spanStart, spanEnd), year);
 
   const allClosed = computeByAgentTemplates(allClosedDeals);
   const closedYtdMap = closedYtdByAgent(allClosedDeals);
 
-  const allPendingDeals = db.prepare(`
+  const allPendingDeals = dealsInAgentAnniversaryYear(db.prepare(`
     ${DEAL_SELECT}
     WHERE t.stage = 'pending' AND t.close_date IS NOT NULL
       AND t.close_date >= ? AND t.close_date <= ?
     ORDER BY t.close_date ASC, t.id ASC
-  `).all(yearStart, yearEnd);
+  `).all(spanStart, spanEnd), year);
 
   const allPipeline = computePipelineByAgent(allPendingDeals, closedYtdMap);
 
@@ -339,10 +354,12 @@ router.get('/', (req, res) => {
 
   const closedVolume = closedResults.reduce((acc, d) => acc + (Number(d.value) || 0), 0);
 
+  const scopeWindow = anniversaryWindowForEndYear(year, settings?.anniversaryMd);
   const summary = {
     year,
-    anniversaryStart: yearStart,
-    anniversaryEnd: yearEnd,
+    anniversaryStart: multiAgent ? null : scopeWindow.start,
+    anniversaryEnd: multiAgent ? null : scopeWindow.end,
+    anniversaryMd: multiAgent ? null : (settings?.anniversaryMd || null),
     agent_key: scopeAgentKey,
     agent_label: agentLabel,
     multi_agent: multiAgent,

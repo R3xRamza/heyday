@@ -19,6 +19,7 @@ export default function TeamAdminTasksPanel({
   tasks,
   teamMembers,
   loading,
+  onEditUnassigned,
   className = '',
 }) {
   const navigate = useNavigate();
@@ -82,6 +83,7 @@ export default function TeamAdminTasksPanel({
               type="button"
               onClick={() => {
                 if (task.assigned_to) navigate(`/tasks/${task.assigned_to}/admin`);
+                else onEditUnassigned?.(task);
               }}
               className="w-full text-left px-4 py-3 hover:bg-surface-container-low/60 transition-colors"
             >

@@ -46,11 +46,12 @@ export default function CreateTaskModal({
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!form.assigned_to) return;
     setSaving(true);
     const payload = {
       title: form.title.trim(),
       description: form.description.trim() || null,
-      assigned_to: form.assigned_to ? Number(form.assigned_to) : null,
+      assigned_to: Number(form.assigned_to),
       transaction_id: adminOnly
         ? null
         : lockTransaction && defaultTransactionId
@@ -131,11 +132,12 @@ export default function CreateTaskModal({
           <div>
             <label className="text-xs font-semibold text-on-surface-variant uppercase">Assigned to</label>
             <select
+              required
               value={form.assigned_to}
               onChange={(e) => setForm({ ...form, assigned_to: e.target.value })}
               className="w-full mt-1 px-3 py-2 border border-outline-variant/30 rounded text-sm"
             >
-              <option value="">Unassigned</option>
+              <option value="">Select a person</option>
               {users.map((u) => (
                 <option key={u.id} value={String(u.id)}>{u.name}</option>
               ))}

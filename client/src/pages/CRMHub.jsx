@@ -147,17 +147,18 @@ export default function CRMHub() {
   return (
     <DashboardLayout title="CRM Hub" headerRight={<CrmHubTabs />} className="p-4 md:p-6 lg:p-8">
       <div className="w-full space-y-4 md:space-y-5">
-        <div className="flex gap-2.5 md:gap-3 overflow-x-auto pb-1 hide-scrollbar md:custom-scrollbar">
-          <div className="shrink-0 min-w-[7.5rem] md:min-w-[8.5rem] flex-1 basis-[7.5rem] max-w-[12rem] rounded-xl border border-outline-variant/15 bg-gradient-to-br from-primary-container/10 to-white px-3 md:px-4 py-3 md:py-3.5">
-            <p className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest mb-1 truncate">
-              Total Contacts
-            </p>
-            <p className="text-xl md:text-2xl font-bold text-primary-container tabular-nums">
-              {data.stats?.total?.toLocaleString() ?? '—'}
-            </p>
-          </div>
-          <WeeklyTouchBase />
-        </div>
+        <WeeklyTouchBase
+          leading={(
+            <div className="shrink-0 min-w-[7.5rem] md:min-w-[8.5rem] flex-1 basis-[7.5rem] max-w-[12rem] rounded-xl border border-outline-variant/15 bg-gradient-to-br from-primary-container/10 to-white px-3 md:px-4 py-3 md:py-3.5">
+              <p className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest mb-1 truncate">
+                Total Contacts
+              </p>
+              <p className="text-xl md:text-2xl font-bold text-primary-container tabular-nums">
+                {data.stats?.total?.toLocaleString() ?? '—'}
+              </p>
+            </div>
+          )}
+        />
 
         <div className="rounded-xl border border-outline-variant/15 bg-white p-3 sm:p-4 space-y-2.5 shadow-sm">
           <div className="relative w-full">

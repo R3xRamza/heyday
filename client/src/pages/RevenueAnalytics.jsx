@@ -66,11 +66,11 @@ function BreakdownLines({ breakdown, netLabel = 'Net' }) {
             <span className="tabular-nums font-bold text-error">{formatDeduction(referralDollars)}</span>
           </div>
           <div className="flex justify-between text-xs font-bold text-primary border-t border-error/10 pt-1.5">
-            <span>Adjusted commission</span>
+            <span>Agent gross</span>
             <span className="tabular-nums">{formatMoney(adjustedCommission)}</span>
           </div>
           <p className="text-[10px] text-on-surface-variant">
-            eXp and team fees below are calculated from adjusted commission.
+            eXp and team fees below are calculated from agent gross.
           </p>
         </div>
       )}
@@ -571,11 +571,15 @@ export default function RevenueAnalytics() {
           <h2 className="min-w-0 flex-1 text-sm md:text-base font-bold text-primary truncate">
             {titleLabel}
           </h2>
-          {s?.anniversaryStart && s?.anniversaryEnd && (
+          {multiAgent ? (
             <span className="text-[11px] text-on-surface-variant hidden lg:inline shrink-0">
-              Dec 1 anniversary · {s.anniversaryStart.slice(0, 7)} → {s.anniversaryEnd}
+              Each agent’s own anniversary year
             </span>
-          )}
+          ) : s?.anniversaryStart && s?.anniversaryEnd ? (
+            <span className="text-[11px] text-on-surface-variant hidden lg:inline shrink-0">
+              {s.anniversaryStart} → {s.anniversaryEnd}
+            </span>
+          ) : null}
           <Link
             to="/revenue/templates"
             className="hidden md:inline-flex items-center gap-2 shrink-0 px-3 py-1.5 bg-surface-container-highest border border-outline-variant/30 text-primary text-xs font-semibold uppercase tracking-wider hover:bg-surface-container-high"
@@ -587,7 +591,7 @@ export default function RevenueAnalytics() {
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
             className="shrink-0 px-2.5 md:px-3 py-1.5 bg-white border border-outline-variant/30 rounded-lg text-sm font-semibold text-primary"
-            title="Anniversary year ending Nov 30"
+            title="Anniversary year"
           >
             {(data?.years ?? [year]).map((y) => (
               <option key={y} value={y}>{y}</option>

@@ -5,6 +5,7 @@ import { buildZip } from '../lib/zipStore.js';
 import {
   computeYearCommissions,
   anniversaryWindowForEndYear,
+  closeDateInAnniversaryYear,
 } from '../lib/commissionPlans.js';
 import { getTemplateSettingsForAgentId } from '../lib/revenueTemplates.js';
 
@@ -49,7 +50,8 @@ function computeRevenueRows() {
   const out = [];
 
   for (const year of years) {
-    const { start, end } = anniversaryWindowForEndYear(year);
+    const spanStart = `${year - 1}-01-01`;
+    const spanEnd = `${year}-12-31`;
 
     for (const stage of ['closed', 'pending']) {
       const deals = db.prepare(`
@@ -57,7 +59,7 @@ function computeRevenueRows() {
         WHERE t.stage = ?
           AND t.close_date >= ? AND t.close_date <= ?
         ORDER BY t.close_date ASC, t.id ASC
-      `).all(stage, start, end);
+      `).all(stage, spanStart, spanEnd);
 
       const groups = new Map();
       for (const deal of deals) {
@@ -68,13 +70,18 @@ function computeRevenueRows() {
 
       for (const [, group] of groups) {
         const settings = getTemplateSettingsForAgentId(db, group[0]?.agent_id);
-        const { results } = computeYearCommissions(group, 0, settings);
+        const window = anniversaryWindowForEndYear(year, settings.anniversaryMd);
+        const inYear = group.filter((deal) => (
+          closeDateInAnniversaryYear(deal.close_date, year, settings.anniversaryMd)
+        ));
+        if (!inYear.length) continue;
+        const { results } = computeYearCommissions(inYear, 0, settings);
         for (const r of results) {
           const b = r.breakdown || {};
           out.push({
             anniversary_year: year,
-            anniversary_start: start,
-            anniversary_end: end,
+            anniversary_start: window.start,
+            anniversary_end: window.end,
             pipeline: stage === 'pending' ? 1 : 0,
             stage: r.stage,
             transaction_id: r.id,

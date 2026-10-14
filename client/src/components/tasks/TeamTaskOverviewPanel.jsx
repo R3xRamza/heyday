@@ -78,6 +78,7 @@ export default function TeamTaskOverviewPanel({
   tasks,
   loading,
   emailByUserId,
+  onEditUnassigned,
   className = '',
 }) {
   const navigate = useNavigate();
@@ -112,6 +113,7 @@ export default function TeamTaskOverviewPanel({
               emailByUserId={emailByUserId}
               onOpen={() => {
                 if (task.assigned_to) navigate(`/tasks/${task.assigned_to}`);
+                else onEditUnassigned?.(task);
               }}
             />
           ))}
@@ -156,6 +158,7 @@ export default function TeamTaskOverviewPanel({
                       className="hover:bg-secondary/5 transition-colors cursor-pointer"
                       onClick={() => {
                         if (task.assigned_to) navigate(`/tasks/${task.assigned_to}`);
+                        else onEditUnassigned?.(task);
                       }}
                     >
                       <td className="px-6 py-3 align-top">

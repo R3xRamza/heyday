@@ -87,7 +87,7 @@ function closedRosterWhere() {
   const meredithId = meredithUserId();
   const conditions = [
     CRM_LIST_STAGE_SQL,
-    `LOWER(TRIM(c.stage)) = 'closed'`,
+    `LOWER(TRIM(c.stage)) IN ('closed', 'under contract')`,
     `(c.person_type IS NULL OR LOWER(TRIM(c.person_type)) != 'child')`,
     `(
       LOWER(IFNULL(c.assigned_to_name, '')) LIKE '%meredith%'
@@ -273,7 +273,7 @@ export function skipWeeklyTouchPick(contactId, _userId) {
     const cooldown = cooldownContactIds(todayIso);
     const replacement = drawRandomIds([...new Set([...currentIds, ...cooldown])], 1)[0];
     if (replacement == null) {
-      return { error: 'No other Closed clients are available to draw', status: 409 };
+      return { error: 'No other clients are available to draw', status: 409 };
     }
 
     db.prepare(`
@@ -326,4 +326,39 @@ export function setWeeklyTouchReached(contactId, reached, userId) {
   const err = run();
   if (err) return err;
   return { list: getWeeklyTouchList() };
+}
+
+/** Latest reached mark per contact. Does not write back to Follow Up Boss. */
+export function listWeeklyTouchContacted() {
+  const rows = db.prepare(`
+    SELECT c.id AS contact_id, c.name, c.stage, c.phone, c.phone_2, c.email,
+      p.reached_at, u.name AS reached_by_name
+    FROM weekly_touch_picks p
+    JOIN contacts c ON c.id = p.contact_id
+    LEFT JOIN users u ON u.id = p.reached_by
+    JOIN (
+      SELECT contact_id, MAX(reached_at) AS reached_at
+      FROM weekly_touch_picks
+      WHERE reached_at IS NOT NULL
+      GROUP BY contact_id
+    ) latest ON latest.contact_id = p.contact_id AND latest.reached_at = p.reached_at
+    ORDER BY p.reached_at DESC, c.name COLLATE NOCASE ASC
+  `).all();
+
+  const seen = new Set();
+  const contacts = [];
+  for (const row of rows) {
+    if (seen.has(row.contact_id)) continue;
+    seen.add(row.contact_id);
+    contacts.push({
+      contactId: row.contact_id,
+      name: row.name,
+      stage: row.stage,
+      phone: row.phone || row.phone_2,
+      email: row.email,
+      reachedAt: row.reached_at,
+      reachedByName: row.reached_by_name,
+    });
+  }
+  return { contacts };
 }

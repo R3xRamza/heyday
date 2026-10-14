@@ -6,6 +6,7 @@ import {
   getWeeklyTouchList,
   skipWeeklyTouchPick,
   setWeeklyTouchReached,
+  listWeeklyTouchContacted,
 } from '../lib/weeklyTouch.js';
 
 const router = Router();
@@ -94,6 +95,15 @@ router.get('/weekly-touch', (_req, res) => {
   } catch (err) {
     console.error('[weekly-touch]', err);
     res.status(500).json({ error: 'Could not load weekly touch-base list' });
+  }
+});
+
+router.get('/weekly-touch/contacted', (_req, res) => {
+  try {
+    res.json(listWeeklyTouchContacted());
+  } catch (err) {
+    console.error('[weekly-touch contacted]', err);
+    res.status(500).json({ error: 'Could not load contacted clients' });
   }
 });
 

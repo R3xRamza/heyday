@@ -16,6 +16,13 @@ export const TEMPLATE_AGENT_LABELS = {
   adam: 'Adam',
 };
 
+/** Seeded eXp anniversaries. Adam stays blank (Dec 1 → Nov 30) until set. */
+export const SEEDED_ANNIVERSARY_MD = {
+  meredith: '12-01',
+  tessa: '12-01',
+  margaret: '01-01',
+};
+
 const EMAIL_TO_KEY = {
   'meredith@theheydaygroup.com': 'meredith',
   'tessa@theheydaygroup.com': 'tessa',
@@ -37,6 +44,7 @@ export function defaultTemplateSettings(agentKey) {
     splitRate: COMMISSION_SETTINGS.splitRate,
     feeLines: DEFAULT_FEE_LINES.map((f) => ({ ...f })),
     teamSplits: [],
+    anniversaryMd: SEEDED_ANNIVERSARY_MD[agentKey] || null,
   };
   if (agentKey === 'meredith') {
     return normalizeCommissionSettings({
@@ -115,6 +123,14 @@ export function migrateRevenueSplitTemplates(db) {
   for (const row of rows) {
     try {
       const parsed = JSON.parse(row.settings_json);
+      const seededMd = SEEDED_ANNIVERSARY_MD[row.agent_key];
+      const missingMd = !Object.prototype.hasOwnProperty.call(parsed, 'anniversaryMd');
+      // 11-01 was written locally before this shipped. Meredith and Tessa are December 1.
+      const badSeed = (row.agent_key === 'meredith' || row.agent_key === 'tessa')
+        && parsed.anniversaryMd === '11-01';
+      if (seededMd && (missingMd || badSeed)) {
+        parsed.anniversaryMd = seededMd;
+      }
       const normalized = normalizeTemplateSettings(parsed);
       update.run(JSON.stringify(normalized), row.agent_key);
     } catch {

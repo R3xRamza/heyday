@@ -369,10 +369,11 @@ router.post('/', (req, res) => {
   }
 
   const assignee = assigned_to ? Number(assigned_to) : null;
-  if (assignee) {
-    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(assignee);
-    if (!user) return res.status(400).json({ error: 'Invalid assigned_to' });
+  if (!assignee) {
+    return res.status(400).json({ error: 'assigned_to is required' });
   }
+  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(assignee);
+  if (!user) return res.status(400).json({ error: 'Invalid assigned_to' });
 
   const timing = parseTaskTiming({ timing_value, timing_direction, timing_anchor });
   const resolvedDueDate = resolveTaskDueDate(transaction, {

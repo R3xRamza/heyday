@@ -36,7 +36,19 @@ function defaultDraft() {
     splitRate: 0.2,
     feeLines: [],
     teamSplits: [],
+    anniversaryMd: null,
   };
+}
+
+function anniversaryWindowLabel(md) {
+  const value = md || '12-01';
+  const [month, day] = value.split('-').map(Number);
+  if (!month || !day) return 'Dec 1 → Nov 30';
+  const start = new Date(Date.UTC(2024, month - 1, day));
+  const end = new Date(start.getTime());
+  end.setUTCDate(end.getUTCDate() - 1);
+  const fmt = (dt) => dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  return `${fmt(start)} → ${fmt(end)}`;
 }
 
 function pctDisplay(rate) {
@@ -147,6 +159,7 @@ export default function SplitTemplatesPanel({ onSaved }) {
       setDraft({
         capAmount: current.settings.capAmount,
         splitRate: current.settings.splitRate,
+        anniversaryMd: current.settings.anniversaryMd || null,
         feeLines: (current.settings.feeLines || []).map((f) => ({ ...f })),
         teamSplits: (current.settings.teamSplits || []).map((s) => ({ ...s })),
       });
@@ -239,6 +252,7 @@ export default function SplitTemplatesPanel({ onSaved }) {
     setDraft({
       capAmount: json.settings.capAmount,
       splitRate: json.settings.splitRate,
+      anniversaryMd: json.settings.anniversaryMd || null,
       feeLines: (json.settings.feeLines || []).map((f) => ({ ...f })),
       teamSplits: (json.settings.teamSplits || []).map((s) => ({ ...s })),
     });
@@ -400,11 +414,22 @@ export default function SplitTemplatesPanel({ onSaved }) {
           <div>
             <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-2">eXp sliding scale</p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <Field label="Split rate" hint="Of GCI until cap">
+              <Field label="Split rate" hint="Of agent gross until cap">
                 <PctInput value={draft.splitRate} onChange={(v) => patch('splitRate', v)} />
               </Field>
-              <Field label="Anniversary cap" hint="Dec 1 → Nov 30">
+              <Field label="Anniversary cap" hint={anniversaryWindowLabel(draft.anniversaryMd)}>
                 <MoneyInput value={draft.capAmount} onChange={(v) => patch('capAmount', v)} />
+              </Field>
+              <Field
+                label="eXp anniversary"
+                hint={draft.anniversaryMd ? 'Cap year starts on this date' : 'Blank uses Dec 1 → Nov 30'}
+              >
+                <input
+                  type="date"
+                  value={draft.anniversaryMd ? `2000-${draft.anniversaryMd}` : ''}
+                  onChange={(e) => patch('anniversaryMd', e.target.value ? e.target.value.slice(5) : null)}
+                  className={INPUT}
+                />
               </Field>
             </div>
           </div>

@@ -15,7 +15,7 @@ function resolveDeadlineMode(task) {
   return 'fixed';
 }
 
-export default function EditTaskModal({ task, users, transaction = null, adminOnly = false, onClose, onSave }) {
+export default function EditTaskModal({ task, users, transaction = null, adminOnly = false, onClose, onSave, onDelete }) {
   const isTemplateTask = Boolean(task.template_task_id);
   const showLinkedDeadline = Boolean(transaction);
   const templateLinkedTiming = isTemplateTask && Boolean(task.timing_anchor);
@@ -208,6 +208,16 @@ export default function EditTaskModal({ task, users, transaction = null, adminOn
           )}
         </div>
         <div className="px-6 py-4 border-t border-outline-variant/20 flex gap-3 justify-end">
+          {onDelete && (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => onDelete(task)}
+              className="mr-auto px-5 py-2 text-sm font-semibold text-error border border-error/30 rounded"
+            >
+              Delete
+            </button>
+          )}
           <button type="button" onClick={onClose} className="px-5 py-2 text-sm font-semibold text-on-surface-variant border rounded">
             Cancel
           </button>

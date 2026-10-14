@@ -1,5 +1,6 @@
 /**
- * eXp commission plans (anniversary year: Dec 1 → Nov 30).
+ * eXp commission plans. The company-dollar year follows each agent's anniversary
+ * (month/day). A blank anniversary stays Dec 1 → Nov 30.
  *
  * Settings use dynamic feeLines[] + teamSplits[]; legacy flat fields migrate on read.
  */
@@ -89,28 +90,67 @@ function todayYmd() {
   return `${y}-${mo}-${d}`;
 }
 
+/** Blank anniversary keeps the historical eXp year. */
+export const DEFAULT_ANNIVERSARY_MD = '12-01';
+
+/** `MM-DD`, or null when blank / invalid. Feb 29 is allowed. */
+export function normalizeAnniversaryMd(value) {
+  if (value == null || String(value).trim() === '') return null;
+  const m = String(value).trim().match(/^(\d{1,2})-(\d{1,2})$/);
+  if (!m) return null;
+  const month = Number(m[1]);
+  const day = Number(m[2]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const probe = new Date(Date.UTC(2024, month - 1, day));
+  if (probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) return null;
+  return `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function ymd(y, mo, d) {
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function shiftDays(y, mo, d, delta) {
+  const dt = new Date(Date.UTC(y, mo - 1, d + delta));
+  return { y: dt.getUTCFullYear(), mo: dt.getUTCMonth() + 1, d: dt.getUTCDate() };
+}
+
 /**
  * Anniversary window containing dateStr (YYYY-MM-DD).
- * Dec 1 of startYear → Nov 30 of startYear+1.
+ * `anniversaryMd` is MM-DD. Blank uses Dec 1 → Nov 30.
  */
-export function anniversaryWindowForDate(dateStr) {
+export function anniversaryWindowForDate(dateStr, anniversaryMd) {
+  const md = normalizeAnniversaryMd(anniversaryMd) || DEFAULT_ANNIVERSARY_MD;
+  const [ms, ds] = md.split('-').map(Number);
   const parsed = parseYmd(dateStr) || parseYmd(todayYmd());
-  const startYear = parsed.mo === 12 ? parsed.y : parsed.y - 1;
+  const onOrAfter = parsed.mo > ms || (parsed.mo === ms && parsed.d >= ds);
+  const startYear = onOrAfter ? parsed.y : parsed.y - 1;
+  const end = shiftDays(startYear + 1, ms, ds, -1);
   return {
-    start: `${startYear}-12-01`,
-    end: `${startYear + 1}-11-30`,
+    start: ymd(startYear, ms, ds),
+    end: ymd(end.y, end.mo, end.d),
     startYear,
+    anniversaryMd: md,
   };
 }
 
-/** Anniversary year that ends Nov 30 of `endYear`. */
-export function anniversaryWindowForEndYear(endYear) {
+/** Window whose end date falls in calendar year `endYear`. */
+export function anniversaryWindowForEndYear(endYear, anniversaryMd) {
   const y = Number(endYear);
-  return {
-    start: `${y - 1}-12-01`,
-    end: `${y}-11-30`,
-    startYear: y - 1,
-  };
+  const md = normalizeAnniversaryMd(anniversaryMd) || DEFAULT_ANNIVERSARY_MD;
+  const [ms, ds] = md.split('-').map(Number);
+  for (const startYear of [y, y - 1]) {
+    const window = anniversaryWindowForDate(ymd(startYear, ms, ds), md);
+    if (Number(String(window.end).slice(0, 4)) === y) return window;
+  }
+  return anniversaryWindowForDate(`${y}-06-01`, md);
+}
+
+export function closeDateInAnniversaryYear(closeDate, endYear, anniversaryMd) {
+  if (!closeDate) return false;
+  const window = anniversaryWindowForEndYear(endYear, anniversaryMd);
+  const close = String(closeDate).slice(0, 10);
+  return close >= window.start && close <= window.end;
 }
 
 export function parseCustomFees(raw) {
@@ -143,7 +183,21 @@ export function serializeCustomFees(fees) {
 const REFERRAL_FEE_ID = 'referral';
 
 function isReferralFeeLabel(label) {
-  return /^referral\b/i.test(String(label || '').trim());
+  return /referral/i.test(String(label || '').trim());
+}
+
+function storedReferralFee(fee) {
+  if (!fee) return null;
+  const amount = Math.max(0, Number(fee.amount) || 0);
+  if (!(amount > 0)) return null;
+  const paidTo = paidToFromReferralLabel(fee.label, fee.paid_to);
+  return {
+    id: REFERRAL_FEE_ID,
+    label: paidTo ? `Referral: ${paidTo}` : 'Referral',
+    amount,
+    unit: fee.unit === 'percent' ? 'percent' : 'amount',
+    ...(paidTo ? { paid_to: paidTo } : {}),
+  };
 }
 
 /** Pull "Lisa Harrell" from "Referral: Lisa Harrell" / "Referral: Lisa Harrell (25%)". */
@@ -170,7 +224,9 @@ export function splitReferralCustomFees(fees) {
   let referral = null;
   const rest = [];
   for (const fee of parsed) {
-    if (!referral && (fee.id === REFERRAL_FEE_ID || isReferralFeeLabel(fee.label))) {
+    const promote = fee.id === REFERRAL_FEE_ID
+      || (isReferralFeeLabel(fee.label) && Number(fee.amount) > 0);
+    if (!referral && promote) {
       const paidTo = paidToFromReferralLabel(fee.label, fee.paid_to);
       referral = {
         id: REFERRAL_FEE_ID,
@@ -186,22 +242,26 @@ export function splitReferralCustomFees(fees) {
   return { referral, customFees: rest };
 }
 
-/** Merge referral fee back into custom_fees JSON for storage. */
+/**
+ * Merge referral fee back into custom_fees JSON for storage.
+ * A custom fee whose label contains "referral" is moved into the referral slot
+ * (it is not dropped). A $0 in-progress row stays in the custom list.
+ */
 export function mergeReferralCustomFees(referral, customFees) {
-  const rest = parseCustomFees(customFees).filter(
-    (fee) => fee.id !== REFERRAL_FEE_ID && !isReferralFeeLabel(fee.label),
-  );
-  const paidTo = paidToFromReferralLabel(referral?.label, referral?.paid_to);
-  const ref = referral && Number(referral.amount) > 0
-    ? [{
-      id: REFERRAL_FEE_ID,
-      label: paidTo ? `Referral: ${paidTo}` : 'Referral',
-      amount: Math.max(0, Number(referral.amount) || 0),
-      unit: referral.unit === 'percent' ? 'percent' : 'amount',
-      ...(paidTo ? { paid_to: paidTo } : {}),
-    }]
-    : [];
-  return serializeCustomFees([...ref, ...rest]);
+  const parsed = parseCustomFees(customFees);
+  const promoted = [];
+  const rest = [];
+  for (const fee of parsed) {
+    const looksReferral = fee.id === REFERRAL_FEE_ID || isReferralFeeLabel(fee.label);
+    if (looksReferral && Number(fee.amount) > 0) promoted.push(fee);
+    else if (looksReferral && fee.id === REFERRAL_FEE_ID) {
+      // Stored referral rows are rewritten from the chosen referral below.
+    } else rest.push(fee);
+  }
+  const fromCustom = promoted.map((fee) => storedReferralFee(fee)).find(Boolean) || null;
+  const explicit = storedReferralFee(referral);
+  const chosen = fromCustom || explicit;
+  return serializeCustomFees(chosen ? [chosen, ...rest] : rest);
 }
 
 /** Deal-level dollar overrides for plan fee lines (keys like exp_split, fee_*, split_*). */
@@ -377,6 +437,7 @@ export function normalizeCommissionSettings(raw = {}) {
     splitRate,
     feeLines,
     teamSplits,
+    anniversaryMd: normalizeAnniversaryMd(migrated.anniversaryMd),
   };
 
   // Progress / summary aliases derived from known fee lines

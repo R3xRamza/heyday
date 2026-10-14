@@ -6,7 +6,7 @@ import { formatPhone } from '../../utils/format';
 const cardClass =
   'shrink-0 min-w-[7.5rem] md:min-w-[8.5rem] flex-1 basis-[7.5rem] rounded-xl border px-3 md:px-4 py-3 md:py-3.5 text-left transition-all';
 
-function monthYear(dateStr) {
+function parseDate(dateStr) {
   if (!dateStr) return null;
   const normalized = String(dateStr).includes('T')
     ? dateStr
@@ -14,8 +14,19 @@ function monthYear(dateStr) {
       ? String(dateStr).replace(' ', 'T')
       : `${dateStr}T12:00:00`;
   const d = new Date(normalized);
-  if (Number.isNaN(d.getTime())) return null;
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function monthYear(dateStr) {
+  const d = parseDate(dateStr);
+  if (!d) return null;
   return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function reachedDate(dateStr) {
+  const d = parseDate(dateStr);
+  if (!d) return '—';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function contactLine(pick) {
@@ -32,7 +43,7 @@ function PickCard({ pick, busy, onOpen, onReplace, onToggleReached }) {
     ? `Reached out ${reachedOn}`
     : since
       ? `Since ${since}`
-      : 'Closed';
+      : (pick.stage || 'Client');
 
   return (
     <div
@@ -88,12 +99,59 @@ function PickCard({ pick, busy, onOpen, onReplace, onToggleReached }) {
   );
 }
 
-export default function WeeklyTouchBase() {
+function ContactedList({ rows, onOpen }) {
+  if (!rows.length) {
+    return (
+      <p className="text-sm text-on-surface-variant px-1 py-2">
+        No one has been marked reached yet.
+      </p>
+    );
+  }
+  return (
+    <div className="overflow-x-auto rounded-xl border border-outline-variant/15 bg-white">
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-outline-variant/15 text-[10px] uppercase tracking-widest text-on-surface-variant">
+            <th className="px-3 py-2 font-semibold">Name</th>
+            <th className="px-3 py-2 font-semibold">Stage</th>
+            <th className="px-3 py-2 font-semibold">Phone</th>
+            <th className="px-3 py-2 font-semibold">Reached</th>
+            <th className="px-3 py-2 font-semibold">By</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.contactId} className="border-b border-outline-variant/10 last:border-0">
+              <td className="px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => onOpen(row.contactId)}
+                  className="font-semibold text-primary-container hover:underline text-left"
+                >
+                  {row.name}
+                </button>
+              </td>
+              <td className="px-3 py-2 text-on-surface-variant">{row.stage || '—'}</td>
+              <td className="px-3 py-2 text-on-surface-variant">{contactLine(row)}</td>
+              <td className="px-3 py-2 whitespace-nowrap">{reachedDate(row.reachedAt)}</td>
+              <td className="px-3 py-2 text-on-surface-variant">{row.reachedByName || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default function WeeklyTouchBase({ leading = null }) {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+  const [showContacted, setShowContacted] = useState(false);
+  const [contacted, setContacted] = useState(null);
+  const [contactedError, setContactedError] = useState('');
 
   const applyList = useCallback((json) => {
     setData(json);
@@ -120,6 +178,22 @@ export default function WeeklyTouchBase() {
     };
   }, [applyList]);
 
+  const loadContacted = useCallback(async () => {
+    try {
+      const res = await fetch('/api/crm/weekly-touch/contacted', { credentials: 'include' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Could not load contacted clients');
+      setContacted(json.contacts || []);
+      setContactedError('');
+    } catch (e) {
+      setContactedError(e.message || 'Could not load contacted clients');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showContacted && contacted == null) loadContacted();
+  }, [showContacted, contacted, loadContacted]);
+
   async function postAction(path, body, contactId) {
     setBusyId(contactId);
     setError('');
@@ -133,6 +207,7 @@ export default function WeeklyTouchBase() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Request failed');
       applyList(json);
+      if (showContacted) loadContacted();
     } catch (e) {
       setError(e.message || 'Request failed');
     } finally {
@@ -140,28 +215,23 @@ export default function WeeklyTouchBase() {
     }
   }
 
-  if (loading) {
-    return [0, 1, 2, 3, 4].map((i) => (
+  const cooldownMonths = data?.cooldownMonths || 6;
+  const cards = loading
+    ? [0, 1, 2, 3, 4].map((i) => (
       <div
         key={i}
         className={`${cardClass} border-outline-variant/15 bg-white animate-pulse min-h-[5.5rem]`}
       />
-    ));
-  }
-
-  if (!data?.picks?.length) {
-    return (
-      <div className={`${cardClass} border-outline-variant/15 bg-white flex items-center`}>
-        <p className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest">
-          {error || 'No Closed clients to draw'}
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {data.picks.map((pick) => (
+    ))
+    : !data?.picks?.length
+      ? (
+        <div className={`${cardClass} border-outline-variant/15 bg-white flex items-center`}>
+          <p className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-widest">
+            {error || 'No clients to draw'}
+          </p>
+        </div>
+      )
+      : data.picks.map((pick) => (
         <PickCard
           key={`${pick.slot}-${pick.contactId}`}
           pick={pick}
@@ -176,7 +246,36 @@ export default function WeeklyTouchBase() {
             )
           }
         />
-      ))}
-    </>
+      ));
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] text-on-surface-variant">
+          New five every Sunday at 6:00 PM Chicago. A checkmark keeps them off the list for {cooldownMonths} months.
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowContacted((open) => !open)}
+          className="text-[11px] font-bold uppercase tracking-widest text-secondary hover:underline"
+        >
+          {showContacted ? 'Hide contacted' : 'Contacted'}
+        </button>
+      </div>
+      <div className="flex gap-2.5 md:gap-3 overflow-x-auto pb-1 hide-scrollbar md:custom-scrollbar">
+        {leading}
+        {cards}
+      </div>
+      {error && data?.picks?.length ? (
+        <p className="text-xs text-error font-semibold" role="alert">{error}</p>
+      ) : null}
+      {showContacted && (
+        contactedError
+          ? <p className="text-xs text-error font-semibold" role="alert">{contactedError}</p>
+          : contacted == null
+            ? <p className="text-sm text-on-surface-variant">Loading contacted clients…</p>
+            : <ContactedList rows={contacted} onOpen={(id) => navigate(`/crm/${id}`)} />
+      )}
+    </div>
   );
 }
