@@ -106,11 +106,17 @@ function rosterCount() {
 function cooldownContactIds(todayIso) {
   const cutoff = addCalendarMonths(todayIso, -COOLDOWN_MONTHS);
   return db.prepare(`
-    SELECT DISTINCT contact_id
-    FROM weekly_touch_picks
-    WHERE reached_at IS NOT NULL
-      AND date(reached_at) >= date(?)
-  `).all(cutoff).map((r) => r.contact_id);
+    SELECT DISTINCT contact_id FROM (
+      SELECT contact_id
+      FROM weekly_touch_picks
+      WHERE reached_at IS NOT NULL
+        AND date(reached_at) >= date(?)
+      UNION
+      SELECT contact_id
+      FROM weekly_touch_reach_log
+      WHERE date(reached_at) >= date(?)
+    )
+  `).all(cutoff, cutoff).map((r) => r.contact_id);
 }
 
 function drawRandomIds(excludeIds, limit) {
@@ -199,11 +205,17 @@ function fillMissingSlots(weekStart, todayIso) {
 
 function reachedThisCycleCount(cycleStartedOn) {
   const row = db.prepare(`
-    SELECT COUNT(DISTINCT contact_id) AS c
-    FROM weekly_touch_picks
-    WHERE reached_at IS NOT NULL
-      AND date(reached_at) >= date(?)
-  `).get(cycleStartedOn);
+    SELECT COUNT(DISTINCT contact_id) AS c FROM (
+      SELECT contact_id
+      FROM weekly_touch_picks
+      WHERE reached_at IS NOT NULL
+        AND date(reached_at) >= date(?)
+      UNION
+      SELECT contact_id
+      FROM weekly_touch_reach_log
+      WHERE date(reached_at) >= date(?)
+    )
+  `).get(cycleStartedOn, cycleStartedOn);
   return row?.c ?? 0;
 }
 
@@ -258,14 +270,11 @@ export function skipWeeklyTouchPick(contactId, _userId) {
   const run = db.transaction(() => {
     fillMissingSlots(weekStart, todayIso);
     const pick = db.prepare(`
-      SELECT id, slot, contact_id, reached_at
+      SELECT id, slot, contact_id, reached_at, reached_by
       FROM weekly_touch_picks
       WHERE week_start = ? AND contact_id = ?
     `).get(weekStart, id);
     if (!pick) return { error: 'That contact is not on this week’s list', status: 404 };
-    if (pick.reached_at) {
-      return { error: 'Reached contacts stay on the list until Sunday evening', status: 400 };
-    }
 
     const currentIds = db.prepare(
       'SELECT contact_id FROM weekly_touch_picks WHERE week_start = ?',
@@ -274,6 +283,13 @@ export function skipWeeklyTouchPick(contactId, _userId) {
     const replacement = drawRandomIds([...new Set([...currentIds, ...cooldown])], 1)[0];
     if (replacement == null) {
       return { error: 'No other clients are available to draw', status: 409 };
+    }
+
+    if (pick.reached_at) {
+      db.prepare(`
+        INSERT INTO weekly_touch_reach_log (contact_id, reached_at, reached_by)
+        VALUES (?, ?, ?)
+      `).run(pick.contact_id, pick.reached_at, pick.reached_by);
     }
 
     db.prepare(`
@@ -331,18 +347,26 @@ export function setWeeklyTouchReached(contactId, reached, userId) {
 /** Latest reached mark per contact. Does not write back to Follow Up Boss. */
 export function listWeeklyTouchContacted() {
   const rows = db.prepare(`
-    SELECT c.id AS contact_id, c.name, c.stage, c.phone, c.phone_2, c.email,
-      p.reached_at, u.name AS reached_by_name
-    FROM weekly_touch_picks p
-    JOIN contacts c ON c.id = p.contact_id
-    LEFT JOIN users u ON u.id = p.reached_by
-    JOIN (
-      SELECT contact_id, MAX(reached_at) AS reached_at
+    WITH reaches AS (
+      SELECT contact_id, reached_at, reached_by
       FROM weekly_touch_picks
       WHERE reached_at IS NOT NULL
+      UNION ALL
+      SELECT contact_id, reached_at, reached_by
+      FROM weekly_touch_reach_log
+    ),
+    latest AS (
+      SELECT contact_id, MAX(reached_at) AS reached_at
+      FROM reaches
       GROUP BY contact_id
-    ) latest ON latest.contact_id = p.contact_id AND latest.reached_at = p.reached_at
-    ORDER BY p.reached_at DESC, c.name COLLATE NOCASE ASC
+    )
+    SELECT c.id AS contact_id, c.name, c.stage, c.phone, c.phone_2, c.email,
+      r.reached_at, u.name AS reached_by_name
+    FROM latest
+    JOIN reaches r ON r.contact_id = latest.contact_id AND r.reached_at = latest.reached_at
+    JOIN contacts c ON c.id = latest.contact_id
+    LEFT JOIN users u ON u.id = r.reached_by
+    ORDER BY r.reached_at DESC, c.name COLLATE NOCASE ASC
   `).all();
 
   const seen = new Set();

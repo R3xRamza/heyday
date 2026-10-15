@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Dices } from 'lucide-react';
 import Icon from '../shared/Icon';
 import { formatPhone } from '../../utils/format';
 
@@ -47,7 +48,7 @@ function PickCard({ pick, busy, onOpen, onReplace, onToggleReached }) {
 
   return (
     <div
-      className={`${cardClass} ${
+      className={`${cardClass} relative ${
         reached
           ? 'border-secondary bg-secondary/5 ring-2 ring-secondary/25'
           : 'border-outline-variant/15 bg-white hover:border-secondary/40'
@@ -81,20 +82,21 @@ function PickCard({ pick, busy, onOpen, onReplace, onToggleReached }) {
         <p className="text-lg md:text-xl font-bold text-primary-container truncate leading-tight">
           {pick.name}
         </p>
-        <p className="text-[10px] text-on-surface-variant truncate mt-1">
+        <p className="text-[10px] text-on-surface-variant truncate mt-1 pr-5">
           {contactLine(pick)}
         </p>
       </button>
-      {reached ? null : (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onReplace}
-          className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant hover:text-secondary mt-1.5 disabled:opacity-50"
-        >
-          Replace
-        </button>
-      )}
+      <div className="h-4" aria-hidden="true" />
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onReplace}
+        className="absolute bottom-1.5 right-2 p-0.5 rounded text-on-surface-variant hover:text-secondary disabled:opacity-50"
+        title="Draw a new client"
+        aria-label={`Draw a new client instead of ${pick.name}`}
+      >
+        <Dices size={14} strokeWidth={2} />
+      </button>
     </div>
   );
 }

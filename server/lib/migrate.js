@@ -359,6 +359,16 @@ function migrateWeeklyTouchTables(db) {
 
     CREATE INDEX IF NOT EXISTS idx_weekly_touch_picks_week ON weekly_touch_picks(week_start, slot);
     CREATE INDEX IF NOT EXISTS idx_weekly_touch_picks_reached ON weekly_touch_picks(contact_id, reached_at);
+
+    CREATE TABLE IF NOT EXISTS weekly_touch_reach_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      contact_id INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+      reached_at DATETIME NOT NULL,
+      reached_by INTEGER REFERENCES users(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_weekly_touch_reach_log_contact
+      ON weekly_touch_reach_log(contact_id, reached_at);
   `);
 }
 
