@@ -34,14 +34,24 @@ function asCompletedFlag(value, fallback = 0) {
   return fallback ? 1 : 0;
 }
 
+function rejectHubAgent(req, res) {
+  if (!req.hubAgent) return false;
+  res.status(403).json({ error: 'Forbidden' });
+  return true;
+}
+
 router.get('/', (req, res) => {
   const section = normalizeSection(req.query.section);
   if (!section) return res.status(400).json({ error: 'section must be feedback or hub_edits' });
+  if (req.hubAgent && section !== 'feedback') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
 
   res.json({ items: getItems(section) });
 });
 
 router.post('/', (req, res) => {
+  if (rejectHubAgent(req, res)) return;
   const section = normalizeSection(req.body.section);
   if (!section) return res.status(400).json({ error: 'section must be feedback or hub_edits' });
 
@@ -63,6 +73,14 @@ router.patch('/:id', (req, res) => {
   const item = getItemOr404(req.params.id);
   if (!item) return res.status(404).json({ error: 'Item not found' });
 
+  if (req.hubAgent) {
+    if (item.section !== 'feedback') return res.status(403).json({ error: 'Forbidden' });
+    const keys = Object.keys(req.body || {});
+    if (keys.length !== 1 || keys[0] !== 'completed') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+  }
+
   const body = req.body.body != null ? req.body.body : item.body;
   const completed = req.body.completed !== undefined
     ? asCompletedFlag(req.body.completed)
@@ -77,16 +95,19 @@ router.patch('/:id', (req, res) => {
     }
   }
 
+  const updatedBy = req.hubAgent ? null : req.user.id;
+
   db.prepare(`
     UPDATE hub_doc_items
     SET body = ?, completed = ?, completed_at = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(body, completed, completedAt, req.user.id, item.id);
+  `).run(body, completed, completedAt, updatedBy, item.id);
 
   res.json({ item: getItemOr404(item.id) });
 });
 
 router.delete('/:id', (req, res) => {
+  if (rejectHubAgent(req, res)) return;
   const item = db.prepare('SELECT id FROM hub_doc_items WHERE id = ?').get(req.params.id);
   if (!item) return res.status(404).json({ error: 'Item not found' });
 

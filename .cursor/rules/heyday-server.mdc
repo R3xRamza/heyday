@@ -16,30 +16,34 @@ alwaysApply: false
 
 ## Route mounts (`server/index.js`)
 
-`auth`, `gmail`, `crm`, `vendors`, `tasks`, `revenue`, `transactions`, `marketing`, `team`, `team-hub`, `checklists`, `projects`, `user-todos`, `address`, `hub-docs`
+`auth`, `gmail`, `crm`, `tasks`, `revenue`, `transactions`, `marketing`, `team`, `team-hub`, `checklists`, `projects`, `user-todos`, `address`, `hub-docs`, `opportunities`, `vendors`, `user-prefs`, `export`
+
+`/api/gmail/callback` is the OAuth redirect and does not use `authMiddleware`. Every other gmail route does. `/api/user-todos` is still mounted; the project page does not call it.
 
 ## Agent scope
 
 - `server/lib/agentScope.js` — `parseAgentScope(query)`, `transactionAgentScopeClause(scope, alias)`
-- Used on transactions, revenue, team-hub, marketing, tasks list endpoints
+- Used on transactions, opportunities, revenue, team, team-hub, and tasks. Marketing post routes ignore `agent_scope`
 - Client passes `agent_scope` via `appendAgentScope()`
 
 ## Transactions
 
 - CRUD + parties + activity + checklists + brokermint import
-- **Create** (`POST /`): `validateCreateTransaction` — address, city, state, zip only; `workflow_status: details`
+- **Create** (`POST /`): `validateCreateTransaction` — address, city, state, zip, and `agent_id`; `workflow_status: details`
 - **Update/setup complete**: `validateTransactionFields` — representing-specific required dates
 - **Delete** (`DELETE /:id`): must run in transaction:
   1. `UPDATE transaction_activity SET task_id = NULL WHERE transaction_id = ? OR task_id IN (SELECT id FROM tasks WHERE transaction_id = ?)`
   2. `DELETE FROM tasks WHERE transaction_id = ?`
   3. `DELETE FROM transactions WHERE id = ?`
 - `important_date` = listing expiration; `important_date_label` often `expires`
-- List filters: scopes in `server/lib/transactionScopes.js` (`CURRENT_LISTINGS_VIEW_SCOPE`, etc.)
+- List filters: scopes in `server/lib/transactionScopes.js` (`CURRENT_LISTINGS_VIEW_SCOPE`, `EXPIRING_SOON_SCOPE` = `important_date` within 30 days and stage active or pending, etc.)
 - Sort keys include `expiration` → `important_date`
+- **Commission** (`GET/PATCH /:id/commission`): referral fee is stored inside `commission_custom_fees` with id `referral` and split out by `splitReferralCustomFees`. A custom fee whose label matches `/referral/i` and whose amount is `> 0` is promoted into that slot on save (`mergeReferralCustomFees`). `$0` in-progress rows stay in the custom list. Referral dollars come off gross before the eXp split. Cap year is `anniversaryWindowForDate(closeDate, template.anniversaryMd)` for that deal's agent
 
 ## Tasks
 
 - Join `template_tasks.calendar_nickname` in TASK_SELECT for calendar display
+- `POST /` rejects a missing `assigned_to`. Checklist apply inserts tasks directly and may still leave `assigned_to` null
 - Delete single task: null `transaction_activity.task_id` first (FK)
 - Checklist remove: same pattern in `applyChecklists.js`
 
@@ -54,12 +58,13 @@ alwaysApply: false
 
 - Table `hub_doc_items`: `section` (`feedback` | `hub_edits`), `body`, `sort_order`, `created_by`, `updated_by`
 - `server/routes/hub-docs.js` — GET `?section=`, POST, PATCH, DELETE; any auth user can write
+- `HUB_AGENT_TOKEN` (`Authorization: Bearer`) may `GET ?section=feedback` and `PATCH` `{ "completed": true/false }` only. It cannot create, edit text, delete, or read `hub_edits`. A token mark sets `updated_by` to null. Mounted via `hubDocsAuth` instead of `authMiddleware`
 
 ## Marketing
 
 - `marketing_posts`, `marketing_platform_goals`, `marketing_birthday_pins`
 - `PATCH /api/crm/:id` — `birthday`, `anniversary` for marketing modals
-- Weekly touch-base: `GET /api/crm/weekly-touch`, `POST /api/crm/weekly-touch/skip`, `POST /api/crm/weekly-touch/reach` — Meredith Closed roster, 5 picks, 6-month cooldown after reached
+- Weekly touch-base: `GET /api/crm/weekly-touch`, `GET /api/crm/weekly-touch/contacted`, `POST /skip`, `POST /reach`. Meredith Closed and Under Contract, 5 picks, Sunday 6:00 PM Chicago. Skip redraws a slot even when reached; a reached row is copied to `weekly_touch_reach_log` first. Cooldown and the contacted list read both `weekly_touch_picks.reached_at` and that log. No FUB write-back
 
 ## Team hub
 

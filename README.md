@@ -12,10 +12,11 @@ Access is limited to team members. Do not publish login credentials in this repo
 |------|----------------|
 | Team Hub | Team operations home: stats, listings, expirations, messages |
 | Task Hub | Team workload, per-person transaction tasks, admin tasks, and projects |
-| CRM | Contacts, vendors, weekly touch-base, contact activity |
-| Transactions | Listings and deals, parties, checklists, activity |
+| CRM | Contacts, vendors, weekly touch-base (Closed and Under Contract), contact activity |
+| Transactions | Listings and deals, parties, checklists, activity, commission |
+| Opportunities | Buyer and seller pipelines, scoped to the selected agent |
 | Marketing Calendar | Social posts, tasks, milestones, and birthday planning |
-| Revenue | Analytics for the team |
+| Revenue | Commission analytics and per-agent eXp anniversary dates |
 | Checklists | Shared template editor applied to transactions |
 | Feedback | Shared team notes |
 
@@ -75,6 +76,7 @@ Set these in Railway (or a local `.env`). Never commit real values.
 | `FUB_API_KEY` | Follow Up Boss API key |
 | `FUB_ASSIGNED_USER_ID` | Optional FUB user id override |
 | `FUB_DAILY_SYNC` | Set `0` to disable the daily FUB sync |
+| `HUB_AGENT_TOKEN` | Bearer token that can list Feedback and mark a bullet complete |
 
 Gmail OAuth variables are documented in [`server/README-gmail.md`](server/README-gmail.md).
 
@@ -89,6 +91,13 @@ Hub pulls contacts from Follow Up Boss. It does not write back.
 ```bash
 npm run sync-crm-fub
 ```
+
+## Commission, cap year, tasks, weekly picks
+
+- **Referral fee** is always on the deal commission screen. It defaults to $0 and can be a percent or a dollar amount. It comes off gross first. Agent gross is what remains, and the eXp split is calculated from agent gross. A custom fee whose name contains “referral” and whose amount is greater than $0 is saved as that referral fee instead of disappearing.
+- **eXp anniversary** is edited per agent on Revenue → Edit Split Templates. Meredith and Tessa are December 1. Margaret is January 1. Adam is blank, which keeps December 1–November 30 until a date is set. Each agent’s $16,000 cap uses the anniversary window that contains the deal’s close date.
+- **New tasks** require a person. A transaction cannot launch from setup while a task has no person. On Team Task Hub, a row with no name can be assigned or deleted.
+- **Weekly picks** on CRM Hub are five of Meredith’s Closed and Under Contract contacts. A new five is drawn every Sunday at 6:00 PM Chicago. The checkmark marks someone reached. The dice draws a replacement into that card. Reached people stay off the draw for six months and remain on the Contacted list. Hub does not write that reach back to Follow Up Boss.
 
 ## Repository layout
 

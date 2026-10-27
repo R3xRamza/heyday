@@ -12,6 +12,19 @@ alwaysApply: true
 - If ambiguous, ask once — do not silently drop scope
 - **Read `heyday-project.mdc`** before implementing; do not rely on chat memory or stale README changelogs
 
+## Feedback word
+
+A user message that is exactly `go`, with no other words, pulls open Feedback bullets, implements the clear ones, pushes them to `main`, and marks only the finished bullets complete. A longer message that contains "go" does not start this. Do not run these steps on any other request.
+
+- Read `HUB_AGENT_TOKEN` from the repo `.env`. Never print the token or commit it
+- `GET https://hub.theheydaygroup.com/api/hub-docs?section=feedback` with header `Authorization: Bearer <token>`
+- Work only items where `completed` is 0 and `body` is not empty
+- Each bullet is acceptance criteria. If one is ambiguous or conflicts with another, skip it, leave it open, and say why
+- `npm run build` must pass before any commit
+- Commit only the files for the bullets that were finished, then `git push origin main`. This request is the ask to commit and push
+- After the push succeeds, `PATCH https://hub.theheydaygroup.com/api/hub-docs/:id` with `{ "completed": true }` for each finished bullet
+- Do not mark a skipped or failed bullet complete
+
 ## Agent prompts (when user asks for one)
 
 Copy-paste block:
@@ -43,18 +56,16 @@ End with: `npm run build must pass. No commit unless asked.`
 
 One slice per session (single feature/fix). New chats load rules from `.cursor/rules/` — do not assume prior chat memory.
 
-### Last session (2026-07-20)
+### Last session (2026-10-15)
+
+- **Referral fee** — always on the commission form ($ or %); comes off gross before eXp split; breakdown shows Agent gross. A custom fee whose name contains "referral" and amount > $0 moves into that field instead of being dropped
+- **Tasks** — person required on create and before transaction setup launches. Unassigned rows on Team Task Hub open to assign or delete. Checklist apply can still insert a task with no person
+- **eXp anniversary** — per agent on Revenue → Edit Split Templates. Meredith and Tessa December 1, Margaret January 1, Adam blank (blank stays Dec 1–Nov 30). Cap year follows that agent's anniversary and the deal close date
+- **Weekly picks** — Meredith Closed and Under Contract. Dice on every card redraws that slot, including after reached. Reached people stay on Contacted and out of the draw for 6 months. New five every Sunday 6:00 PM Chicago. Does not write back to Follow Up Boss
+
+### Prior session (2026-07-20)
 
 - **CRM Hub redesign** — full-bleed Contacts list, stage strip + toolbar fit
-- **Vendors** `/crm/vendors` — new `vendors` table + `/api/vendors`, in-hub Contacts|Vendors tabs (no sidebar item), notes + 1–5 ratings, any auth user CRUD
-
-### Prior session (2026-07-09)
-
-- **Feedback** `/feedback` — shared bullet list, `/api/hub-docs`, sidebar link
-- **Favicon** — HUB circle logo in `client/public/`
-- **Transactions list** — Expiration column on Current Listings (replaces Agent); create step 1 address-only validation
-- **Transactions** — delete fix (activity FK); checklist UI density + strikethrough complete (no COMPLETED label)
-- **Listings KPI** — subtitle "Active"
-- **Docs** — this rules refresh
+- **Vendors** `/crm/vendors` — `vendors` table + `/api/vendors`, in-hub Contacts|Vendors tabs (no sidebar item). Team likes and dislikes with optional notes; any auth user can add, edit, or remove a reaction. The old 1–5 `rating` column is unused
 
 See `heyday-project.mdc` for full current routes, APIs, and domain behavior.

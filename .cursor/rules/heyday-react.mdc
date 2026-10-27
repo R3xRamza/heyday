@@ -16,7 +16,7 @@ Add routes in `App.jsx` + nav in `Sidebar.jsx`.
 ## Sidebar
 
 - `SidebarContext` — `collapsed`, `sidebarWidth` (260 | 72), `sidebar-collapsed-v1`
-- Nav: Team Hub, Task Hub (+ nested My Transaction/Admin/Projects), CRM, Revenue, Transactions, Marketing, Feedback
+- Nav order from `constants/nav.js`: Team Hub, Task Hub (+ nested My Transaction/Admin/Projects), Transactions, Opportunities, Marketing, CRM Hub, Revenue, Feedback. Same list drives `MobileBottomNav`
 - Task Hub `NavLink` `end={taskHub}`; Transactions link uses `resolveTransactionsSidebarLink()`
 - Logo: `import heydayLogo from '../assets/heyday-logo.png'`
 
@@ -29,13 +29,13 @@ Add routes in `App.jsx` + nav in `Sidebar.jsx`.
 
 - `AgentScopeProvider` in `App.jsx`
 - `AgentScopeToggle` / `AgentScopeBadge` in TopNav
-- `appendAgentScope(params, scope)` on fetch URLs for transactions, revenue, marketing, tasks
+- `appendAgentScope(params, scope)` on fetch URLs for transactions, opportunities, revenue, team, team-hub, and tasks. Marketing calendar posts are fetched without scope; task chips use `/api/tasks`
 
 ## Transactions
 
-- **List** `TransactionsList.jsx` — filter tabs, sortable columns, KPI row, pagination
+- **List** `TransactionsList.jsx` — filter tabs (includes Expiring Soon), sortable columns, KPI row, pagination
 - Current Listings: columns include **Expiration** (`important_date`), not Agent
-- Create modal step 1: `validateCreateTransaction` (address fields only)
+- Create modal step 1: `validateCreateTransaction` (address, city, state, zip, and required Agent)
 - List state: `transactionsListPath.js`, `TransactionsNavTracker`, sessionStorage `transactions-list-view-v1`
 - **Workspace** `TransactionManager.jsx` → `TransactionWorkspace.jsx`
   - Views: details, checklist, activity
@@ -50,16 +50,23 @@ Add routes in `App.jsx` + nav in `Sidebar.jsx`.
 - `displayTaskTitle()` from `taskDisplay.js` for calendar chips
 - `TaskCalendarView.jsx` — `.calendar-grid` 7 cols Sun–Sat
 
+## Opportunities
+
+- `Opportunities.jsx` — Buyers | Sellers, search, status chips, New. `fillViewport`. `AgentScopeToggle` in the header
+- Tables and cards in `client/src/components/opportunities/`. Column prefs load and save through `/api/user-prefs/opportunities`
+
 ## Feedback
 
 - `HubFeedback.jsx` — `DashboardLayout` title "Feedback"
 - `HubDocList.jsx` — fetch `/api/hub-docs?section=feedback`, inline edit, Enter adds bullet
+- **Download all data** → `GET /api/export/zip`
 
 ## Weekly Touch-Base (CRM Hub)
 
-- `WeeklyTouchBase.jsx` — 5 pick cards in the CRM Hub KPI row, same chrome as Sphere/Closed cards; leave Total Contacts
-- Card: 10px gray uppercase label (`Since {Mon YYYY}` / `Reached out {Mon YYYY}`), smaller teal name, phone (email fallback), Replace, check mark
-- Refreshes Sunday 6:00 PM America/Chicago
+- `WeeklyTouchBase.jsx` — caption, then the KPI row (Total Contacts is passed in as `leading`), then an optional **Contacted** list
+- Pool: Meredith Closed and Under Contract. Caption states Sunday 6:00 PM Chicago refresh and the 6-month cooldown
+- Card: 10px gray uppercase label (`Since {Mon YYYY}` / `Reached out {Mon YYYY}`), teal name, phone (email fallback), check mark top right, lucide `Dices` bottom right. Dice calls skip for that contact, including when the card is already reached
+- **Contacted** toggles `GET /api/crm/weekly-touch/contacted`
 
 ## Checklist editor
 
@@ -75,7 +82,7 @@ Add routes in `App.jsx` + nav in `Sidebar.jsx`.
 
 ## Project dashboard
 
-- `UserProjectDashboard.jsx` — 3-column: projects | pending todos | done todos
+- `UserProjectDashboard.jsx` — projects-only list (optional date and priority). Day-to-day work stays on Admin Tasks. Does not call `/api/user-todos`
 - Components in `client/src/components/projects/`
 
 ## Calendar CSS

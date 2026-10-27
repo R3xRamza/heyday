@@ -42,44 +42,49 @@ alwaysApply: true
 | `/tasks/:userId/admin` | Admin Task Dashboard |
 | `/tasks/:userId/projects` | Project Dashboard |
 | `/crm` | CRM Hub — Contacts |
-| `/crm/vendors` | CRM Hub — Vendors (notes + ratings) |
+| `/crm/vendors` | CRM Hub — Vendors (likes, dislikes, notes) |
 | `/crm/:id` | Contact detail |
 | `/transactions`, `/transactions/:id` | Transactions list, TransactionManager |
 | `/marketing` | Marketing Calendar |
 | `/revenue` | Revenue Analytics |
-| `/checklists` | Checklist template editor |
+| `/revenue/templates` | Edit Split Templates (eXp anniversary per agent) |
+| `/checklists` | Checklist template editor (opened from the transactions list, not the sidebar) |
+| `/opportunities` | Buyer and seller pipelines |
 | `/feedback` | Shared team bullet list |
 
 ## SIDEBAR
 
-Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · CRM Hub · Revenue · Transactions · Marketing · **Feedback**
+Order in `client/src/constants/nav.js` (sidebar and mobile bottom nav): Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · Transactions · **Opportunities** · Marketing · CRM Hub · Revenue · Feedback
 
 - Collapse: `SidebarContext`, `sidebar-collapsed-v1` (260px ↔ 72px)
 - Task Hub `NavLink` uses `end` — `/tasks/:userId` must not highlight Task Hub
 - Sidebar label **Marketing**; page title **Marketing Calendar**
 - Logo: import `client/src/assets/heyday-logo.png` (sidebar). Favicon: `client/public/favicon*.png` via `index.html`
 
-## API (auth cookie required except `/api/auth`)
+## API (auth cookie required except `/api/auth` and the Gmail OAuth redirect `/api/gmail/callback`)
 
 | Mount | Purpose |
 |-------|---------|
 | `/api/auth` | Login, logout, session |
 | `/api/crm` | Contacts (birthday, anniversary, FUB fields) |
-| `/api/vendors` | Vendor directory CRUD (notes, 1–5 rating, free-text category) |
+| `/api/vendors` | Vendor directory CRUD (free-text category, notes) plus likes/dislikes (`vendor_likes.kind`). The `vendors.rating` column is unused |
 | `/api/tasks` | Tasks; filters: `assigned_to`, `transaction_id`, dates, `include_completed` |
-| `/api/transactions` | CRUD, parties, activity, checklists, import |
+| `/api/transactions` | CRUD, parties, activity, checklists, import, commission (`GET/PATCH /:id/commission`) |
 | `/api/marketing` | Posts, platform-goals, birthdays, birthday-pins |
 | `/api/checklists` | Template + template_tasks CRUD |
 | `/api/projects` | Per-user projects (`?user_id=`) |
-| `/api/user-todos` | Per-user todos; purges completed >7 days |
+| `/api/user-todos` | Per-user todos; purges completed >7 days. Still mounted; the project page does not call it |
 | `/api/team` | Members + stats (Tessa → Adam → Margaret → Meredith) |
 | `/api/team-hub` | Team ops stats, celebrations, messages, links |
-| `/api/revenue` | Revenue analytics |
+| `/api/revenue` | Revenue analytics; split templates include each agent's eXp anniversary (`anniversaryMd`) |
 | `/api/gmail` | OAuth + CRM email sync |
 | `/api/address` | Address autocomplete |
-| `/api/hub-docs` | Shared feedback bullets (`section=feedback`) |
+| `/api/hub-docs` | Shared feedback bullets (`section=feedback`). `HUB_AGENT_TOKEN` bearer may list feedback and mark a bullet complete only |
+| `/api/opportunities` | Buyer and seller pipelines (`/buyers`, `/sellers`) |
+| `/api/user-prefs` | Per-user opportunity table columns (`GET/PUT /opportunities`) |
+| `/api/export` | `GET /zip` (and `/manifest`) — CSV zip of hub tables |
 
-**Agent scope** — `?agent_scope=` / `scope` on transactions, revenue, team-hub, marketing, tasks. `AgentScopeContext` + `appendAgentScope()` on client.
+**Agent scope** — `?agent_scope=` / `scope` on transactions, opportunities, revenue, team, team-hub, and tasks. Marketing posts are not scoped; calendar task chips go through `/api/tasks`. Default scope is Meredith (`M`). `AgentScopeContext` + `appendAgentScope()` on the client.
 
 ## LAYOUT & DESIGN
 
@@ -92,19 +97,22 @@ Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · CR
 ## DOMAIN — Transactions
 
 - Representing: seller, buyer, landlord, tenant (legacy `seller_and_buyer` normalized)
-- Parties: Traditional = Agent, Title, Cooperating Agent, Client, Lender (+ custom); Rent/lease = Agent, Client (+ custom). Active requires Agent+Client; Traditional pending requires Agent, Client, Cooperating Agent (Title/Lender optional). `workflow_status`: setup via `TransactionSetup` until active
+- Parties: Traditional = Agent, Title, Cooperating Agent, Client, Lender (+ custom); Rent/lease and Referral = Agent, Client (+ custom). Active requires Agent+Client; Traditional pending requires Agent, Client, Cooperating Agent (Title/Lender optional). `workflow_status`: setup via `TransactionSetup` (`details` → `template` → `assign`) until `active`
 - Key dates: `listing_date`, `important_date` (expiration), `close_date`, `acceptance_date`, `option_end_date`, optional `leaseback_end_date` (buyer/seller only)
-- **List filters** (`TransactionsList.jsx`): Active Transactions, Coming Soon, Current Listings, Pending, Closed, All
+- **List filters** (`TransactionsList.jsx`): Active Transactions, Coming Soon, Current Listings, Pending, Expiring Soon (expiration within 30 days, stage active or pending), Closed, All Transactions
 - **Current Listings columns:** Address, Type, Price, Listing Date, **Expiration** (`important_date`) — no Agent column
 - **Listings KPI card** subtitle: **Active**
 - **Create (step 1):** address/city/state/zip + required Agent (no default) — `validateCreateTransaction`; client name in setup later
 - **Delete:** detach `transaction_activity.task_id` → delete tasks → delete transaction (FK-safe)
 - **Checklist view** (`TransactionWorkspace.jsx`): scrollable panel ~32rem min height; task rows `font-medium`; complete = strikethrough only (no COMPLETED label); click row → detail sidebar
+- **Commission** (`TransactionCommission.jsx`): Referral fee is always visible, default $0, `%` or `$`. Referral comes off gross first. **Agent gross** = gross minus referral (shown when referral > $0). eXp split, plan fees, and other percent fees use agent gross. Team splits use the amount after the eXp split. A custom fee whose label contains "referral" and whose amount is greater than $0 is stored as the referral fee, not left in the custom list. A $0 in-progress row with that name stays in the custom list. Pending custom-fee saves flush when the panel unmounts
+- **eXp cap year** is per agent, edited on Revenue → Edit Split Templates (`anniversaryMd`, `MM-DD`). Seeded: Meredith `12-01`, Tessa `12-01`, Margaret `01-01`, Adam blank. Blank uses Dec 1–Nov 30. The $16k company-dollar cap, risk-fee annual cap, and capped-transaction step-down use the window that contains that deal's close date for that deal's agent. Revenue's year view filters each agent on their own window
 - List view state: `transactions-list-view-v1` sessionStorage; `TransactionsNavTracker`
 
 ## DOMAIN — Tasks
 
 - Status: pending | complete; optional `transaction_id`, `due_date`, template link
+- **Assignee:** required on `POST /api/tasks` and in `CreateTaskModal` ("Select a person"). Transaction setup will not launch while any task on that deal has no person. Checklist apply can still insert a task with no person when a template role does not map. On Team Task Hub, a transaction or admin row with no assignee opens the edit modal (assign or delete) instead of navigating away
 - **TeamTaskOverview** `/tasks` — workload cards, milestones
 - **UserTaskDashboard** `/tasks/:userId` — filters, table/calendar; categories: transaction + admin
 - **TaskHubTabs** + **TaskHubPersonHeader** on person dashboards
@@ -123,7 +131,7 @@ Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · CR
 - Detail: `/crm/:id`
 - Vendors: standalone `vendors` table; team **likes/dislikes** via `vendor_likes.kind` (`like`|`dislike`, multiple + optional notes per person); any auth user can add/edit/remove any reaction; sort by likes, dislikes, category, name; seeded from `server/data/vendors-seed.json`
 - Full-width CRM content (no content `max-w` caps)
-- **Weekly Touch-Base** — 5 shared Meredith Closed picks in the CRM Hub KPI row (same card chrome as Sphere/Closed); Total Contacts stays. Replace draws another (name returns to pool). Check = reached this week (label **Reached out {Mon YYYY}**) then 6-month cooldown; list refreshes Sunday 6pm Chicago. `GET/POST /api/crm/weekly-touch` `/skip` `/reach`
+- **Weekly Touch-Base** — 5 shared picks in the CRM Hub row next to Total Contacts. Pool: Meredith's **Closed** and **Under Contract** contacts (skip children, vendors, trash). A new five is drawn every Sunday at 6:00 PM Chicago. It does not wait until the roster is finished. Each card has a checkmark (reached) and a dice button (bottom right) that redraws that slot and saves it, including after the card is marked reached. Reached people stay off the draw for 6 months, then return. Replacing a reached card copies the reach into `weekly_touch_reach_log` so they stay on **Contacted** and on cooldown. **Contacted** lists name, stage, phone, date reached, and who marked it. Reaching does not update the contact or write back to Follow Up Boss. `GET /api/crm/weekly-touch`, `GET /api/crm/weekly-touch/contacted`, `POST /api/crm/weekly-touch/skip`, `POST /api/crm/weekly-touch/reach`
 
 ## DOMAIN — Checklists
 
@@ -144,6 +152,13 @@ Team Hub · Task Hub (+ My Transaction Tasks, My Admin Tasks, My Projects) · CR
 - `/feedback` — `HubFeedback.jsx` + `HubDocList.jsx`
 - Shared bullet list for all auth users; `hub_doc_items` table, `section='feedback'`
 - Enter adds row; auto-save; empty row removes on blur
+- **Download all data** calls `GET /api/export/zip` (any auth user)
+
+## DOMAIN — Opportunities
+
+- `/opportunities` — Buyers | Sellers, search, status chips, New. Full-bleed, `fillViewport`. Agent scope applies; creating while scope is All assigns Meredith
+- Buyers: status Pending, Option period, Active, On hold (legacy Closed still labels). Sellers: status is stored as Leads
+- Column show/hide, order, and width save per user via `/api/user-prefs/opportunities`
 
 ## DOMAIN — Team
 
