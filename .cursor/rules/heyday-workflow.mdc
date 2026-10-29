@@ -61,7 +61,7 @@ One slice per session (single feature/fix). New chats load rules from `.cursor/r
 - **Referral fee** — always on the commission form ($ or %); comes off gross before eXp split; breakdown shows Agent gross. A custom fee whose name contains "referral" and amount > $0 moves into that field instead of being dropped
 - **Tasks** — person required on create and before transaction setup launches. Unassigned rows on Team Task Hub open to assign or delete. Checklist apply can still insert a task with no person
 - **eXp anniversary** — per agent on Revenue → Edit Split Templates. Meredith and Tessa December 1, Margaret January 1, Adam blank (blank stays Dec 1–Nov 30). Cap year follows that agent's anniversary and the deal close date
-- **Weekly picks** — Meredith Closed and Under Contract. Dice on every card redraws that slot, including after reached. Reached people stay on Contacted and out of the draw for 6 months. New five every Sunday 6:00 PM Chicago. Does not write back to Follow Up Boss
+- **Weekly picks** — Meredith Closed and Under Contract. Dice on every card redraws that slot, including after reached. Reached people stay on Contacted and out of the draw for 6 months. New five every Sunday 6:00 PM CST. Does not write back to Follow Up Boss
 
 ### Prior session (2026-07-20)
 

@@ -64,7 +64,7 @@ alwaysApply: false
 
 - `marketing_posts`, `marketing_platform_goals`, `marketing_birthday_pins`
 - `PATCH /api/crm/:id` — `birthday`, `anniversary` for marketing modals
-- Weekly touch-base: `GET /api/crm/weekly-touch`, `GET /api/crm/weekly-touch/contacted`, `POST /skip`, `POST /reach`. Meredith Closed and Under Contract, 5 picks, Sunday 6:00 PM Chicago. Skip redraws a slot even when reached; a reached row is copied to `weekly_touch_reach_log` first. Cooldown and the contacted list read both `weekly_touch_picks.reached_at` and that log. No FUB write-back
+- Weekly touch-base: `GET /api/crm/weekly-touch`, `GET /api/crm/weekly-touch/contacted`, `POST /skip`, `POST /reach`. Meredith Closed and Under Contract, 5 picks, Sunday 6:00 PM CST. Skip redraws a slot even when reached; a reached row is copied to `weekly_touch_reach_log` first. Cooldown and the contacted list read both `weekly_touch_picks.reached_at` and that log. No FUB write-back
 
 ## Team hub
 

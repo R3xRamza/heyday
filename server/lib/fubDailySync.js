@@ -1,6 +1,6 @@
 /**
  * Daily FUB → CRM contacts sync (production).
- * Runs at 2:00 AM America/Chicago. Never touches vendors (delegates to sync script).
+ * Runs at 2:00 AM CST. Never touches vendors (delegates to sync script).
  *
  * Enable: NODE_ENV=production (default on) or FUB_DAILY_SYNC=1
  * Disable: FUB_DAILY_SYNC=0
@@ -21,7 +21,7 @@ const CHECK_MS = 60 * 1000;
 let running = false;
 let lastStartedDay = null;
 
-function chicagoParts(date = new Date()) {
+function cstParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: TZ,
     year: 'numeric',
@@ -68,7 +68,7 @@ function writeLastDay(dayKey) {
 }
 
 function shouldRunNow() {
-  const { dayKey, hour, minute } = chicagoParts();
+  const { dayKey, hour, minute } = cstParts();
   const last = lastStartedDay || readLastDay();
   if (last === dayKey) return false;
   // Fire in the 2:00–2:09 window (covers check interval jitter)
@@ -92,7 +92,7 @@ export function runFubSyncOnce(reason = 'manual') {
     return false;
   }
 
-  const { dayKey } = chicagoParts();
+  const { dayKey } = cstParts();
   running = true;
   lastStartedDay = dayKey;
   writeLastDay(dayKey);

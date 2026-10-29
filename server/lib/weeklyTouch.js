@@ -9,10 +9,10 @@ const CONTACT_SELECT = `
   c.id, c.name, c.email, c.phone, c.phone_2, c.date_added, c.stage
 `;
 
-/** New list draws Sunday 6:00 PM America/Chicago. */
+/** New list draws Sunday 6:00 PM CST. */
 const SUNDAY_EVENING_HOUR = 18;
 
-export function chicagoDateISO(date = new Date()) {
+export function cstDateISO(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: TZ,
     year: 'numeric',
@@ -23,7 +23,7 @@ export function chicagoDateISO(date = new Date()) {
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
-function chicagoHour(date = new Date()) {
+function cstHour(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: TZ,
     hour: 'numeric',
@@ -40,10 +40,10 @@ function parseIsoDate(isoDate) {
   return { y: Number(m[1]), month: Number(m[2]), d: Number(m[3]) };
 }
 
-/** Sunday 6pm Chicago that opened the current touch-base week. */
+/** Sunday 6pm CST that opened the current touch-base week. */
 export function sundayEveningWeekStart(date = new Date()) {
-  const iso = chicagoDateISO(date);
-  const hour = chicagoHour(date);
+  const iso = cstDateISO(date);
+  const hour = cstHour(date);
   const { y, month, d } = parseIsoDate(iso);
   const utc = Date.UTC(y, month - 1, d);
   const dow = new Date(utc).getUTCDay(); // 0 Sun
@@ -220,7 +220,7 @@ function reachedThisCycleCount(cycleStartedOn) {
 }
 
 export function getWeeklyTouchList() {
-  const todayIso = chicagoDateISO();
+  const todayIso = cstDateISO();
   const weekStart = sundayEveningWeekStart();
   const { cycleNumber, cycleStartedOn } = ensureMeta(todayIso);
 
@@ -264,7 +264,7 @@ export function skipWeeklyTouchPick(contactId, _userId) {
     return { error: 'contactId is required', status: 400 };
   }
 
-  const todayIso = chicagoDateISO();
+  const todayIso = cstDateISO();
   const weekStart = sundayEveningWeekStart();
 
   const run = db.transaction(() => {
@@ -312,7 +312,7 @@ export function setWeeklyTouchReached(contactId, reached, userId) {
   }
   const markReached = reached !== false && reached !== 0 && reached !== '0';
 
-  const todayIso = chicagoDateISO();
+  const todayIso = cstDateISO();
   const weekStart = sundayEveningWeekStart();
 
   const run = db.transaction(() => {

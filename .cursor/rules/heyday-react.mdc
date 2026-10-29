@@ -64,7 +64,7 @@ Add routes in `App.jsx` + nav in `Sidebar.jsx`.
 ## Weekly Touch-Base (CRM Hub)
 
 - `WeeklyTouchBase.jsx` — caption, then the KPI row (Total Contacts is passed in as `leading`), then an optional **Contacted** list
-- Pool: Meredith Closed and Under Contract. Caption states Sunday 6:00 PM Chicago refresh and the 6-month cooldown
+- Pool: Meredith Closed and Under Contract. Caption states Sunday 6:00 PM CST refresh and the 6-month cooldown
 - Card: 10px gray uppercase label (`Since {Mon YYYY}` / `Reached out {Mon YYYY}`), teal name, phone (email fallback), check mark top right, lucide `Dices` bottom right. Dice calls skip for that contact, including when the card is already reached
 - **Contacted** toggles `GET /api/crm/weekly-touch/contacted`
 

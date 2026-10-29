@@ -254,7 +254,7 @@ export default function WeeklyTouchBase({ leading = null }) {
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] text-on-surface-variant">
-          New five every Sunday at 6:00 PM Chicago. A checkmark keeps them off the list for {cooldownMonths} months.
+          New five every Sunday at 6:00 PM CST. A checkmark keeps them off the list for {cooldownMonths} months.
         </p>
         <button
           type="button"
