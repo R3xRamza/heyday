@@ -58,7 +58,7 @@ alwaysApply: false
 
 - Table `hub_doc_items`: `section` (`feedback` | `hub_edits`), `body`, `sort_order`, `created_by`, `updated_by`
 - `server/routes/hub-docs.js` — GET `?section=`, POST, PATCH, DELETE; any auth user can write
-- `HUB_AGENT_TOKEN` (`Authorization: Bearer`) may `GET ?section=feedback` and `PATCH` `{ "completed": true/false }` only. It cannot create, edit text, delete, or read `hub_edits`. A token mark sets `updated_by` to null. Mounted via `hubDocsAuth` instead of `authMiddleware`
+- No login required for `GET ?section=feedback` or `PATCH` `{ "completed": true/false }` on a feedback row. Those calls cannot create, edit text, delete, or read `hub_edits`, and a public mark sets `updated_by` to null. Mounted via `hubDocsAuth` instead of `authMiddleware`
 
 ## Marketing
 

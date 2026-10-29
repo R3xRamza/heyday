@@ -16,14 +16,14 @@ alwaysApply: true
 
 A user message that is exactly `go`, with no other words, pulls open Feedback bullets, implements the clear ones, pushes them to `main`, and marks only the finished bullets complete. A longer message that contains "go" does not start this. Do not run these steps on any other request.
 
-- Read `HUB_AGENT_TOKEN` from the repo `.env`. Never print the token or commit it
-- `GET https://hub.theheydaygroup.com/api/hub-docs?section=feedback` with header `Authorization: Bearer <token>`
+- `GET https://hub.theheydaygroup.com/api/hub-docs?section=feedback` with no login and no token
 - Work only items where `completed` is 0 and `body` is not empty
 - Each bullet is acceptance criteria. If one is ambiguous or conflicts with another, skip it, leave it open, and say why
 - `npm run build` must pass before any commit
 - Commit only the files for the bullets that were finished, then `git push origin main`. This request is the ask to commit and push
-- After the push succeeds, `PATCH https://hub.theheydaygroup.com/api/hub-docs/:id` with `{ "completed": true }` for each finished bullet
+- After the push succeeds, `PATCH https://hub.theheydaygroup.com/api/hub-docs/:id` with `{ "completed": true }` and no login for each finished bullet
 - Do not mark a skipped or failed bullet complete
+- End the reply with a 5-sentence summary of the open bullets, then one short explanation per bullet of how it was solved. A skipped bullet gets the reason it was left open instead of a solution
 
 ## Agent prompts (when user asks for one)
 

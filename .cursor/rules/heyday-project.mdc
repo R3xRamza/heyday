@@ -61,7 +61,7 @@ Order in `client/src/constants/nav.js` (sidebar and mobile bottom nav): Team Hub
 - Sidebar label **Marketing**; page title **Marketing Calendar**
 - Logo: import `client/src/assets/heyday-logo.png` (sidebar). Favicon: `client/public/favicon*.png` via `index.html`
 
-## API (auth cookie required except `/api/auth` and the Gmail OAuth redirect `/api/gmail/callback`)
+## API (auth cookie required except `/api/auth`, the Gmail OAuth redirect `/api/gmail/callback`, and Feedback list plus mark-complete on `/api/hub-docs`)
 
 | Mount | Purpose |
 |-------|---------|
@@ -79,7 +79,7 @@ Order in `client/src/constants/nav.js` (sidebar and mobile bottom nav): Team Hub
 | `/api/revenue` | Revenue analytics; split templates include each agent's eXp anniversary (`anniversaryMd`) |
 | `/api/gmail` | OAuth + CRM email sync |
 | `/api/address` | Address autocomplete |
-| `/api/hub-docs` | Shared feedback bullets (`section=feedback`). `HUB_AGENT_TOKEN` bearer may list feedback and mark a bullet complete only |
+| `/api/hub-docs` | Shared feedback bullets (`section=feedback`). Listing feedback and marking a bullet complete need no login. Creating, editing text, deleting, and `hub_edits` still require a login |
 | `/api/opportunities` | Buyer and seller pipelines (`/buyers`, `/sellers`) |
 | `/api/user-prefs` | Per-user opportunity table columns (`GET/PUT /opportunities`) |
 | `/api/export` | `GET /zip` (and `/manifest`) — CSV zip of hub tables |

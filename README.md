@@ -76,7 +76,7 @@ Set these in Railway (or a local `.env`). Never commit real values.
 | `FUB_API_KEY` | Follow Up Boss API key |
 | `FUB_ASSIGNED_USER_ID` | Optional FUB user id override |
 | `FUB_DAILY_SYNC` | Set `0` to disable the daily FUB sync |
-| `HUB_AGENT_TOKEN` | Bearer token that can list Feedback and mark a bullet complete |
+| `HUB_AGENT_TOKEN` | Optional. Listing Feedback and marking a bullet complete need no login |
 
 Gmail OAuth variables are documented in [`server/README-gmail.md`](server/README-gmail.md).
 

@@ -14,17 +14,32 @@ function tokensMatch(provided, expected) {
   return timingSafeEqual(a, b);
 }
 
-/** Cookie session, or HUB_AGENT_TOKEN for the feedback list only. */
-export function hubDocsAuth(req, res, next) {
-  const provided = bearerToken(req);
-  if (!provided) return authMiddleware(req, res, next);
-
-  const expected = process.env.HUB_AGENT_TOKEN?.trim();
-  if (!expected || !tokensMatch(provided, expected)) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
+function asHubAgent(req) {
   req.hubAgent = true;
   req.user = { id: null, role: 'agent', name: 'Hub agent' };
-  return next();
+}
+
+/**
+ * Logged-in users keep full access.
+ * Anyone can list Feedback and mark a feedback bullet complete.
+ * Creating, editing text, deleting, and hub_edits still require a login.
+ */
+export function hubDocsAuth(req, res, next) {
+  const provided = bearerToken(req);
+  const expected = process.env.HUB_AGENT_TOKEN?.trim();
+  if (provided && expected && tokensMatch(provided, expected)) {
+    asHubAgent(req);
+    return next();
+  }
+
+  if (req.cookies?.token) return authMiddleware(req, res, next);
+
+  const publicGet = req.method === 'GET' && String(req.query.section || '') === 'feedback';
+  const publicPatch = req.method === 'PATCH';
+  if (publicGet || publicPatch) {
+    asHubAgent(req);
+    return next();
+  }
+
+  return authMiddleware(req, res, next);
 }
