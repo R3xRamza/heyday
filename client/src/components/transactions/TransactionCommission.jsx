@@ -215,7 +215,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
   const [gciMode, setGciMode] = useState('percent');
   const [gciAmount, setGciAmount] = useState(null);
   const [gciPercent, setGciPercent] = useState(3);
-  const [referralFee, setReferralFee] = useState({ amount: 0, unit: 'amount', paid_to: '' });
+  const [referralFee, setReferralFee] = useState({ amount: 0, unit: 'amount', paid_to: '', label: 'Referral' });
   const [customFees, setCustomFees] = useState([]);
   const [feeAmounts, setFeeAmounts] = useState({});
   const saveTimer = useRef(null);
@@ -245,8 +245,9 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
           amount: json.referral_fee.amount ?? 0,
           unit: json.referral_fee.unit === 'percent' ? 'percent' : 'amount',
           paid_to: json.referral_fee.paid_to || '',
+          label: json.referral_fee.label || '',
         }
-        : { amount: 0, unit: 'amount', paid_to: '' });
+        : { amount: 0, unit: 'amount', paid_to: '', label: 'Referral' });
     }
     if (syncCustom) {
       const fees = json.custom_fees?.length ? json.custom_fees : [];
@@ -387,7 +388,8 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
     || referralFee.paid_to
     || '',
   ).trim();
-  const referralLabel = referralPaidTo ? `Referral: ${referralPaidTo}` : 'Referral';
+  const referralLabel = String(referralFee.label || '').trim()
+    || (referralPaidTo ? `Referral: ${referralPaidTo}` : 'Referral');
   const hasReferralValue = referralDollars > 0 || Number(referralFee.amount) > 0;
 
   function displayFeeValue(line) {
@@ -484,11 +486,24 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
               }}
             />
             <div className="mt-3 pt-3 border-t border-outline-variant/5">
-              <div className="mb-1">
+              <label className="block mb-2">
                 <span className="text-[9px] font-bold text-on-surface-variant/70 uppercase tracking-widest">
-                  Referral fee
+                  Title
                 </span>
-              </div>
+                <input
+                  type="text"
+                  value={referralFee.label || ''}
+                  placeholder="Referral"
+                  onChange={(e) => {
+                    setReferralFee((prev) => ({ ...prev, label: e.target.value }));
+                  }}
+                  onBlur={(e) => {
+                    const label = e.target.value.trim() || 'Referral';
+                    persistReferral({ ...referralFee, label });
+                  }}
+                  className="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-surface-container-low border border-outline-variant/15 text-xs text-primary font-medium focus:outline-none focus:ring-2 focus:ring-secondary/30"
+                />
+              </label>
               <UnitValueField
                 compact
                 unit={referralFee.unit}

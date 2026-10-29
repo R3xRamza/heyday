@@ -36,6 +36,7 @@ export const TRANSACTION_STAGE_OPTIONS = [
   { value: 'active', label: 'Active' },
   { value: 'pending', label: 'Pending' },
   { value: 'closed', label: 'Closed' },
+  { value: 'terminated', label: 'Terminated' },
 ];
 
 const TRANSACTION_STAGE_LABELS = Object.fromEntries(
@@ -47,7 +48,7 @@ export function transactionStageLabel(stage) {
 }
 
 function isUnderContract(tx) {
-  if (!tx || tx.stage === 'closed') return false;
+  if (!tx || tx.stage === 'closed' || tx.stage === 'terminated') return false;
   return tx.stage === 'pending' || Boolean(tx.close_date);
 }
 
@@ -109,6 +110,7 @@ function portfolioTodayStr() {
 export function transactionPortfolioType(tx) {
   if (!tx) return 'Active';
   if (tx.stage === 'closed') return 'Closed';
+  if (tx.stage === 'terminated') return 'Terminated';
 
   // Rent/lease deals show sale type in the Type column (not a list filter).
   if (normalizeSaleType(tx.sale_type, tx.representing) === SALE_TYPE_RENT_LEASE) {

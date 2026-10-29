@@ -12,6 +12,7 @@ export function isCloseDatePast(closeDate) {
 
 /** Derive portfolio stage from close_date and current stage. */
 export function deriveStageFromCloseDate(record) {
+  if (record.stage === 'terminated') return 'terminated';
   if (record.stage === 'closed') return 'closed';
   if (record.close_date && isCloseDatePast(record.close_date)) return 'closed';
   if (record.close_date) return 'pending';
@@ -23,7 +24,7 @@ export function closePastDueTransactions(db) {
   const rows = db.prepare(`
     SELECT id, stage, close_date
     FROM transactions
-    WHERE stage != 'closed'
+    WHERE stage NOT IN ('closed', 'terminated')
       AND close_date IS NOT NULL
       AND TRIM(close_date) != ''
       AND close_date < date('now')

@@ -50,6 +50,7 @@ const EXTRA_FIELDS = [
   },
   { key: 'sale_type', label: 'Type of sale', type: 'select', options: SALE_TYPE_OPTIONS },
   { key: 'stage', label: 'Status', type: 'select', options: TRANSACTION_STAGE_OPTIONS },
+  { key: 'terminated_date', label: 'Terminated date', type: 'date', whenTerminated: true },
   { key: 'address', label: 'Address', type: 'text' },
   { key: 'city', label: 'City', type: 'text' },
   { key: 'state', label: 'State', type: 'text' },
@@ -459,6 +460,12 @@ export default function TransactionWorkspace({
       saveTransaction(payload);
       return;
     }
+    if (key === 'stage' && value === 'terminated') {
+      const terminated_date = form.terminated_date || new Date().toISOString().slice(0, 10);
+      setForm((prev) => ({ ...prev, stage: 'terminated', terminated_date }));
+      saveTransaction({ stage: 'terminated', terminated_date });
+      return;
+    }
     setForm((prev) => ({ ...prev, [key]: value }));
     saveTransaction({ [key]: value });
   }
@@ -533,6 +540,7 @@ export default function TransactionWorkspace({
   const visibleExtraFields = EXTRA_FIELDS.filter((f) => {
     if (timelineKeySet.has(f.key)) return false;
     if (f.listingSideOnly && !isListingSideRepresenting(form.representing)) return false;
+    if (f.whenTerminated && form.stage !== 'terminated') return false;
     return true;
   });
   const representingDisplay = representingLabel(form.representing);

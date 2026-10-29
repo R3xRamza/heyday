@@ -160,6 +160,9 @@ export default function CRMHub() {
           )}
         />
 
+        <p className="text-sm text-on-surface-variant">
+          Follow Up Boss syncs into Hub daily at 2:00 AM Chicago. Hub does not write back.
+        </p>
         <div className="rounded-xl border border-outline-variant/15 bg-white p-3 sm:p-4 space-y-2.5 shadow-sm">
           <div className="relative w-full">
             <Icon

@@ -38,7 +38,6 @@ function CategoryChip({ category }) {
 }
 
 function LikeNoteModal({ vendorName, kind = 'like', busy, onClose, onSubmit }) {
-  const [wantNote, setWantNote] = useState(false);
   const [note, setNote] = useState('');
   const isDislike = kind === 'dislike';
   const noun = isDislike ? 'dislike' : 'like';
@@ -72,27 +71,14 @@ function LikeNoteModal({ vendorName, kind = 'like', busy, onClose, onSubmit }) {
           )}
         </p>
 
-        <label className="flex items-start gap-2.5 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={wantNote}
-            onChange={(e) => setWantNote(e.target.checked)}
-            className="mt-1 rounded border-outline-variant"
-            disabled={busy}
-          />
-          <span className="text-sm text-primary font-medium">Leave a note with this {noun}</span>
-        </label>
-
-        {wantNote && (
-          <textarea
-            className={`${inputClass} min-h-[5.5rem] resize-y`}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder={isDislike ? 'Why you’re not recommending them…' : 'Why you recommend them…'}
-            autoFocus
-            disabled={busy}
-          />
-        )}
+        <textarea
+          className={`${inputClass} min-h-[5.5rem] resize-y`}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder={isDislike ? 'Why you’re not recommending them…' : 'Why you recommend them…'}
+          autoFocus
+          disabled={busy}
+        />
 
         <div className="flex justify-end gap-2 pt-1">
           <button
@@ -106,7 +92,7 @@ function LikeNoteModal({ vendorName, kind = 'like', busy, onClose, onSubmit }) {
           <button
             type="button"
             disabled={busy}
-            onClick={() => onSubmit(wantNote ? note.trim() : '')}
+            onClick={() => onSubmit(note.trim())}
             className={`px-4 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-50 ${
               isDislike ? 'bg-error hover:bg-error/90' : 'bg-secondary hover:bg-secondary/90'
             }`}
@@ -541,7 +527,9 @@ export default function VendorsHub() {
   const loadCategories = useCallback(async () => {
     const res = await fetch('/api/vendors/categories', { credentials: 'include' });
     const json = await res.json();
-    setCategories(json.categories || []);
+    const list = [...(json.categories || [])];
+    list.sort((a, b) => String(a.value).localeCompare(String(b.value), undefined, { sensitivity: 'base' }));
+    setCategories(list);
   }, []);
 
   const fetchVendors = useCallback(async () => {
@@ -571,8 +559,12 @@ export default function VendorsHub() {
     fetchVendors();
   }, [fetchVendors]);
 
-  function applyVendorDetail(vendor) {
-    setForm(formFromVendor(vendor));
+  function applyVendorDetail(vendor, { keepNotes = false } = {}) {
+    setForm((prev) => {
+      const next = formFromVendor(vendor);
+      if (keepNotes) next.notes = prev.notes;
+      return next;
+    });
     setLikes(vendor.likes || []);
     setLikedByMe(!!vendor.liked_by_me);
     setDislikedByMe(!!vendor.disliked_by_me);
@@ -596,7 +588,7 @@ export default function VendorsHub() {
       ),
     }));
     if (drawer === vendor.id) {
-      applyVendorDetail(vendor);
+      applyVendorDetail(vendor, { keepNotes: true });
     }
   }
 
@@ -859,6 +851,8 @@ export default function VendorsHub() {
             <span>
               {loading ? 'Loading…' : `${data.total?.toLocaleString() ?? 0} vendors`}
               {hasFilters && ' (filtered)'}
+              {' · '}
+              A filled thumb is one you added. Categories are A to Z.
             </span>
             {hasFilters && (
               <button

@@ -34,6 +34,7 @@ const FILTERS = [
   { key: 'pending', label: 'Pending' },
   { key: 'expiring_soon', label: 'Expiring Soon' },
   { key: 'closed', label: 'Closed' },
+  { key: 'terminated', label: 'Terminated' },
   { key: 'all', label: 'All Transactions' },
 ];
 
@@ -53,6 +54,7 @@ const VOLUME_BOX_BY_FILTER = {
   expiring_soon: { label: 'Expiring Volume', sub: (n) => `${n} expiring soon` },
   pending: { label: 'Total Pending Volume', sub: (n) => `${n} under contract` },
   closed: { label: 'Closed Volume', sub: (n) => `${n} closing${n === 1 ? '' : 's'}` },
+  terminated: { label: 'Terminated Volume', sub: (n) => `${n} terminated` },
 };
 
 const FOOTER_VOLUME_LABEL = {
@@ -63,6 +65,7 @@ const FOOTER_VOLUME_LABEL = {
   expiring_soon: 'expiring volume',
   pending: 'total pending volume',
   closed: 'closed volume',
+  terminated: 'terminated volume',
 };
 
 function filterVolume(stats, filter) {
@@ -86,6 +89,7 @@ const DATE_COLUMN_BY_FILTER = {
   expiring_soon: { label: 'Expiration', field: 'important_date' },
   pending: { label: 'Closing Date', field: 'close_date' },
   closed: { label: 'Closing Date', field: 'close_date' },
+  terminated: { label: 'Terminated', field: 'terminated_date' },
 };
 
 const SORTABLE_COLUMNS_BASE = [
@@ -145,6 +149,7 @@ function emptyFilterMessage(filter) {
     case 'expiring_soon': return 'No listings expiring in the next 30 days.';
     case 'pending': return 'No pending transactions.';
     case 'closed': return 'No closed transactions.';
+    case 'terminated': return 'No terminated transactions.';
     case 'all': return 'No transactions yet.';
     default: return 'No active transactions yet.';
   }

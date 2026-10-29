@@ -191,9 +191,10 @@ function storedReferralFee(fee) {
   const amount = Math.max(0, Number(fee.amount) || 0);
   if (!(amount > 0)) return null;
   const paidTo = paidToFromReferralLabel(fee.label, fee.paid_to);
+  const customLabel = String(fee.label || '').trim();
   return {
     id: REFERRAL_FEE_ID,
-    label: paidTo ? `Referral: ${paidTo}` : 'Referral',
+    label: customLabel || (paidTo ? `Referral: ${paidTo}` : 'Referral'),
     amount,
     unit: fee.unit === 'percent' ? 'percent' : 'amount',
     ...(paidTo ? { paid_to: paidTo } : {}),
@@ -228,9 +229,10 @@ export function splitReferralCustomFees(fees) {
       || (isReferralFeeLabel(fee.label) && Number(fee.amount) > 0);
     if (!referral && promote) {
       const paidTo = paidToFromReferralLabel(fee.label, fee.paid_to);
+      const customLabel = String(fee.label || '').trim();
       referral = {
         id: REFERRAL_FEE_ID,
-        label: paidTo ? `Referral: ${paidTo}` : 'Referral',
+        label: customLabel || (paidTo ? `Referral: ${paidTo}` : 'Referral'),
         amount: fee.amount,
         unit: fee.unit,
         ...(paidTo ? { paid_to: paidTo } : {}),
@@ -260,7 +262,7 @@ export function mergeReferralCustomFees(referral, customFees) {
   }
   const fromCustom = promoted.map((fee) => storedReferralFee(fee)).find(Boolean) || null;
   const explicit = storedReferralFee(referral);
-  const chosen = fromCustom || explicit;
+  const chosen = explicit || fromCustom;
   return serializeCustomFees(chosen ? [chosen, ...rest] : rest);
 }
 

@@ -91,7 +91,7 @@ router.get('/categories', (_req, res) => {
     FROM vendors
     WHERE category IS NOT NULL AND category != ''
     GROUP BY category
-    ORDER BY count DESC, category ASC
+    ORDER BY category COLLATE NOCASE ASC
   `).all();
   res.json({ categories });
 });

@@ -413,4 +413,81 @@ router.delete('/sellers/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+function normalizeLeaseType(value) {
+  return String(value || '').trim().toLowerCase() === 'buyer' ? 'buyer' : 'listing';
+}
+
+router.get('/leases', (req, res) => {
+  const agentScope = parseAgentScope(req.query);
+  const { sql: scopeSql, params: scopeParams } = transactionAgentScopeClause(agentScope, '');
+  const q = String(req.query.q || '').trim();
+  let searchSql = '';
+  const searchParams = [];
+  if (q) {
+    const like = `%${q}%`;
+    searchSql = ` AND (
+      COALESCE(party_name,'') LIKE ? OR COALESCE(address,'') LIKE ?
+      OR COALESCE(notes,'') LIKE ? OR COALESCE(opportunity_type,'') LIKE ?
+    )`;
+    searchParams.push(like, like, like, like);
+  }
+  const rows = db.prepare(`
+    SELECT * FROM opportunity_leases
+    WHERE 1=1 ${scopeSql} ${searchSql}
+    ORDER BY lease_end_date IS NULL, lease_end_date ASC, address COLLATE NOCASE ASC, id ASC
+  `).all(...scopeParams, ...searchParams);
+  res.json({ leases: rows });
+});
+
+router.post('/leases', (req, res) => {
+  const agentId = resolveCreateAgentId(req, res);
+  if (agentId == null) return;
+  const address = trimOrNull(req.body.address);
+  if (!address) return res.status(400).json({ error: 'address is required' });
+  const type = normalizeLeaseType(req.body.opportunity_type);
+  const result = db.prepare(`
+    INSERT INTO opportunity_leases (
+      agent_id, party_name, address, lease_end_date, notes, opportunity_type
+    ) VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    agentId,
+    trimOrNull(req.body.party_name),
+    address,
+    trimOrNull(req.body.lease_end_date),
+    trimOrNull(req.body.notes),
+    type,
+  );
+  const lease = db.prepare('SELECT * FROM opportunity_leases WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json({ lease });
+});
+
+router.patch('/leases/:id', (req, res) => {
+  const existing = db.prepare('SELECT * FROM opportunity_leases WHERE id = ?').get(req.params.id);
+  if (!assertRowInScope(req, res, existing)) return;
+  const address = 'address' in req.body ? trimOrNull(req.body.address) : existing.address;
+  if (!address) return res.status(400).json({ error: 'address is required' });
+  db.prepare(`
+    UPDATE opportunity_leases SET
+      party_name = ?, address = ?, lease_end_date = ?, notes = ?,
+      opportunity_type = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(
+    'party_name' in req.body ? trimOrNull(req.body.party_name) : existing.party_name,
+    address,
+    'lease_end_date' in req.body ? trimOrNull(req.body.lease_end_date) : existing.lease_end_date,
+    'notes' in req.body ? trimOrNull(req.body.notes) : existing.notes,
+    'opportunity_type' in req.body ? normalizeLeaseType(req.body.opportunity_type) : normalizeLeaseType(existing.opportunity_type),
+    existing.id,
+  );
+  const lease = db.prepare('SELECT * FROM opportunity_leases WHERE id = ?').get(existing.id);
+  res.json({ lease });
+});
+
+router.delete('/leases/:id', (req, res) => {
+  const existing = db.prepare('SELECT * FROM opportunity_leases WHERE id = ?').get(req.params.id);
+  if (!assertRowInScope(req, res, existing)) return;
+  db.prepare('DELETE FROM opportunity_leases WHERE id = ?').run(existing.id);
+  res.json({ ok: true });
+});
+
 export default router;

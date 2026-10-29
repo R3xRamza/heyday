@@ -15,6 +15,9 @@ export default function VendorLikeButton({
   const icon = isDislike ? 'thumb_down' : 'thumb_up';
   const noun = isDislike ? 'dislike' : 'like';
   const label = count === 1 ? `1 ${noun}` : `${count} ${noun}s`;
+  const title = active
+    ? `Highlighted because you ${isDislike ? 'disliked' : 'liked'} this`
+    : label;
   const activeColor = isDislike ? 'text-error' : 'text-secondary';
   const activeBg = isDislike ? 'bg-error/10 hover:bg-error/15' : 'bg-secondary/10 hover:bg-secondary/15';
 
@@ -33,7 +36,7 @@ export default function VendorLikeButton({
 
   if (!interactive) {
     return (
-      <span className={`inline-flex items-center gap-1 ${className}`} title={label}>
+      <span className={`inline-flex items-center gap-1 ${className}`} title={title}>
         {inner}
       </span>
     );
@@ -49,8 +52,8 @@ export default function VendorLikeButton({
       className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg transition-colors ${
         active ? activeBg : 'hover:bg-surface-container-low'
       } ${className}`}
-      aria-label={`Add ${noun} (${label})`}
-      title={`Add ${noun}`}
+      aria-label={active ? title : `Add ${noun} (${label})`}
+      title={active ? title : `Add ${noun}`}
     >
       {inner}
     </button>

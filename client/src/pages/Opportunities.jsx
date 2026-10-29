@@ -23,13 +23,14 @@ import OpportunityBuyerCards from '../components/opportunities/OpportunityBuyerC
 import OpportunitySellerCards from '../components/opportunities/OpportunitySellerCards';
 import OpportunityForm from '../components/opportunities/OpportunityForm';
 import OpportunityTableColumnsMenu from '../components/opportunities/OpportunityTableColumnsMenu';
+import OpportunityLeases from '../components/opportunities/OpportunityLeases';
 
 const TAB_KEY = 'opportunities-tab-v1';
 
 function loadTab() {
   try {
     const v = sessionStorage.getItem(TAB_KEY);
-    if (v === 'sellers' || v === 'buyers') return v;
+    if (v === 'sellers' || v === 'buyers' || v === 'leases') return v;
   } catch {
     // ignore
   }
@@ -136,6 +137,11 @@ export default function Opportunities() {
   }, []);
 
   const fetchRows = useCallback(async () => {
+    if (tab === 'leases') {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const params = new URLSearchParams();
     if (search.trim()) params.set('q', search.trim());
@@ -161,6 +167,10 @@ export default function Opportunities() {
   useEffect(() => {
     const params = new URLSearchParams();
     if (search.trim()) params.set('q', search.trim());
+    if (tab === 'leases') {
+      setAllForPills([]);
+      return;
+    }
     const path = tab === 'buyers' ? '/api/opportunities/buyers' : '/api/opportunities/sellers';
     const url = appendAgentScope(`${path}?${params.toString()}`, scope);
     fetch(url, { credentials: 'include' })
@@ -298,7 +308,7 @@ export default function Opportunities() {
   return (
     <DashboardLayout
       title="Opportunities"
-      subtitle="Buyer & seller pipelines"
+      subtitle="Buyer, seller, and lease pipelines"
       headerRight={<AgentScopeToggle />}
       fillViewport
       className="p-0 overflow-hidden bg-surface"
@@ -320,8 +330,16 @@ export default function Opportunities() {
             >
               Sellers
             </button>
+            <button
+              type="button"
+              onClick={() => switchTab('leases')}
+              className={tabBtn(tab === 'leases')}
+            >
+              Leases
+            </button>
           </div>
 
+          {tab !== 'leases' && (
           <div className="relative w-full md:flex-1 md:min-w-[12rem] md:max-w-md">
             <Search
               size={16}
@@ -346,7 +364,9 @@ export default function Opportunities() {
               </button>
             )}
           </div>
+          )}
 
+          {tab !== 'leases' && (
           <div className="flex items-center gap-2 w-full md:w-auto md:ml-auto shrink-0">
             {prefsReady && (
               <OpportunityTableColumnsMenu
@@ -364,6 +384,7 @@ export default function Opportunities() {
               <Plus size={16} /> New
             </button>
           </div>
+          )}
         </header>
 
         {statusOptions.length > 0 && (
@@ -400,7 +421,9 @@ export default function Opportunities() {
         )}
 
         <div className="flex-1 min-h-0 flex flex-col">
-          {loading && rows.length === 0 ? (
+          {tab === 'leases' ? (
+            <OpportunityLeases />
+          ) : loading && rows.length === 0 ? (
             <p className="text-sm text-on-surface-variant py-12 text-center">Loading…</p>
           ) : rows.length === 0 ? (
             <div className="py-12 md:py-16 px-4 text-center border border-dashed border-outline-variant/30 rounded-xl bg-white">

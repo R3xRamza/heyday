@@ -57,7 +57,7 @@ import {
 
 const router = Router();
 
-const PORTFOLIO_SCOPE = "stage != 'closed'";
+const PORTFOLIO_SCOPE = "stage NOT IN ('closed', 'terminated')";
 const PENDING_COUNT = "stage = 'pending' AND close_date IS NOT NULL";
 
 const VIEW_MAP = {
@@ -68,6 +68,7 @@ const VIEW_MAP = {
   all_listings: PRE_LISTINGS_SCOPE,
   pending: PENDING_COUNT,
   closed: "stage = 'closed'",
+  terminated: "stage = 'terminated'",
   expiring_soon: EXPIRING_SOON_SCOPE,
 };
 
@@ -197,7 +198,7 @@ const TX_FIELDS = [
   'acceptance_date', 'option_end_date', 'leaseback_end_date', 'workflow_status', 'transaction_name',
   'sale_type', 'gross_commission', 'commission_custom_fees', 'commission_fee_overrides',
   'commission_gci_mode', 'commission_gci_percent',
-  'buyer_agreement_date', 'buyer_expiration_date',
+  'buyer_agreement_date', 'buyer_expiration_date', 'terminated_date',
   'client_name', 'owner_name', 'agent_id',
 ];
 
@@ -388,6 +389,7 @@ const DATE_FIELD_BY_FILTER = {
   all_listings: 'listing_date',
   pending: 'close_date',
   closed: 'close_date',
+  terminated: 'terminated_date',
   expiring_soon: 'important_date',
 };
 
@@ -909,10 +911,31 @@ router.put('/:id', (req, res) => {
     return res.json({ transaction: pickTransaction(req.params.id) });
   }
 
+  if (nextStageExplicit === 'terminated' && !('terminated_date' in req.body)) {
+    const today = todayYmd();
+    if (!before.terminated_date) {
+      sets.push('terminated_date = ?');
+      values.push(today);
+    }
+  }
+
   values.push(req.params.id);
   db.prepare(`UPDATE transactions SET ${sets.join(', ')} WHERE id = ?`).run(...values);
 
   let after = db.prepare('SELECT * FROM transactions WHERE id = ?').get(req.params.id);
+
+  if (before.stage !== 'terminated' && after.stage === 'terminated') {
+    const openTasks = db.prepare(
+      "SELECT id FROM tasks WHERE transaction_id = ? AND status != 'complete'",
+    ).all(after.id);
+    if (openTasks.length) {
+      const ids = openTasks.map((task) => task.id);
+      const marks = ids.map(() => '?').join(', ');
+      db.prepare(`UPDATE transaction_activity SET task_id = NULL WHERE task_id IN (${marks})`).run(...ids);
+      db.prepare(`DELETE FROM tasks WHERE id IN (${marks})`).run(...ids);
+      changes.push(`canceled ${openTasks.length} open task${openTasks.length === 1 ? '' : 's'}`);
+    }
+  }
 
   if (
     'value' in req.body

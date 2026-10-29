@@ -89,6 +89,21 @@ export function migrateOpportunitiesTables(db) {
 
     CREATE INDEX IF NOT EXISTS idx_opportunity_buyers_agent ON opportunity_buyers(agent_id);
     CREATE INDEX IF NOT EXISTS idx_opportunity_sellers_agent ON opportunity_sellers(agent_id);
+
+    CREATE TABLE IF NOT EXISTS opportunity_leases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_id INTEGER NOT NULL REFERENCES users(id),
+      party_name TEXT,
+      address TEXT NOT NULL,
+      lease_end_date TEXT,
+      notes TEXT,
+      opportunity_type TEXT NOT NULL DEFAULT 'listing',
+      sort_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_opportunity_leases_agent ON opportunity_leases(agent_id);
   `);
 
   addColumnIfMissingLocal(db, 'opportunity_buyers', 'price_min', 'REAL');

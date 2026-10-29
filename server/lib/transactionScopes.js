@@ -3,7 +3,7 @@ import { transactionAgentScopeClause } from './agentScope.js';
 
 export const LISTING_REPRESENTING = "representing IN ('seller','seller_and_buyer','landlord','both','seller_and_client','leasing')";
 
-const LISTING_SIDE_OPEN = `${LISTING_REPRESENTING} AND stage != 'closed' AND acceptance_date IS NULL`;
+const LISTING_SIDE_OPEN = `${LISTING_REPRESENTING} AND stage NOT IN ('closed', 'terminated') AND acceptance_date IS NULL`;
 
 const LISTING_DATE_LIVE = "COALESCE(listing_visibility, 'public') != 'coming_soon' AND listing_date IS NOT NULL AND listing_date <= date('now')";
 

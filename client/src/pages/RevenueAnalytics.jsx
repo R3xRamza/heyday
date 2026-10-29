@@ -217,7 +217,15 @@ function DealsTable({ title, icon, headerClass, deals, emptyText, onSaveGci, pro
           <Icon name={icon} className="text-lemon !text-[18px]" />
           {title}
         </h3>
-        <span className="text-[9px] font-bold uppercase tracking-widest opacity-80">{deals.length}</span>
+        <span className="text-[9px] font-bold uppercase tracking-widest opacity-80 text-right">
+          {deals.length}
+          {' · '}
+          Sale {formatCurrency(deals.reduce((n, d) => n + (Number(d.value) || 0), 0))}
+          {' · '}
+          GCI {formatMoney(deals.reduce((n, d) => n + (d.hasGci ? Number(d.breakdown?.gci) || 0 : 0), 0))}
+          {' · '}
+          Net {formatMoney(deals.reduce((n, d) => n + (d.hasGci ? Number(d.breakdown?.net) || 0 : 0), 0))}
+        </span>
       </div>
       {deals.length === 0 ? (
         <p className="px-4 py-6 text-xs text-on-surface-variant">{emptyText}</p>
@@ -440,7 +448,11 @@ function IncomingSplitsTable({ title, icon, headerClass, rows, emptyText, projec
           <Icon name={icon} className="text-lemon !text-[18px]" />
           {title}
         </h3>
-        <span className="text-[9px] font-bold uppercase tracking-widest opacity-80">{rows.length}</span>
+        <span className="text-[9px] font-bold uppercase tracking-widest opacity-80">
+          {rows.length}
+          {' · '}
+          Total {formatMoney(rows.reduce((n, row) => n + (Number(row.amount) || 0), 0))}
+        </span>
       </div>
       {!isMdUp ? (
         <div className="divide-y divide-outline-variant/10">
@@ -571,15 +583,12 @@ export default function RevenueAnalytics() {
           <h2 className="min-w-0 flex-1 text-sm md:text-base font-bold text-primary truncate">
             {titleLabel}
           </h2>
-          {multiAgent ? (
-            <span className="text-[11px] text-on-surface-variant hidden lg:inline shrink-0">
-              Each agent’s own anniversary year
-            </span>
-          ) : s?.anniversaryStart && s?.anniversaryEnd ? (
-            <span className="text-[11px] text-on-surface-variant hidden lg:inline shrink-0">
-              {s.anniversaryStart} → {s.anniversaryEnd}
-            </span>
-          ) : null}
+          <span className="text-[11px] text-on-surface-variant hidden lg:inline shrink-0">
+            Calendar year
+            {!multiAgent && s?.anniversaryStart && s?.anniversaryEnd
+              ? ` · cap ${s.anniversaryStart} → ${s.anniversaryEnd}`
+              : ' · cap follows each anniversary'}
+          </span>
           <Link
             to="/revenue/templates"
             className="hidden md:inline-flex items-center gap-2 shrink-0 px-3 py-1.5 bg-surface-container-highest border border-outline-variant/30 text-primary text-xs font-semibold uppercase tracking-wider hover:bg-surface-container-high"
@@ -591,7 +600,7 @@ export default function RevenueAnalytics() {
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
             className="shrink-0 px-2.5 md:px-3 py-1.5 bg-white border border-outline-variant/30 rounded-lg text-sm font-semibold text-primary"
-            title="Anniversary year"
+            title="Calendar year"
           >
             {(data?.years ?? [year]).map((y) => (
               <option key={y} value={y}>{y}</option>
@@ -607,7 +616,15 @@ export default function RevenueAnalytics() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 xl:grid-cols-5 gap-3 md:gap-4">
+              <div className="relative overflow-hidden bg-gradient-to-br from-primary-container/15 to-sky/10 p-4 rounded-xl border border-white/60 shadow-executive">
+                <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg shadow-sm bg-primary-container text-white mb-3">
+                  <Icon name="home" className="!text-[20px]" />
+                </span>
+                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Sales Volume {s?.year}</p>
+                <h2 className="text-2xl font-bold text-primary leading-tight mt-0.5">{formatCurrency(s?.closedVolume ?? 0)}</h2>
+                <p className="text-[11px] text-on-surface-variant mt-1">{s?.closedCount ?? 0} closed this calendar year</p>
+              </div>
               <div className="relative overflow-hidden bg-gradient-to-br from-secondary/20 to-secondary/5 p-4 rounded-xl border border-white/60 shadow-executive">
                 <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg shadow-sm bg-secondary text-white mb-3">
                   <Icon name="account_balance_wallet" className="!text-[20px]" />

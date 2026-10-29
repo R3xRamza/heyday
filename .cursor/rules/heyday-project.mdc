@@ -99,14 +99,15 @@ Order in `client/src/constants/nav.js` (sidebar and mobile bottom nav): Team Hub
 - Representing: seller, buyer, landlord, tenant (legacy `seller_and_buyer` normalized)
 - Parties: Traditional = Agent, Title, Cooperating Agent, Client, Lender (+ custom); Rent/lease and Referral = Agent, Client (+ custom). Active requires Agent+Client; Traditional pending requires Agent, Client, Cooperating Agent (Title/Lender optional). `workflow_status`: setup via `TransactionSetup` (`details` → `template` → `assign`) until `active`
 - Key dates: `listing_date`, `important_date` (expiration), `close_date`, `acceptance_date`, `option_end_date`, optional `leaseback_end_date` (buyer/seller only)
-- **List filters** (`TransactionsList.jsx`): Active Transactions, Coming Soon, Current Listings, Pending, Expiring Soon (expiration within 30 days, stage active or pending), Closed, All Transactions
+- **List filters** (`TransactionsList.jsx`): Active Transactions, Coming Soon, Current Listings, Pending, Expiring Soon (expiration within 30 days, stage active or pending), Closed, Terminated, All Transactions
+- **Terminated** (`stage = terminated`, `terminated_date`): excluded from volume, revenue, listings, and active/pending filters. Setting status to Terminated deletes that deal's open tasks. Auto-close does not change a terminated deal.
 - **Current Listings columns:** Address, Type, Price, Listing Date, **Expiration** (`important_date`) — no Agent column
 - **Listings KPI card** subtitle: **Active**
 - **Create (step 1):** address/city/state/zip + required Agent (no default) — `validateCreateTransaction`; client name in setup later
 - **Delete:** detach `transaction_activity.task_id` → delete tasks → delete transaction (FK-safe)
 - **Checklist view** (`TransactionWorkspace.jsx`): scrollable panel ~32rem min height; task rows `font-medium`; complete = strikethrough only (no COMPLETED label); click row → detail sidebar
 - **Commission** (`TransactionCommission.jsx`): Referral fee is always visible, default $0, `%` or `$`. Referral comes off gross first. **Agent gross** = gross minus referral (shown when referral > $0). eXp split, plan fees, and other percent fees use agent gross. Team splits use the amount after the eXp split. A custom fee whose label contains "referral" and whose amount is greater than $0 is stored as the referral fee, not left in the custom list. A $0 in-progress row with that name stays in the custom list. Pending custom-fee saves flush when the panel unmounts
-- **eXp cap year** is per agent, edited on Revenue → Edit Split Templates (`anniversaryMd`, `MM-DD`). Seeded: Meredith `12-01`, Tessa `12-01`, Margaret `01-01`, Adam blank. Blank uses Dec 1–Nov 30. The $16k company-dollar cap, risk-fee annual cap, and capped-transaction step-down use the window that contains that deal's close date for that deal's agent. Revenue's year view filters each agent on their own window
+- **eXp cap year** is per agent, edited on Revenue → Edit Split Templates (`anniversaryMd`, `MM-DD`). Seeded: Meredith `12-01`, Tessa `12-01`, Margaret `01-01`, Adam blank. Blank uses Dec 1–Nov 30. The $16k company-dollar cap, risk-fee annual cap, and capped-transaction step-down use the window that contains that deal's close date for that deal's agent. Revenue's year dropdown is a calendar year (Jan 1–Dec 31) for volume, GCI, net, and the deal lists. Each section totals sales price, GCI, and net. A Sales Volume tile sits in front of Net Income. Terminated deals are excluded from every total.
 - List view state: `transactions-list-view-v1` sessionStorage; `TransactionsNavTracker`
 
 ## DOMAIN — Tasks
@@ -156,7 +157,8 @@ Order in `client/src/constants/nav.js` (sidebar and mobile bottom nav): Team Hub
 
 ## DOMAIN — Opportunities
 
-- `/opportunities` — Buyers | Sellers, search, status chips, New. Full-bleed, `fillViewport`. Agent scope applies; creating while scope is All assigns Meredith
+- `/opportunities` — Buyers | Sellers | Leases, search, status chips, New. Full-bleed, `fillViewport`. Agent scope applies; creating while scope is All assigns Meredith
+- Leases: one Tenant/Landlord column, address, lease end date, notes, type Listing or Buyer (`opportunity_leases`)
 - Buyers: status Pending, Option period, Active, On hold (legacy Closed still labels). Sellers: status is stored as Leads
 - Column show/hide, order, and width save per user via `/api/user-prefs/opportunities`
 

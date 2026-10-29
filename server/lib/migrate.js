@@ -101,6 +101,7 @@ export function runMigrations(db, options = {}) {
   addColumnIfMissing(db, 'transactions', 'buyer_agreement_date', 'DATE');
   addColumnIfMissing(db, 'transactions', 'buyer_expiration_date', 'DATE');
   addColumnIfMissing(db, 'transactions', 'leaseback_end_date', 'DATE');
+  addColumnIfMissing(db, 'transactions', 'terminated_date', 'DATE');
 
   addColumnIfMissing(db, 'transactions', 'client_name', 'TEXT');
   db.prepare('UPDATE transactions SET client_name = owner_name WHERE client_name IS NULL AND owner_name IS NOT NULL').run();

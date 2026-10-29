@@ -2,6 +2,7 @@ import { Router } from 'express';
 import db from '../db.js';
 import {
   computeYearCommissions,
+  anniversaryWindowForDate,
   anniversaryWindowForEndYear,
   closeDateInAnniversaryYear,
   settingsProgressMeta,
@@ -270,6 +271,42 @@ router.delete('/templates/:agentKey', (req, res) => {
   }
 });
 
+function inCalendarYear(closeDate, year) {
+  const close = String(closeDate || '').slice(0, 10);
+  return close >= `${year}-01-01` && close <= `${year}-12-31`;
+}
+
+/** Cap math resets at each agent's anniversary. Display lists use the calendar year. */
+function computeByAnniversaryWindows(deals) {
+  const groups = new Map();
+  for (const deal of deals) {
+    const key = deal.agent_id != null ? String(deal.agent_id) : 'none';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(deal);
+  }
+
+  const results = [];
+  for (const [, group] of groups) {
+    group.sort((a, b) => {
+      const ad = a.close_date || '';
+      const bd = b.close_date || '';
+      if (ad !== bd) return ad < bd ? -1 : 1;
+      return Number(a.id) - Number(b.id);
+    });
+    const settings = getTemplateSettingsForAgentId(db, group[0]?.agent_id);
+    const buckets = new Map();
+    for (const deal of group) {
+      const window = anniversaryWindowForDate(deal.close_date, settings.anniversaryMd);
+      if (!buckets.has(window.start)) buckets.set(window.start, []);
+      buckets.get(window.start).push(deal);
+    }
+    for (const bucket of buckets.values()) {
+      results.push(...computeYearCommissions(bucket, 0, settings).results);
+    }
+  }
+  return results;
+}
+
 function dealsInAgentAnniversaryYear(deals, year) {
   const windows = new Map();
   return deals.filter((deal) => {
@@ -301,21 +338,29 @@ router.get('/', (req, res) => {
   const allClosed = computeByAgentTemplates(allClosedDeals);
   const closedYtdMap = closedYtdByAgent(allClosedDeals);
 
-  const allPendingDeals = dealsInAgentAnniversaryYear(db.prepare(`
+  const calendarClosed = computeByAnniversaryWindows(db.prepare(`
     ${DEAL_SELECT}
-    WHERE t.stage = 'pending' AND t.close_date IS NOT NULL
+    WHERE t.stage = 'closed'
       AND t.close_date >= ? AND t.close_date <= ?
     ORDER BY t.close_date ASC, t.id ASC
-  `).all(spanStart, spanEnd), year);
+  `).all(`${year}-01-01`, `${year}-12-31`)).filter((d) => inCalendarYear(d.close_date, year));
 
-  const allPipeline = computePipelineByAgent(allPendingDeals, closedYtdMap);
+  const calendarPending = computePipelineByAgent(
+    db.prepare(`
+      ${DEAL_SELECT}
+      WHERE t.stage = 'pending' AND t.close_date IS NOT NULL
+        AND t.close_date >= ? AND t.close_date <= ?
+      ORDER BY t.close_date ASC, t.id ASC
+    `).all(`${year}-01-01`, `${year}-12-31`),
+    closedYtdMap,
+  ).results.filter((d) => inCalendarYear(d.close_date, year));
 
   const closedResults = scopeUserId != null
-    ? allClosed.results.filter((d) => Number(d.agent_id) === Number(scopeUserId))
-    : allClosed.results;
+    ? calendarClosed.filter((d) => Number(d.agent_id) === Number(scopeUserId))
+    : calendarClosed;
   const pipelineResults = scopeUserId != null
-    ? allPipeline.results.filter((d) => Number(d.agent_id) === Number(scopeUserId))
-    : allPipeline.results;
+    ? calendarPending.filter((d) => Number(d.agent_id) === Number(scopeUserId))
+    : calendarPending;
 
   const recipientName = scopeUserId != null
     ? (db.prepare('SELECT name FROM users WHERE id = ?').get(scopeUserId)?.name || null)
@@ -323,10 +368,10 @@ router.get('/', (req, res) => {
 
   // Incoming team-split income only for a single person (All would double-count).
   const incomingSplits = scopeUserId != null
-    ? extractIncomingSplits(allClosed.results, scopeUserId, recipientName)
+    ? extractIncomingSplits(calendarClosed, scopeUserId, recipientName)
     : [];
   const pipelineIncomingSplits = scopeUserId != null
-    ? extractIncomingSplits(allPipeline.results, scopeUserId, recipientName)
+    ? extractIncomingSplits(calendarPending, scopeUserId, recipientName)
     : [];
 
   const sum = (rows, fn) => round2(rows.reduce((acc, r) => acc + (r.hasGci ? fn(r.breakdown) : 0), 0));
