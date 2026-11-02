@@ -21,6 +21,9 @@ export default function MobileBottomNav() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const overdueCount = useOverdueTaskCount();
+  const canManageUsers = user?.role === 'admin' || user?.role === 'owner_lead';
+  const usersItem = NAV_ITEMS.find((item) => item.manageUsers);
+  const UsersIcon = usersItem?.icon;
   const [moreOpen, setMoreOpen] = useState(false);
 
   async function handleLogout() {
@@ -36,7 +39,7 @@ export default function MobileBottomNav() {
         aria-label="Primary"
       >
         <div className="flex items-stretch overflow-x-auto hide-scrollbar overscroll-x-contain">
-          {NAV_ITEMS.filter((item) => !item.manageUsers || user?.role === 'admin' || user?.role === 'owner_lead').map(({ to, label, shortLabel, icon: Icon, taskHub }) => {
+          {NAV_ITEMS.filter((item) => !item.manageUsers).map(({ to, label, shortLabel, icon: Icon, taskHub }) => {
             const linkTo = to === '/transactions' ? resolveTransactionsSidebarLink() : to;
             return (
               <NavLink
@@ -86,14 +89,26 @@ export default function MobileBottomNav() {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="w-full min-h-11 flex items-center justify-center gap-2 rounded-lg bg-feather text-lemon text-sm font-semibold"
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex-1 min-h-11 flex items-center justify-center gap-2 rounded-lg bg-feather text-lemon text-sm font-semibold"
+              >
+                <LogOut size={16} />
+                Logout
+              </button>
+              {canManageUsers && UsersIcon && (
+                <NavLink
+                  to={usersItem.to}
+                  onClick={() => setMoreOpen(false)}
+                  className="flex-1 min-h-11 flex items-center justify-center gap-2 rounded-lg border border-feather text-feather text-sm font-semibold"
+                >
+                  <UsersIcon size={16} />
+                  Users
+                </NavLink>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => setMoreOpen(false)}

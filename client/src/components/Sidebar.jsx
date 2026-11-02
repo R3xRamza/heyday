@@ -48,6 +48,9 @@ export default function Sidebar() {
   const { collapsed, toggleCollapsed, sidebarWidth } = useSidebar();
   const navigate = useNavigate();
   const overdueCount = useOverdueTaskCount();
+  const canManageUsers = user?.role === 'admin' || user?.role === 'owner_lead';
+  const usersItem = NAV_ITEMS.find((item) => item.manageUsers);
+  const UsersIcon = usersItem?.icon;
 
   async function handleLogout() {
     await logout();
@@ -93,7 +96,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 py-2 overflow-y-auto custom-scrollbar">
-        {NAV_ITEMS.filter((item) => !item.manageUsers || user?.role === 'admin' || user?.role === 'owner_lead').map(({ to, label, icon: Icon, taskHub }) => {
+        {NAV_ITEMS.filter((item) => !item.manageUsers).map(({ to, label, icon: Icon, taskHub }) => {
           const linkTo = to === '/transactions' ? resolveTransactionsSidebarLink() : to;
           return (
             <div key={to}>
@@ -147,15 +150,31 @@ export default function Sidebar() {
         {collapsed ? (
           <div className="flex flex-col items-center gap-2 py-3 px-2">
             <TeamAvatar email={user?.email} name={user?.name} size="sm" title={user?.name} />
-            <button
-              type="button"
-              onClick={handleLogout}
-              aria-label="Logout"
-              title="Logout"
-              className="p-1.5 rounded-md text-sky hover:text-lemon hover:bg-feather-alt/30 transition-colors"
-            >
-              <LogOut size={16} />
-            </button>
+            <div className="flex items-center justify-center gap-1">
+              <button
+                type="button"
+                onClick={handleLogout}
+                aria-label="Logout"
+                title="Logout"
+                className="p-1.5 rounded-md text-sky hover:text-lemon hover:bg-feather-alt/30 transition-colors"
+              >
+                <LogOut size={16} />
+              </button>
+              {canManageUsers && UsersIcon && (
+                <NavLink
+                  to={usersItem.to}
+                  aria-label="Users"
+                  title="Users"
+                  className={({ isActive }) =>
+                    `p-1.5 rounded-md transition-colors ${
+                      isActive ? 'text-lemon bg-feather-alt/40' : 'text-sky hover:text-lemon hover:bg-feather-alt/30'
+                    }`
+                  }
+                >
+                  <UsersIcon size={16} />
+                </NavLink>
+              )}
+            </div>
           </div>
         ) : (
           <div className="px-4 py-3">
@@ -168,14 +187,29 @@ export default function Sidebar() {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="mt-2 flex items-center gap-1 text-xs text-sky hover:text-lemon py-0.5 transition-colors"
-            >
-              <LogOut size={14} />
-              Logout
-            </button>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center gap-1 text-xs text-sky hover:text-lemon py-0.5 transition-colors"
+              >
+                <LogOut size={14} />
+                Logout
+              </button>
+              {canManageUsers && UsersIcon && (
+                <NavLink
+                  to={usersItem.to}
+                  className={({ isActive }) =>
+                    `flex items-center gap-1 text-xs py-0.5 transition-colors ${
+                      isActive ? 'text-lemon' : 'text-sky hover:text-lemon'
+                    }`
+                  }
+                >
+                  <UsersIcon size={14} />
+                  Users
+                </NavLink>
+              )}
+            </div>
           </div>
         )}
       </div>

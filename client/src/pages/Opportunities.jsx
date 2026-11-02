@@ -3,7 +3,7 @@ import { Plus, Search, X } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
 import AgentScopeToggle from '../components/AgentScopeToggle';
 import { useAgentScope } from '../context/AgentScopeContext';
-import { appendAgentScope } from '../utils/agentScope';
+import { appendAgentScope, memberInitials } from '../utils/agentScope';
 import {
   BUYER_STATUSES,
   buyerStatusLabel,
@@ -214,7 +214,7 @@ export default function Opportunities() {
 
   const sortedRows = useMemo(
     () => {
-      const names = Object.fromEntries(members.map((member) => [Number(member.id), member.name]));
+      const names = Object.fromEntries(members.map((member) => [Number(member.id), memberInitials(member)]));
       const named = rows.map((row) => ({
         ...row,
         agent_name: names[Number(row.agent_id)] || '',
@@ -386,7 +386,7 @@ export default function Opportunities() {
           >
             <option value="">All agents</option>
             {members.map((member) => (
-              <option key={member.id} value={member.id}>{member.name}</option>
+              <option key={member.id} value={member.id} title={member.name}>{memberInitials(member)}</option>
             ))}
           </select>
 

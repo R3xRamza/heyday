@@ -117,19 +117,24 @@ router.post('/:id/tasks', (req, res) => {
   const normalized = normalizeTaskBody(req.body, templateId);
   if (normalized.error) return res.status(400).json({ error: normalized.error });
 
-  const result = db.prepare(`
-    INSERT INTO template_tasks (template_id, title, timing_value, timing_direction, timing_anchor, sort_order, default_role, calendar_nickname)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    templateId,
-    normalized.title,
-    normalized.timing_value,
-    normalized.timing_direction,
-    normalized.timing_anchor,
-    normalized.sort_order,
-    normalized.default_role,
-    normalized.calendar_nickname,
-  );
+  const result = db.transaction(() => {
+    db.prepare(
+      'UPDATE template_tasks SET sort_order = sort_order + 1 WHERE template_id = ?',
+    ).run(templateId);
+    return db.prepare(`
+      INSERT INTO template_tasks (template_id, title, timing_value, timing_direction, timing_anchor, sort_order, default_role, calendar_nickname)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      templateId,
+      normalized.title,
+      normalized.timing_value,
+      normalized.timing_direction,
+      normalized.timing_anchor,
+      0,
+      normalized.default_role,
+      normalized.calendar_nickname,
+    );
+  })();
 
   const task = db.prepare('SELECT * FROM template_tasks WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json({ template: getTemplateWithTasks(templateId), task });

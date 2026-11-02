@@ -43,6 +43,23 @@ export function scopeInitials(scope) {
   return VISIBLE_SCOPE_OPTIONS.find((o) => o.value === normalized)?.initials ?? 'MA';
 }
 
+const INITIALS_BY_EMAIL = {
+  'meredith@theheydaygroup.com': 'MA',
+  'tessa@theheydaygroup.com': 'TO',
+  'margaret@theheydaygroup.com': 'MM',
+  'adam@theheydaygroup.com': 'AW',
+};
+
+/** Two-letter initials. Known teammates match the header scope chips. */
+export function memberInitials(member) {
+  const known = INITIALS_BY_EMAIL[String(member?.email || '').toLowerCase()];
+  if (known) return known;
+  const parts = String(member?.name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
 export function appendAgentScope(input, scope) {
   const code = scopeQueryParam(scope);
   if (input instanceof URLSearchParams) {

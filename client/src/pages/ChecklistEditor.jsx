@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ListChecks, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import DashboardLayout from '../components/DashboardLayout';
@@ -12,17 +12,33 @@ const ROLE_LABELS = {
   owner_lead: 'Owner Lead',
 };
 
-function emptyTask(sortOrder) {
+let nextLocalKey = 1;
+
+function emptyTask() {
+  nextLocalKey += 1;
   return {
     id: null,
+    localKey: nextLocalKey,
     title: '',
     calendar_nickname: '',
     default_role: 'operations',
     timing_value: 0,
     timing_direction: 'A',
     timing_anchor: 'CLOSING',
-    sort_order: sortOrder,
+    sort_order: 0,
   };
+}
+
+const UNFINISHED_TASK = 'This task is unfinished. Add a title before it can be saved.';
+
+function taskWasStarted(task) {
+  return Boolean(
+    String(task?.calendar_nickname || '').trim()
+    || (task?.default_role && task.default_role !== 'operations')
+    || Number(task?.timing_value) !== 0
+    || (task?.timing_direction && task.timing_direction !== 'A')
+    || (task?.timing_anchor && task.timing_anchor !== 'CLOSING'),
+  );
 }
 
 export default function ChecklistEditor() {
@@ -34,6 +50,8 @@ export default function ChecklistEditor() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [teamMembers, setTeamMembers] = useState([]);
+  const [unfinishedKey, setUnfinishedKey] = useState(null);
+  const draftRef = useRef(null);
 
   const assigneeOptions = useMemo(() => {
     const byRole = {};
@@ -48,9 +66,9 @@ export default function ChecklistEditor() {
       }));
   }, [teamMembers]);
 
-  const loadTemplates = useCallback(async (selectId, { silent = false } = {}) => {
+  const loadTemplates = useCallback(async (selectId, { silent = false, dropLocalKey } = {}) => {
     if (!silent) setLoading(true);
-    setError('');
+    if (!silent) setError('');
     const res = await fetch('/api/checklists', { credentials: 'include' });
     const json = await res.json();
     if (!silent) setLoading(false);
@@ -67,14 +85,24 @@ export default function ChecklistEditor() {
 
     if (id != null) {
       const t = list.find((x) => x.id === id);
-      setSelectedId(id);
-      setDraft({
+      const sameTemplate = draftRef.current?.id === id;
+      const drafts = sameTemplate
+        ? (draftRef.current.tasks || []).filter((task) => !task.id && task.localKey !== dropLocalKey)
+        : [];
+      const saved = (t.tasks || [])
+        .filter((task) => String(task.title || '').trim())
+        .map((task) => ({ ...task }));
+      const next = {
         id: t.id,
         name: t.name,
         category: t.category || 'TRANSACTION',
-        tasks: (t.tasks || []).map((task) => ({ ...task })),
-      });
+        tasks: [...drafts, ...saved],
+      };
+      draftRef.current = next;
+      setSelectedId(id);
+      setDraft(next);
     } else {
+      draftRef.current = null;
       setSelectedId(null);
       setDraft(null);
     }
@@ -92,13 +120,18 @@ export default function ChecklistEditor() {
   }, []);
 
   function selectTemplate(t) {
-    setSelectedId(t.id);
-    setDraft({
+    const next = {
       id: t.id,
       name: t.name,
       category: t.category || 'TRANSACTION',
-      tasks: (t.tasks || []).map((task) => ({ ...task })),
-    });
+      tasks: (t.tasks || [])
+        .filter((task) => String(task.title || '').trim())
+        .map((task) => ({ ...task })),
+    };
+    draftRef.current = next;
+    setSelectedId(t.id);
+    setDraft(next);
+    setUnfinishedKey(null);
     setMessage('');
     setError('');
   }
@@ -142,24 +175,37 @@ export default function ChecklistEditor() {
     await loadTemplates(draft.id, { silent: true });
   }
 
-  async function saveTask(task) {
-    if (!draft?.id || !task.title?.trim()) return;
+  function markUnfinished(task) {
+    setUnfinishedKey(task.localKey ?? task.id);
+    setError(UNFINISHED_TASK);
+  }
+
+  async function saveTask(task, { explicit = false } = {}) {
+    const current = draftRef.current;
+    if (!current?.id || !task) return;
+    const title = String(task.title || '').trim();
+    if (!title) {
+      const mustWarn = explicit || task.id || taskWasStarted(task);
+      if (mustWarn) markUnfinished(task);
+      return;
+    }
+    setUnfinishedKey((key) => (key === (task.localKey ?? task.id) ? null : key));
+    setError('');
     const isNew = !task.id;
     const url = isNew
-      ? `/api/checklists/${draft.id}/tasks`
-      : `/api/checklists/${draft.id}/tasks/${task.id}`;
+      ? `/api/checklists/${current.id}/tasks`
+      : `/api/checklists/${current.id}/tasks/${task.id}`;
     const res = await fetch(url, {
       method: isNew ? 'POST' : 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
-        title: task.title,
+        title,
         calendar_nickname: task.calendar_nickname ?? '',
         default_role: task.default_role || 'operations',
         timing_value: task.timing_value,
         timing_direction: task.timing_direction,
         timing_anchor: task.timing_anchor,
-        sort_order: task.sort_order,
       }),
     });
     const json = await res.json();
@@ -167,7 +213,7 @@ export default function ChecklistEditor() {
       setError(json.error || 'Could not save task');
       return;
     }
-    await loadTemplates(draft.id, { silent: true });
+    await loadTemplates(current.id, { silent: true, dropLocalKey: task.localKey });
   }
 
   async function deleteTemplate() {
@@ -185,6 +231,8 @@ export default function ChecklistEditor() {
       return;
     }
     setMessage('Template deleted');
+    setUnfinishedKey(null);
+    draftRef.current = null;
     setSelectedId(null);
     setDraft(null);
     await loadTemplates(null, { silent: true });
@@ -206,46 +254,62 @@ export default function ChecklistEditor() {
   }
 
   async function reorderTask(index, direction) {
-    if (!draft?.tasks) return;
-    const next = index + direction;
-    if (next < 0 || next >= draft.tasks.length) return;
-    const tasks = [...draft.tasks];
-    [tasks[index], tasks[next]] = [tasks[next], tasks[index]];
-    const order = tasks.filter((t) => t.id).map((t) => t.id);
-    if (order.length === 0) return;
+    const current = draftRef.current;
+    if (!current?.tasks) return;
+    const target = index + direction;
+    if (target < 0 || target >= current.tasks.length) return;
+    const tasks = [...current.tasks];
+    const moving = tasks[index];
+    const neighbor = tasks[target];
+    [tasks[index], tasks[target]] = [neighbor, moving];
+    const next = { ...current, tasks };
+    draftRef.current = next;
+    setDraft(next);
+    if (!moving.id || !neighbor.id) return;
 
-    const res = await fetch(`/api/checklists/${draft.id}/tasks/reorder`, {
+    const order = tasks.filter((t) => t.id).map((t) => t.id);
+    const res = await fetch(`/api/checklists/${current.id}/tasks/reorder`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ order }),
     });
-    if (res.ok) await loadTemplates(draft.id, { silent: true });
+    if (res.ok) await loadTemplates(current.id, { silent: true });
   }
 
-  function saveTaskAtIndex(index) {
-    const task = draft?.tasks?.[index];
-    if (task) saveTask(task);
+  function saveTaskAtIndex(index, { explicit = false } = {}) {
+    const task = draftRef.current?.tasks?.[index];
+    if (task) saveTask(task, { explicit });
   }
 
   function updateTaskField(index, key, value, save = false) {
-    setDraft((prev) => {
-      if (!prev) return prev;
-      const tasks = prev.tasks.map((t, i) => (i === index ? { ...t, [key]: value } : t));
-      if (save) {
-        const updated = tasks[index];
-        if (updated?.title?.trim()) saveTask(updated);
-      }
-      return { ...prev, tasks };
-    });
+    const prev = draftRef.current;
+    if (!prev) return;
+    const tasks = prev.tasks.map((t, i) => (i === index ? { ...t, [key]: value } : t));
+    const next = { ...prev, tasks };
+    draftRef.current = next;
+    setDraft(next);
+    if (save) saveTask(tasks[index]);
   }
 
   function addLocalTask() {
     setDraft((prev) => {
       if (!prev) return prev;
-      const sort_order = prev.tasks.length;
-      return { ...prev, tasks: [...prev.tasks, emptyTask(sort_order)] };
+      const next = { ...prev, tasks: [emptyTask(), ...prev.tasks] };
+      draftRef.current = next;
+      return next;
     });
+  }
+
+  function removeDraft(localKey) {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, tasks: prev.tasks.filter((task) => task.localKey !== localKey) };
+      draftRef.current = next;
+      return next;
+    });
+    setUnfinishedKey((key) => (key === localKey ? null : key));
+    setError((current) => (current === UNFINISHED_TASK ? '' : current));
   }
 
   return (
@@ -274,7 +338,7 @@ export default function ChecklistEditor() {
         </header>
 
         {message && <p className="text-sm text-secondary font-semibold mb-4">{message}</p>}
-        {error && <p className="text-sm text-error font-semibold mb-4">{error}</p>}
+        {error && <p role="alert" className="text-sm text-error font-semibold mb-4">{error}</p>}
 
         {loading ? (
           <p className="text-on-surface-variant">Loading checklists…</p>
@@ -358,7 +422,7 @@ export default function ChecklistEditor() {
 
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest flex items-center gap-2">
-                      <ListChecks size={16} /> Tasks ({draft.tasks.length})
+                      <ListChecks size={16} /> Tasks ({draft.tasks.filter((task) => String(task.title || '').trim()).length})
                     </h2>
                     <button
                       type="button"
@@ -373,10 +437,15 @@ export default function ChecklistEditor() {
                     {draft.tasks.length === 0 ? (
                       <p className="text-sm text-on-surface-variant py-8 text-center">No tasks in this template.</p>
                     ) : (
-                      draft.tasks.map((task, index) => (
+                      draft.tasks.map((task, index) => {
+                        const taskKey = task.localKey ?? task.id;
+                        const unfinished = unfinishedKey != null && unfinishedKey === taskKey;
+                        return (
                         <div
-                          key={task.id ?? `new-${index}`}
-                          className="p-4 bg-surface-container-low/50 border border-outline-variant/15 rounded-lg space-y-3"
+                          key={task.id ?? `new-${task.localKey}`}
+                          className={`p-4 bg-surface-container-low/50 border rounded-lg space-y-3 ${
+                            unfinished ? 'border-error ring-1 ring-error/30' : 'border-outline-variant/15'
+                          }`}
                         >
                           <div className="space-y-1">
                             <label className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
@@ -385,11 +454,20 @@ export default function ChecklistEditor() {
                             <textarea
                               rows={3}
                               value={task.title}
-                              onChange={(e) => updateTaskField(index, 'title', e.target.value)}
-                              onBlur={() => saveTaskAtIndex(index)}
+                              onChange={(e) => {
+                                updateTaskField(index, 'title', e.target.value);
+                                if (String(e.target.value || '').trim() && unfinishedKey === taskKey) {
+                                  setUnfinishedKey(null);
+                                  setError((current) => (current === UNFINISHED_TASK ? '' : current));
+                                }
+                              }}
+                              onBlur={() => saveTaskAtIndex(index, { explicit: true })}
                               placeholder="Task title"
                               className="w-full min-h-[72px] text-sm font-medium text-primary bg-surface border border-outline-variant/20 rounded-lg px-3 py-2 focus:ring-2 focus:ring-secondary/30 outline-none resize-y"
                             />
+                            {unfinished && (
+                              <p role="alert" className="text-xs font-semibold text-error">{UNFINISHED_TASK}</p>
+                            )}
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
@@ -459,10 +537,7 @@ export default function ChecklistEditor() {
                               </label>
                               <select
                                 value={task.timing_anchor || 'CLOSING'}
-                                onChange={(e) => {
-                                  updateTaskField(index, 'timing_anchor', e.target.value);
-                                  saveTask({ ...task, timing_anchor: e.target.value });
-                                }}
+                                onChange={(e) => updateTaskField(index, 'timing_anchor', e.target.value, true)}
                                 className="w-full text-sm text-primary bg-surface border border-outline-variant/20 rounded-lg px-2 py-1.5"
                               >
                                 {TIMING_ANCHORS.map((a) => (
@@ -474,7 +549,7 @@ export default function ChecklistEditor() {
 
                           <div className="flex items-center justify-end gap-1 pt-1 border-t border-outline-variant/10">
                             <span className="text-[10px] text-on-surface-variant/60 mr-auto">
-                              Order #{task.sort_order ?? index}
+                              {task.id ? `Order #${task.sort_order ?? index}` : 'New — not saved'}
                             </span>
                             <button
                               type="button"
@@ -494,7 +569,7 @@ export default function ChecklistEditor() {
                             >
                               <ChevronDown size={18} />
                             </button>
-                            {task.id && (
+                            {task.id ? (
                               <button
                                 type="button"
                                 onClick={() => deleteTask(task.id)}
@@ -503,12 +578,22 @@ export default function ChecklistEditor() {
                               >
                                 <Trash2 size={18} />
                               </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => removeDraft(task.localKey)}
+                                className="p-1 text-on-surface-variant hover:text-error"
+                                title="Remove unfinished task"
+                              >
+                                <Trash2 size={18} />
+                              </button>
                             )}
                             {!task.id && (
                               <button
                                 type="button"
-                                onClick={() => saveTask(task)}
-                                disabled={!task.title?.trim()}
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => saveTaskAtIndex(index, { explicit: true })}
                                 className="text-[10px] font-bold text-secondary uppercase px-2"
                               >
                                 Save
@@ -516,7 +601,8 @@ export default function ChecklistEditor() {
                             )}
                           </div>
                         </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
 

@@ -30,7 +30,7 @@ export default function UserProjectDashboard() {
 
   const fetchProjects = useCallback(async () => {
     const params = new URLSearchParams({ user_id: String(userId) });
-    if (showCompleted) params.set('include_completed', '1');
+    if (showCompleted) params.set('status', 'completed');
     const res = await fetch(`/api/projects?${params}`, { credentials: 'include' });
     if (res.ok) {
       const json = await res.json();
@@ -119,7 +119,7 @@ export default function UserProjectDashboard() {
             <>
               <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 mb-5">
                 <div className="w-full sm:min-w-[12rem] sm:flex-1 sm:max-w-sm">
-                  {showAddProject ? (
+                  {showCompleted ? null : showAddProject ? (
                     <AddProjectForm
                       onSave={handleCreateProject}
                       onCancel={() => setShowAddProject(false)}
@@ -134,7 +134,10 @@ export default function UserProjectDashboard() {
                 <div className="flex items-center gap-3 sm:ml-auto">
                   <button
                     type="button"
-                    onClick={() => setShowCompleted((open) => !open)}
+                    onClick={() => setShowCompleted((open) => {
+                      if (!open) setShowAddProject(false);
+                      return !open;
+                    })}
                     className="text-xs font-bold uppercase tracking-widest text-secondary"
                   >
                     {showCompleted ? 'Hide completed' : 'Show completed'}
@@ -147,11 +150,15 @@ export default function UserProjectDashboard() {
 
               {projects.length === 0 && !showAddProject ? (
                 <div className="flex flex-col items-center justify-center text-center py-14 md:py-20 px-2">
-                  <p className="text-lg font-semibold text-primary mb-1">No projects yet</p>
+                  <p className="text-lg font-semibold text-primary mb-1">
+                    {showCompleted ? 'No completed projects' : 'No projects yet'}
+                  </p>
+                  {!showCompleted && (
                   <p className="text-sm text-on-surface-variant mb-5 max-w-sm">
                     Track bigger initiatives here with an optional date and priority. Day-to-day work lives under Admin Tasks.
                   </p>
-                  {canWrite && (
+                  )}
+                  {canWrite && !showCompleted && (
                     <button
                       type="button"
                       onClick={() => setShowAddProject(true)}

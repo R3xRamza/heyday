@@ -34,9 +34,9 @@ router.get('/', (req, res) => {
   const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  const includeCompleted = req.query.include_completed === '1';
-  const statusSql = includeCompleted
-    ? "status != 'archived'"
+  const onlyCompleted = req.query.status === 'completed';
+  const statusSql = onlyCompleted
+    ? "status = 'completed'"
     : "status NOT IN ('archived', 'completed')";
   const projects = db.prepare(`
     SELECT * FROM projects

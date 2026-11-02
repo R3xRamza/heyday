@@ -8,9 +8,9 @@ import DateText from '../components/shared/DateText';
 import { useIsMdUp } from '../hooks/useMediaQuery';
 import { formatPhone } from '../utils/format';
 
-function CopyButton({ label, value }) {
+function CopyContactButton({ name, phone, email }) {
   const [copied, setCopied] = useState(false);
-  const text = String(value || '').trim();
+  const text = [name, phone, email].map((part) => String(part || '').trim()).filter(Boolean).join(', ');
   return (
     <button
       type="button"
@@ -23,7 +23,7 @@ function CopyButton({ label, value }) {
       }}
       className="min-h-10 px-3 text-[11px] font-semibold uppercase tracking-wider border border-outline-variant/30 rounded-lg text-primary disabled:opacity-40"
     >
-      {copied ? 'Copied' : label}
+      {copied ? 'Copied' : 'Copy'}
     </button>
   );
 }
@@ -364,11 +364,7 @@ function VendorDrawer({
               />
             </label>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <CopyButton label="Copy name" value={form.name} />
-            <CopyButton label="Copy phone" value={form.phone} />
-            <CopyButton label="Copy email" value={form.email} />
-          </div>
+          <CopyContactButton name={form.name} phone={form.phone} email={form.email} />
           <label className="block space-y-1">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
               Website
