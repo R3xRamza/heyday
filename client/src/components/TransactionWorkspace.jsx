@@ -50,7 +50,7 @@ const EXTRA_FIELDS = [
   },
   { key: 'sale_type', label: 'Type of sale', type: 'select', options: SALE_TYPE_OPTIONS },
   { key: 'stage', label: 'Status', type: 'select', options: TRANSACTION_STAGE_OPTIONS },
-  { key: 'terminated_date', label: 'Terminated date', type: 'date', whenTerminated: true },
+  { key: 'terminated_date', label: 'Termination date', type: 'date', whenTerminated: true },
   { key: 'address', label: 'Address', type: 'text' },
   { key: 'city', label: 'City', type: 'text' },
   { key: 'state', label: 'State', type: 'text' },
@@ -535,7 +535,12 @@ export default function TransactionWorkspace({
   });
   const openTasks = tasks.filter((t) => t.status !== 'complete').length;
   const overdueTasks = tasks.filter((t) => t.is_overdue && t.status !== 'complete');
-  const timelineDates = getTimelineSteps(form.representing);
+  const timelineDates = [
+    ...getTimelineSteps(form.representing),
+    ...(form.stage === 'terminated'
+      ? [{ key: 'terminated_date', label: 'Termination date', icon: 'event_busy' }]
+      : []),
+  ];
   const timelineKeySet = new Set(getTimelineDateKeys(form.representing));
   const visibleExtraFields = EXTRA_FIELDS.filter((f) => {
     if (timelineKeySet.has(f.key)) return false;

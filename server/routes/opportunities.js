@@ -51,6 +51,25 @@ function resolveCreateAgentId(req, res) {
   return meredith;
 }
 
+function listScope(req) {
+  const explicit = Number(req.query.agent_id);
+  if (explicit) return { sql: ' AND agent_id = ?', params: [explicit] };
+  return transactionAgentScopeClause(parseAgentScope(req.query), '');
+}
+
+function nextAgentId(req, res, existing) {
+  if (!Object.prototype.hasOwnProperty.call(req.body, 'agent_id')) return existing.agent_id;
+  const id = Number(req.body.agent_id);
+  const user = id
+    ? db.prepare("SELECT id FROM users WHERE id = ? AND email != 'admin@theheydaygroup.com'").get(id)
+    : null;
+  if (!user) {
+    res.status(400).json({ error: 'Choose a team member' });
+    return undefined;
+  }
+  return user.id;
+}
+
 function assertRowInScope(req, res, row) {
   if (!row) {
     res.status(404).json({ error: 'Not found' });
@@ -98,8 +117,7 @@ function sellerSearchClause(q) {
 // ── Buyers ──────────────────────────────────────────────────────────────
 
 router.get('/buyers', (req, res) => {
-  const agentScope = parseAgentScope(req.query);
-  const { sql: scopeSql, params: scopeParams } = transactionAgentScopeClause(agentScope, '');
+  const { sql: scopeSql, params: scopeParams } = listScope(req);
   const q = String(req.query.q || '').trim();
   const { sql: searchSql, params: searchParams } = buyerSearchClause(q);
   const status = String(req.query.status || '').trim();
@@ -246,9 +264,12 @@ router.patch('/buyers/:id', (req, res) => {
     ? resolveBuyerRepFields(req.body, existing)
     : resolveBuyerRepFields({}, existing);
 
+  const buyerAgentId = nextAgentId(req, res, existing);
+  if (buyerAgentId === undefined) return;
+
   db.prepare(`
     UPDATE opportunity_buyers SET
-      status = ?, buyer_name = ?, price = ?, price_min = ?, price_max = ?,
+      agent_id = ?, status = ?, buyer_name = ?, price = ?, price_min = ?, price_max = ?,
       location = ?, timing = ?,
       buyer_rep_signed = ?, buyer_rep_expires_on = ?, buyer_rep_dropbox = NULL,
       notes = ?, lender = ?,
@@ -256,6 +277,7 @@ router.patch('/buyers/:id', (req, res) => {
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(
+    buyerAgentId,
     statusOut,
     buyerName,
     priceFieldsFinal.price,
@@ -287,8 +309,7 @@ router.delete('/buyers/:id', (req, res) => {
 // ── Sellers ─────────────────────────────────────────────────────────────
 
 router.get('/sellers', (req, res) => {
-  const agentScope = parseAgentScope(req.query);
-  const { sql: scopeSql, params: scopeParams } = transactionAgentScopeClause(agentScope, '');
+  const { sql: scopeSql, params: scopeParams } = listScope(req);
   const q = String(req.query.q || '').trim();
   const { sql: searchSql, params: searchParams } = sellerSearchClause(q);
   const status = String(req.query.status || '').trim();
@@ -383,13 +404,17 @@ router.patch('/sellers/:id', (req, res) => {
     };
   }
 
+  const sellerAgentId = nextAgentId(req, res, existing);
+  if (sellerAgentId === undefined) return;
+
   db.prepare(`
     UPDATE opportunity_sellers SET
-      status = ?, property_address = ?, seller_name = ?, timing = ?,
+      agent_id = ?, status = ?, property_address = ?, seller_name = ?, timing = ?,
       price_range = ?, price_min = ?, price_max = ?, neighborhood = ?, notes = ?,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(
+    sellerAgentId,
     SELLER_STATUS,
     address,
     pick('seller_name'),
@@ -418,8 +443,7 @@ function normalizeLeaseType(value) {
 }
 
 router.get('/leases', (req, res) => {
-  const agentScope = parseAgentScope(req.query);
-  const { sql: scopeSql, params: scopeParams } = transactionAgentScopeClause(agentScope, '');
+  const { sql: scopeSql, params: scopeParams } = listScope(req);
   const q = String(req.query.q || '').trim();
   let searchSql = '';
   const searchParams = [];
@@ -466,12 +490,15 @@ router.patch('/leases/:id', (req, res) => {
   if (!assertRowInScope(req, res, existing)) return;
   const address = 'address' in req.body ? trimOrNull(req.body.address) : existing.address;
   if (!address) return res.status(400).json({ error: 'address is required' });
+  const leaseAgentId = nextAgentId(req, res, existing);
+  if (leaseAgentId === undefined) return;
   db.prepare(`
     UPDATE opportunity_leases SET
-      party_name = ?, address = ?, lease_end_date = ?, notes = ?,
+      agent_id = ?, party_name = ?, address = ?, lease_end_date = ?, notes = ?,
       opportunity_type = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(
+    leaseAgentId,
     'party_name' in req.body ? trimOrNull(req.body.party_name) : existing.party_name,
     address,
     'lease_end_date' in req.body ? trimOrNull(req.body.lease_end_date) : existing.lease_end_date,

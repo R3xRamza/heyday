@@ -93,7 +93,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 py-2 overflow-y-auto custom-scrollbar">
-        {NAV_ITEMS.map(({ to, label, icon: Icon, taskHub }) => {
+        {NAV_ITEMS.filter((item) => !item.manageUsers || user?.role === 'admin' || user?.role === 'owner_lead').map(({ to, label, icon: Icon, taskHub }) => {
           const linkTo = to === '/transactions' ? resolveTransactionsSidebarLink() : to;
           return (
             <div key={to}>

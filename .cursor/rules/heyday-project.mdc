@@ -51,6 +51,7 @@ alwaysApply: true
 | `/checklists` | Checklist template editor (opened from the transactions list, not the sidebar) |
 | `/opportunities` | Buyer and seller pipelines |
 | `/feedback` | Shared team bullet list |
+| `/users` | Users — add a login, role, eXp anniversary, move tasks (admin and owner lead) |
 
 ## SIDEBAR
 
@@ -100,7 +101,7 @@ Order in `client/src/constants/nav.js` (sidebar and mobile bottom nav): Team Hub
 - Parties: Traditional = Agent, Title, Cooperating Agent, Client, Lender (+ custom); Rent/lease and Referral = Agent, Client (+ custom). Active requires Agent+Client; Traditional pending requires Agent, Client, Cooperating Agent (Title/Lender optional). `workflow_status`: setup via `TransactionSetup` (`details` → `template` → `assign`) until `active`
 - Key dates: `listing_date`, `important_date` (expiration), `close_date`, `acceptance_date`, `option_end_date`, optional `leaseback_end_date` (buyer/seller only)
 - **List filters** (`TransactionsList.jsx`): Active Transactions, Coming Soon, Current Listings, Pending, Expiring Soon (expiration within 30 days, stage active or pending), Closed, Terminated, All Transactions
-- **Terminated** (`stage = terminated`, `terminated_date`): excluded from volume, revenue, listings, and active/pending filters. Setting status to Terminated deletes that deal's open tasks. Auto-close does not change a terminated deal.
+- **Terminated** (`stage = terminated`, `terminated_date`, labeled Termination date): excluded from volume, revenue, listings, and active/pending filters. Setting status to Terminated deletes that deal's open tasks, including deals already terminated. Auto-close does not change a terminated deal.
 - **Current Listings columns:** Address, Type, Price, Listing Date, **Expiration** (`important_date`) — no Agent column
 - **Listings KPI card** subtitle: **Active**
 - **Create (step 1):** address/city/state/zip + required Agent (no default) — `validateCreateTransaction`; client name in setup later
@@ -122,7 +123,7 @@ Order in `client/src/constants/nav.js` (sidebar and mobile bottom nav): Team Hub
 ## DOMAIN — Project Dashboard
 
 - `/tasks/:userId/projects` — projects-only card grid (optional target date / `deadline`); no personal todo columns
-- Write: owner or admin. Components: `client/src/components/projects/*`
+- Write: owner, admin, or owner lead. Complete marks `status = completed` and hides the project until Show completed. Components: `client/src/components/projects/*`
 - Day-to-day tasks live under Admin Tasks; projects track longer initiatives
 
 ## DOMAIN — CRM
@@ -157,7 +158,7 @@ Order in `client/src/constants/nav.js` (sidebar and mobile bottom nav): Team Hub
 
 ## DOMAIN — Opportunities
 
-- `/opportunities` — Buyers | Sellers | Leases, search, status chips, New. Full-bleed, `fillViewport`. Agent scope applies; creating while scope is All assigns Meredith
+- `/opportunities` — Buyers | Sellers | Leases, search, status chips, New, Agent column (team dropdown) and an Agent filter. Full-bleed, `fillViewport`. Agent scope applies; creating while scope is All assigns Meredith. Lease end date sorts from the column header.
 - Leases: one Tenant/Landlord column, address, lease end date, notes, type Listing or Buyer (`opportunity_leases`)
 - Buyers: status Pending, Option period, Active, On hold (legacy Closed still labels). Sellers: status is stored as Leads
 - Column show/hide, order, and width save per user via `/api/user-prefs/opportunities`

@@ -6,7 +6,7 @@ const router = Router();
 const PRIORITIES = new Set(['high', 'medium', 'low']);
 
 function canWriteForUser(reqUser, userId) {
-  return reqUser.id === userId || reqUser.role === 'admin';
+  return reqUser.id === userId || reqUser.role === 'admin' || reqUser.role === 'owner_lead';
 }
 
 function getProjectOr404(id) {
@@ -34,9 +34,13 @@ router.get('/', (req, res) => {
   const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
 
+  const includeCompleted = req.query.include_completed === '1';
+  const statusSql = includeCompleted
+    ? "status != 'archived'"
+    : "status NOT IN ('archived', 'completed')";
   const projects = db.prepare(`
     SELECT * FROM projects
-    WHERE user_id = ? AND status != 'archived'
+    WHERE user_id = ? AND ${statusSql}
     ORDER BY
       CASE lower(COALESCE(priority, 'medium'))
         WHEN 'high' THEN 0
@@ -98,11 +102,14 @@ router.patch('/:id', (req, res) => {
     ? normalizePriority(req.body.priority, project.priority || 'medium')
     : normalizePriority(project.priority);
 
+  let status = project.status || 'active';
+  if (req.body.status === 'completed' || req.body.status === 'active') status = req.body.status;
+
   db.prepare(`
     UPDATE projects
-    SET title = ?, description = ?, deadline = ?, priority = ?, updated_at = CURRENT_TIMESTAMP
+    SET title = ?, description = ?, deadline = ?, priority = ?, status = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(title, description, deadline, priority, project.id);
+  `).run(title, description, deadline, priority, status, project.id);
 
   res.json({ project: getProjectOr404(project.id) });
 });

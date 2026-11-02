@@ -1,5 +1,6 @@
 import { Pencil, Trash2 } from 'lucide-react';
 import OpportunityStatusBadge from './OpportunityStatusBadge';
+import OpportunityAgentSelect from './OpportunityAgentSelect';
 import OpportunityTableHead, { TD } from './OpportunityTableHead';
 import { visibleColumnDefs } from '../../utils/opportunityTablePrefs';
 import { formatSellerPrice, formatSellerAddressDisplay } from '../../utils/sellerOpportunity';
@@ -23,6 +24,8 @@ export default function SellerOpportunitiesTable({
   rows,
   onEdit,
   onDelete,
+  onPatch,
+  members = [],
   prefs,
   onSort,
   onReorder,
@@ -35,6 +38,16 @@ export default function SellerOpportunitiesTable({
   function renderCell(col, row) {
     const style = cellStyle(widths, col.id, col.defaultWidth);
     switch (col.id) {
+      case 'agent':
+        return (
+          <td key={col.id} className={TD} style={style} onClick={(e) => e.stopPropagation()}>
+            <OpportunityAgentSelect
+              value={row.agent_id}
+              members={members}
+              onChange={(agent_id) => onPatch(row.id, { agent_id })}
+            />
+          </td>
+        );
       case 'status':
         return (
           <td key={col.id} className={TD} style={style}>

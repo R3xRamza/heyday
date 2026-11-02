@@ -6,6 +6,7 @@ export default function ProjectListItem({
   expanded,
   onExpand,
   onEdit,
+  onComplete,
   canEdit,
   mobile = false,
 }) {
@@ -27,7 +28,7 @@ export default function ProjectListItem({
             className="w-full text-left"
           >
             <div className="flex items-start justify-between gap-3">
-              <p className="text-primary font-semibold text-sm leading-snug min-w-0 flex-1">
+              <p className={`text-primary font-semibold text-sm leading-snug min-w-0 flex-1 ${project.status === 'completed' ? 'line-through text-on-surface-variant' : ''}`}>
                 {project.title}
               </p>
               <ProjectPriorityBadge priority={project.priority} className="shrink-0" />
@@ -67,6 +68,16 @@ export default function ProjectListItem({
               >
                 Edit
               </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onComplete?.(project);
+                }}
+                className="inline-flex items-center justify-center min-h-11 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wide text-secondary hover:bg-surface-container-high"
+              >
+                {project.status === 'completed' ? 'Reopen' : 'Complete'}
+              </button>
             </div>
           )}
         </div>
@@ -90,7 +101,7 @@ export default function ProjectListItem({
           }}
           className="w-full text-left"
         >
-          <p className="text-primary font-semibold text-sm leading-snug">{project.title}</p>
+          <p className={`text-primary font-semibold text-sm leading-snug ${project.status === 'completed' ? 'line-through text-on-surface-variant' : ''}`}>{project.title}</p>
           {project.description ? (
             <p
               className={`text-xs text-on-surface-variant mt-1 leading-relaxed ${
@@ -129,6 +140,18 @@ export default function ProjectListItem({
             className="text-[11px] font-bold uppercase tracking-wide text-on-surface-variant hover:text-secondary px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
           >
             Edit
+          </button>
+        )}
+        {canEdit && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onComplete?.(project);
+            }}
+            className="text-[11px] font-bold uppercase tracking-wide text-secondary px-2 py-1 rounded-md"
+          >
+            {project.status === 'completed' ? 'Reopen' : 'Complete'}
           </button>
         )}
       </td>

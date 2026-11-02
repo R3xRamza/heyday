@@ -16,6 +16,7 @@ import {
 import { normalizeOpportunityTablePrefs } from './opportunityTablePrefs.js';
 import { seedVendorsFromCrm } from './seedVendorsFromCrm.js';
 import { migrateRevenueSplitTemplates } from './revenueTemplates.js';
+import { cancelOpenTasksOnTerminatedDeals } from './cancelTerminatedTasks.js';
 
 export function addColumnIfMissing(db, table, column, definition) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
@@ -161,6 +162,7 @@ export function runMigrations(db, options = {}) {
   migrateUserTodosTable(db);
   addColumnIfMissing(db, 'user_todos', 'due_date', 'DATE');
   migratePendingStageFromCloseDate(db);
+  cancelOpenTasksOnTerminatedDeals(db);
   migrateChecklistTemplateSortOrder(db);
   migrateChecklistTemplateAssigneesOnce(db);
   migrateUserEmailsToHeydayGroup(db);

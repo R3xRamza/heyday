@@ -36,7 +36,7 @@ export default function MobileBottomNav() {
         aria-label="Primary"
       >
         <div className="flex items-stretch overflow-x-auto hide-scrollbar overscroll-x-contain">
-          {NAV_ITEMS.map(({ to, label, shortLabel, icon: Icon, taskHub }) => {
+          {NAV_ITEMS.filter((item) => !item.manageUsers || user?.role === 'admin' || user?.role === 'owner_lead').map(({ to, label, shortLabel, icon: Icon, taskHub }) => {
             const linkTo = to === '/transactions' ? resolveTransactionsSidebarLink() : to;
             return (
               <NavLink

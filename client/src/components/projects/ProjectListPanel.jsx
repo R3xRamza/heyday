@@ -139,6 +139,7 @@ export default function ProjectListPanel({
   projects,
   onUpdate,
   onDelete,
+  onComplete,
   readOnly,
 }) {
   const [expandedId, setExpandedId] = useState(null);
@@ -214,6 +215,7 @@ export default function ProjectListPanel({
               expanded={expandedId === project.id}
               onExpand={() => handleExpand(project.id)}
               onEdit={() => handleEdit(project.id)}
+              onComplete={onComplete}
               canEdit={!readOnly}
               mobile
             />
@@ -235,7 +237,7 @@ export default function ProjectListPanel({
                 <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant w-32">
                   Priority
                 </th>
-                <th className="px-4 py-3 w-20" aria-label="Actions" />
+                <th className="px-4 py-3 w-36" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -260,6 +262,7 @@ export default function ProjectListPanel({
                     expanded={expandedId === project.id}
                     onExpand={() => handleExpand(project.id)}
                     onEdit={() => handleEdit(project.id)}
+                    onComplete={onComplete}
                     canEdit={!readOnly}
                   />
                 );

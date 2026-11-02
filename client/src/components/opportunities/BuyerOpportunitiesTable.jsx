@@ -9,6 +9,7 @@ import {
   visibleColumnDefs,
 } from '../../utils/opportunityTablePrefs';
 import BuyerRepIcons from './BuyerRepIcons';
+import OpportunityAgentSelect from './OpportunityAgentSelect';
 import OpportunityTableHead, { TD } from './OpportunityTableHead';
 
 const SELECT =
@@ -35,6 +36,7 @@ export default function BuyerOpportunitiesTable({
   onSort,
   onReorder,
   onResize,
+  members = [],
 }) {
   const columns = visibleColumnDefs('buyers', prefs);
   const widths = prefs.widths || {};
@@ -56,6 +58,16 @@ export default function BuyerOpportunitiesTable({
             <BuyerRepIcons
               buyerRepSigned={row.buyer_rep_signed}
               buyerRepExpiresOn={row.buyer_rep_expires_on}
+            />
+          </td>
+        );
+      case 'agent':
+        return (
+          <td key={col.id} className={TD} style={style} onClick={(e) => e.stopPropagation()}>
+            <OpportunityAgentSelect
+              value={row.agent_id}
+              members={members}
+              onChange={(agent_id) => onPatch(row.id, { agent_id })}
             />
           </td>
         );

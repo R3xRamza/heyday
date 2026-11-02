@@ -89,7 +89,7 @@ const DATE_COLUMN_BY_FILTER = {
   expiring_soon: { label: 'Expiration', field: 'important_date' },
   pending: { label: 'Closing Date', field: 'close_date' },
   closed: { label: 'Closing Date', field: 'close_date' },
-  terminated: { label: 'Terminated', field: 'terminated_date' },
+  terminated: { label: 'Termination date', field: 'terminated_date' },
 };
 
 const SORTABLE_COLUMNS_BASE = [

@@ -8,6 +8,26 @@ import DateText from '../components/shared/DateText';
 import { useIsMdUp } from '../hooks/useMediaQuery';
 import { formatPhone } from '../utils/format';
 
+function CopyButton({ label, value }) {
+  const [copied, setCopied] = useState(false);
+  const text = String(value || '').trim();
+  return (
+    <button
+      type="button"
+      disabled={!text}
+      onClick={async () => {
+        if (!text) return;
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1200);
+      }}
+      className="min-h-10 px-3 text-[11px] font-semibold uppercase tracking-wider border border-outline-variant/30 rounded-lg text-primary disabled:opacity-40"
+    >
+      {copied ? 'Copied' : label}
+    </button>
+  );
+}
+
 const EMPTY_FORM = {
   name: '',
   company: '',
@@ -305,11 +325,12 @@ function VendorDrawer({
           </label>
           <label className="block space-y-1">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
-              Category
+              Category *
             </span>
             <input
               className={inputClass}
               list="vendor-categories"
+              required
               value={form.category}
               onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
               placeholder="e.g. Inspector, Title, Photographer"
@@ -342,6 +363,11 @@ function VendorDrawer({
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
               />
             </label>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <CopyButton label="Copy name" value={form.name} />
+            <CopyButton label="Copy phone" value={form.phone} />
+            <CopyButton label="Copy email" value={form.email} />
           </div>
           <label className="block space-y-1">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">
@@ -723,7 +749,10 @@ export default function VendorsHub() {
   }
 
   async function handleSave() {
-    if (!form.name.trim()) return;
+    if (!form.name.trim() || !form.category.trim()) {
+      setError('Name and category are required');
+      return;
+    }
     setSaving(true);
     setError('');
 

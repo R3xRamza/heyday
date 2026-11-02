@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { appendAgentScope } from '../../utils/agentScope';
 import { useAgentScope } from '../../context/AgentScopeContext';
+import OpportunityAgentSelect from './OpportunityAgentSelect';
 
 const TYPES = [
   { value: 'listing', label: 'Listing' },
@@ -17,24 +18,27 @@ const EMPTY = {
   opportunity_type: 'listing',
 };
 
-export default function OpportunityLeases() {
+export default function OpportunityLeases({ members = [], agentId = '' }) {
   const { scope } = useAgentScope();
+  const queryScope = agentId ? 'all' : scope;
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState(EMPTY);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
+  const [endSort, setEndSort] = useState('asc');
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
     if (search.trim()) params.set('q', search.trim());
-    const res = await fetch(appendAgentScope(`/api/opportunities/leases?${params}`, scope), {
+    if (agentId) params.set('agent_id', agentId);
+    const res = await fetch(appendAgentScope(`/api/opportunities/leases?${params}`, queryScope), {
       credentials: 'include',
     });
     if (!res.ok) return;
     const json = await res.json();
     setRows(json.leases || []);
-  }, [scope, search]);
+  }, [queryScope, search, agentId]);
 
   useEffect(() => {
     load();
@@ -56,7 +60,7 @@ export default function OpportunityLeases() {
     setError('');
     const url = appendAgentScope(
       editingId ? `/api/opportunities/leases/${editingId}` : '/api/opportunities/leases',
-      scope,
+      queryScope,
     );
     const res = await fetch(url, {
       method: editingId ? 'PATCH' : 'POST',
@@ -75,7 +79,7 @@ export default function OpportunityLeases() {
   }
 
   async function remove(id) {
-    const res = await fetch(appendAgentScope(`/api/opportunities/leases/${id}`, scope), {
+    const res = await fetch(appendAgentScope(`/api/opportunities/leases/${id}`, queryScope), {
       method: 'DELETE',
       credentials: 'include',
     });
@@ -86,6 +90,29 @@ export default function OpportunityLeases() {
       }
       await load();
     }
+  }
+
+  const sorted = useMemo(() => {
+    const list = [...rows];
+    list.sort((a, b) => {
+      const ad = a.lease_end_date || '';
+      const bd = b.lease_end_date || '';
+      if (!ad && !bd) return 0;
+      if (!ad) return 1;
+      if (!bd) return -1;
+      return endSort === 'desc' ? bd.localeCompare(ad) : ad.localeCompare(bd);
+    });
+    return list;
+  }, [rows, endSort]);
+
+  async function setAgent(row, agent_id) {
+    const res = await fetch(appendAgentScope(`/api/opportunities/leases/${row.id}`, queryScope), {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id }),
+    });
+    if (res.ok) await load();
   }
 
   return (
@@ -115,19 +142,31 @@ export default function OpportunityLeases() {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[10px] uppercase tracking-widest text-on-surface-variant border-b border-outline-variant/15">
+              <th className="px-3 py-2">Agent</th>
               <th className="px-3 py-2">Tenant / Landlord</th>
               <th className="px-3 py-2">Address</th>
-              <th className="px-3 py-2">Lease end</th>
+              <th className="px-3 py-2">
+                <button type="button" className="font-semibold uppercase tracking-widest" onClick={() => setEndSort((dir) => (dir === 'asc' ? 'desc' : 'asc'))}>
+                  Lease end {endSort === 'asc' ? '↑' : '↓'}
+                </button>
+              </th>
               <th className="px-3 py-2">Notes</th>
               <th className="px-3 py-2">Type</th>
               <th className="px-3 py-2" />
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-on-surface-variant">No lease opportunities yet.</td></tr>
-            ) : rows.map((row) => (
+            {sorted.length === 0 ? (
+              <tr><td colSpan={7} className="px-3 py-8 text-center text-on-surface-variant">No lease opportunities yet.</td></tr>
+            ) : sorted.map((row) => (
               <tr key={row.id} className="border-b border-outline-variant/10">
+                <td className="px-3 py-2">
+                  <OpportunityAgentSelect
+                    value={row.agent_id}
+                    members={members}
+                    onChange={(agent_id) => setAgent(row, agent_id)}
+                  />
+                </td>
                 <td className="px-3 py-2">{row.party_name || '—'}</td>
                 <td className="px-3 py-2">{row.address}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{row.lease_end_date || '—'}</td>

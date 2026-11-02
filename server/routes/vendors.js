@@ -156,6 +156,8 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   const name = trimOrNull(req.body.name);
   if (!name) return res.status(400).json({ error: 'name is required' });
+  const category = trimOrNull(req.body.category);
+  if (!category) return res.status(400).json({ error: 'category is required' });
 
   const result = db.prepare(`
     INSERT INTO vendors (name, company, category, phone, email, website, notes, created_by, updated_by)
@@ -163,7 +165,7 @@ router.post('/', (req, res) => {
   `).run(
     name,
     trimOrNull(req.body.company),
-    trimOrNull(req.body.category),
+    category,
     trimOrNull(req.body.phone),
     trimOrNull(req.body.email),
     trimOrNull(req.body.website),
@@ -190,6 +192,14 @@ router.patch('/:id', (req, res) => {
       if (!name) return res.status(400).json({ error: 'name is required' });
       sets.push('name = ?');
       values.push(name);
+      continue;
+    }
+
+    if (field === 'category') {
+      const category = trimOrNull(req.body.category);
+      if (!category) return res.status(400).json({ error: 'category is required' });
+      sets.push('category = ?');
+      values.push(category);
       continue;
     }
 

@@ -17,7 +17,8 @@ export default function UserProjectDashboard() {
   const [showAddProject, setShowAddProject] = useState(false);
 
   const numericUserId = Number(userId);
-  const canWrite = user && (user.id === numericUserId || user.role === 'admin');
+  const canWrite = user && (user.id === numericUserId || user.role === 'admin' || user.role === 'owner_lead');
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const fetchMember = useCallback(async () => {
     const res = await fetch(`/api/team/${userId}`, { credentials: 'include' });
@@ -28,12 +29,14 @@ export default function UserProjectDashboard() {
   }, [userId]);
 
   const fetchProjects = useCallback(async () => {
-    const res = await fetch(`/api/projects?user_id=${userId}`, { credentials: 'include' });
+    const params = new URLSearchParams({ user_id: String(userId) });
+    if (showCompleted) params.set('include_completed', '1');
+    const res = await fetch(`/api/projects?${params}`, { credentials: 'include' });
     if (res.ok) {
       const json = await res.json();
       setProjects(json.projects || []);
     }
-  }, [userId]);
+  }, [userId, showCompleted]);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -73,6 +76,12 @@ export default function UserProjectDashboard() {
     if (res.ok) {
       await fetchProjects();
     }
+  }
+
+  async function handleCompleteProject(project) {
+    await handleUpdateProject(project.id, {
+      status: project.status === 'completed' ? 'active' : 'completed',
+    });
   }
 
   async function handleDeleteProject(projectId) {
@@ -122,9 +131,18 @@ export default function UserProjectDashboard() {
                     />
                   )}
                 </div>
-                <p className="text-xs font-bold uppercase tracking-widest text-primary sm:text-right">
-                  {projects.length} {projects.length === 1 ? 'project' : 'projects'}
-                </p>
+                <div className="flex items-center gap-3 sm:ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setShowCompleted((open) => !open)}
+                    className="text-xs font-bold uppercase tracking-widest text-secondary"
+                  >
+                    {showCompleted ? 'Hide completed' : 'Show completed'}
+                  </button>
+                  <p className="text-xs font-bold uppercase tracking-widest text-primary sm:text-right">
+                    {projects.length} {projects.length === 1 ? 'project' : 'projects'}
+                  </p>
+                </div>
               </div>
 
               {projects.length === 0 && !showAddProject ? (
@@ -149,6 +167,7 @@ export default function UserProjectDashboard() {
                   onCreate={handleCreateProject}
                   onUpdate={handleUpdateProject}
                   onDelete={handleDeleteProject}
+                  onComplete={handleCompleteProject}
                   readOnly={!canWrite}
                 />
               )}

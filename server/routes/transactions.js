@@ -23,6 +23,7 @@ import {
   mergeTransactionForValidation,
 } from '../lib/transactionValidation.js';
 import { closePastDueTransactions, deriveStageFromCloseDate } from '../lib/transactionAutoClose.js';
+import { cancelOpenTasksForTransaction } from '../lib/cancelTerminatedTasks.js';
 import { completeMarketing90DayTasksForTransaction } from '../lib/completeMarketing90DayOnClose.js';
 import {
   CURRENT_LISTINGS_VIEW_SCOPE,
@@ -924,16 +925,10 @@ router.put('/:id', (req, res) => {
 
   let after = db.prepare('SELECT * FROM transactions WHERE id = ?').get(req.params.id);
 
-  if (before.stage !== 'terminated' && after.stage === 'terminated') {
-    const openTasks = db.prepare(
-      "SELECT id FROM tasks WHERE transaction_id = ? AND status != 'complete'",
-    ).all(after.id);
-    if (openTasks.length) {
-      const ids = openTasks.map((task) => task.id);
-      const marks = ids.map(() => '?').join(', ');
-      db.prepare(`UPDATE transaction_activity SET task_id = NULL WHERE task_id IN (${marks})`).run(...ids);
-      db.prepare(`DELETE FROM tasks WHERE id IN (${marks})`).run(...ids);
-      changes.push(`canceled ${openTasks.length} open task${openTasks.length === 1 ? '' : 's'}`);
+  if (after.stage === 'terminated') {
+    const canceled = cancelOpenTasksForTransaction(db, after.id);
+    if (canceled) {
+      changes.push(`canceled ${canceled} open task${canceled === 1 ? '' : 's'}`);
     }
   }
 

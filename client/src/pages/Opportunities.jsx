@@ -41,6 +41,8 @@ export default function Opportunities() {
   const { scope } = useAgentScope();
   const [tab, setTab] = useState(loadTab);
   const [rows, setRows] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [agentFilter, setAgentFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -102,6 +104,15 @@ export default function Opportunities() {
     }
   }, []);
 
+  const queryScope = agentFilter ? 'all' : scope;
+
+  useEffect(() => {
+    fetch('/api/team', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((json) => setMembers(json.members || []))
+      .catch(() => {});
+  }, []);
+
   const activePrefs = tab === 'buyers' ? buyerPrefs : sellerPrefs;
 
   function applyPrefsLocal(next) {
@@ -146,8 +157,9 @@ export default function Opportunities() {
     const params = new URLSearchParams();
     if (search.trim()) params.set('q', search.trim());
     if (statusFilter) params.set('status', statusFilter);
+    if (agentFilter) params.set('agent_id', agentFilter);
     const path = tab === 'buyers' ? '/api/opportunities/buyers' : '/api/opportunities/sellers';
-    const url = appendAgentScope(`${path}?${params.toString()}`, scope);
+    const url = appendAgentScope(`${path}?${params.toString()}`, queryScope);
     try {
       const res = await fetch(url, { credentials: 'include' });
       const json = await res.json();
@@ -157,7 +169,7 @@ export default function Opportunities() {
     } finally {
       setLoading(false);
     }
-  }, [tab, scope, search, statusFilter]);
+  }, [tab, queryScope, search, statusFilter, agentFilter]);
 
   useEffect(() => {
     fetchRows();
@@ -167,19 +179,20 @@ export default function Opportunities() {
   useEffect(() => {
     const params = new URLSearchParams();
     if (search.trim()) params.set('q', search.trim());
+    if (agentFilter) params.set('agent_id', agentFilter);
     if (tab === 'leases') {
       setAllForPills([]);
       return;
     }
     const path = tab === 'buyers' ? '/api/opportunities/buyers' : '/api/opportunities/sellers';
-    const url = appendAgentScope(`${path}?${params.toString()}`, scope);
+    const url = appendAgentScope(`${path}?${params.toString()}`, queryScope);
     fetch(url, { credentials: 'include' })
       .then((r) => r.json())
       .then((json) => {
         setAllForPills(tab === 'buyers' ? (json.buyers || []) : (json.sellers || []));
       })
       .catch(() => setAllForPills([]));
-  }, [tab, scope, search]);
+  }, [tab, queryScope, search, agentFilter]);
 
   const statusOptions = useMemo(() => {
     if (tab === 'buyers') {
@@ -200,8 +213,15 @@ export default function Opportunities() {
   }, [allForPills]);
 
   const sortedRows = useMemo(
-    () => sortOpportunityRows(tab, rows, activePrefs.sortKey, activePrefs.sortDir),
-    [tab, rows, activePrefs.sortKey, activePrefs.sortDir],
+    () => {
+      const names = Object.fromEntries(members.map((member) => [Number(member.id), member.name]));
+      const named = rows.map((row) => ({
+        ...row,
+        agent_name: names[Number(row.agent_id)] || '',
+      }));
+      return sortOpportunityRows(tab, named, activePrefs.sortKey, activePrefs.sortDir);
+    },
+    [tab, rows, members, activePrefs.sortKey, activePrefs.sortDir],
   );
 
   function switchTab(next) {
@@ -226,7 +246,7 @@ export default function Opportunities() {
     const isEdit = Boolean(editing?.id);
     const url = appendAgentScope(
       isEdit ? `/api/opportunities/${kind}/${editing.id}` : `/api/opportunities/${kind}`,
-      scope,
+      queryScope,
     );
     const res = await fetch(url, {
       method: isEdit ? 'PATCH' : 'POST',
@@ -245,7 +265,7 @@ export default function Opportunities() {
 
   async function handlePatchBuyer(id, fields) {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...fields } : r)));
-    const url = appendAgentScope(`/api/opportunities/buyers/${id}`, scope);
+    const url = appendAgentScope(`/api/opportunities/buyers/${id}`, queryScope);
     const res = await fetch(url, {
       method: 'PATCH',
       credentials: 'include',
@@ -263,11 +283,30 @@ export default function Opportunities() {
     }
   }
 
+  async function handlePatchSeller(id, fields) {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...fields } : r)));
+    const url = appendAgentScope(`/api/opportunities/sellers/${id}`, queryScope);
+    const res = await fetch(url, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    });
+    if (!res.ok) {
+      await fetchRows();
+      return;
+    }
+    const json = await res.json().catch(() => ({}));
+    if (json.seller) {
+      setRows((prev) => prev.map((r) => (r.id === id ? json.seller : r)));
+    }
+  }
+
   async function handleDelete(row) {
     const label = tab === 'buyers' ? row.buyer_name : row.property_address;
     if (!window.confirm(`Delete opportunity for ${label || 'this row'}?`)) return;
     const kind = tab === 'buyers' ? 'buyers' : 'sellers';
-    const url = appendAgentScope(`/api/opportunities/${kind}/${row.id}`, scope);
+    const url = appendAgentScope(`/api/opportunities/${kind}/${row.id}`, queryScope);
     const res = await fetch(url, { method: 'DELETE', credentials: 'include' });
     if (!res.ok) {
       window.alert('Delete failed');
@@ -338,6 +377,18 @@ export default function Opportunities() {
               Leases
             </button>
           </div>
+
+          <select
+            aria-label="Filter by agent"
+            value={agentFilter}
+            onChange={(e) => setAgentFilter(e.target.value)}
+            className="min-h-11 px-3 bg-white border border-outline-variant/30 rounded-lg text-sm font-semibold text-primary"
+          >
+            <option value="">All agents</option>
+            {members.map((member) => (
+              <option key={member.id} value={member.id}>{member.name}</option>
+            ))}
+          </select>
 
           {tab !== 'leases' && (
           <div className="relative w-full md:flex-1 md:min-w-[12rem] md:max-w-md">
@@ -422,7 +473,7 @@ export default function Opportunities() {
 
         <div className="flex-1 min-h-0 flex flex-col">
           {tab === 'leases' ? (
-            <OpportunityLeases />
+            <OpportunityLeases members={members} agentId={agentFilter} />
           ) : loading && rows.length === 0 ? (
             <p className="text-sm text-on-surface-variant py-12 text-center">Loading…</p>
           ) : rows.length === 0 ? (
@@ -448,6 +499,7 @@ export default function Opportunities() {
                 rows={sortedRows}
                 onEdit={openEdit}
                 onPatch={handlePatchBuyer}
+                members={members}
                 prefs={buyerPrefs}
                 onSort={handleSort}
                 onReorder={handleReorder}
@@ -463,6 +515,8 @@ export default function Opportunities() {
                 rows={sortedRows}
                 onEdit={openEdit}
                 onDelete={handleDelete}
+                onPatch={handlePatchSeller}
+                members={members}
                 prefs={sellerPrefs}
                 onSort={handleSort}
                 onReorder={handleReorder}

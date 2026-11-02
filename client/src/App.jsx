@@ -19,6 +19,7 @@ import ChecklistEditor from './pages/ChecklistEditor';
 import TeamExecutiveOps from './pages/TeamExecutiveOps';
 import HubFeedback from './pages/HubFeedback';
 import Opportunities from './pages/Opportunities';
+import UsersAdmin from './pages/UsersAdmin';
 import TransactionsNavTracker from './components/TransactionsNavTracker';
 import { FullScreenSkeleton } from './components/shared/Skeleton';
 
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/team-ops" element={<ProtectedRoute><TeamExecutiveOps /></ProtectedRoute>} />
           <Route path="/opportunities" element={<ProtectedRoute><Opportunities /></ProtectedRoute>} />
           <Route path="/feedback" element={<ProtectedRoute><HubFeedback /></ProtectedRoute>} />
+          <Route path="/users" element={<ProtectedRoute><UsersAdmin /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

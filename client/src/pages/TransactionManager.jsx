@@ -120,7 +120,8 @@ export default function TransactionManager() {
       setTransaction(json.transaction);
       if (json.parties?.length) setParties(json.parties);
       const becameClosed = payload.stage === 'closed' || json.transaction?.stage === 'closed';
-      if (json.tasksRecalculated || json.marketing90Completed > 0 || becameClosed) {
+      const becameTerminated = payload.stage === 'terminated' || json.transaction?.stage === 'terminated';
+      if (json.tasksRecalculated || json.marketing90Completed > 0 || becameClosed || becameTerminated) {
         fetchTasks();
       }
       fetchActivities();

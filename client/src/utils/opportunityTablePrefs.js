@@ -28,6 +28,7 @@ export function columnWidthFloor(colId) {
 
 export const BUYER_COLUMNS = [
   { id: 'rep', label: 'Rep', pinned: 'start', sortable: false, defaultWidth: 72 },
+  { id: 'agent', label: 'Agent', pinned: null, sortable: true, defaultWidth: 140 },
   { id: 'buyer_name', label: 'Buyers', pinned: null, sortable: true, defaultWidth: 168 },
   { id: 'status', label: 'Status', pinned: null, sortable: true, defaultWidth: 136 },
   { id: 'budget', label: 'Budget', pinned: null, sortable: true, defaultWidth: 100 },
@@ -38,6 +39,7 @@ export const BUYER_COLUMNS = [
 ];
 
 export const SELLER_COLUMNS = [
+  { id: 'agent', label: 'Agent', pinned: null, sortable: true, defaultWidth: 140 },
   { id: 'status', label: 'Status', pinned: null, sortable: true, defaultWidth: 110 },
   { id: 'property_address', label: 'Address', pinned: null, sortable: true, defaultWidth: 180 },
   { id: 'seller_name', label: 'Seller', pinned: null, sortable: true, defaultWidth: 160 },
@@ -216,6 +218,8 @@ function cmpEmptyLast(a, b, dir) {
 
 function buyerSortValue(row, key) {
   switch (key) {
+    case 'agent':
+      return row.agent_name || '';
     case 'buyer_name':
       return row.buyer_name || '';
     case 'status':
@@ -245,6 +249,8 @@ function buyerSortValue(row, key) {
 
 function sellerSortValue(row, key) {
   switch (key) {
+    case 'agent':
+      return row.agent_name || '';
     case 'status':
       return row.status || '';
     case 'property_address':

@@ -1,5 +1,6 @@
 import {
   Users,
+  UserPlus,
   CheckSquare,
   BookUser,
   BarChart2,
@@ -19,6 +20,7 @@ export const NAV_ITEMS = [
   { to: '/crm', label: 'CRM Hub', shortLabel: 'CRM', icon: BookUser },
   { to: '/revenue', label: 'Revenue', shortLabel: 'Revenue', icon: BarChart2 },
   { to: '/feedback', label: 'Feedback', shortLabel: 'Feedback', icon: MessageSquare },
+  { to: '/users', label: 'Users', shortLabel: 'Users', icon: UserPlus, manageUsers: true },
 ];
 
 /** Approximate height of MobileBottomNav (icon+label+padding) for content padding. */
