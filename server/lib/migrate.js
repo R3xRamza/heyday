@@ -159,6 +159,7 @@ export function runMigrations(db, options = {}) {
   migrateProjectsTables(db);
   addColumnIfMissing(db, 'projects', 'deadline', 'DATE');
   addColumnIfMissing(db, 'projects', 'priority', "TEXT NOT NULL DEFAULT 'medium'");
+  reopenCompletedProjectsOnce(db);
   migrateUserTodosTable(db);
   addColumnIfMissing(db, 'user_todos', 'due_date', 'DATE');
   migratePendingStageFromCloseDate(db);
@@ -495,6 +496,19 @@ function migratePendingStageFromCloseDate(db) {
     UPDATE transactions SET stage = 'pending'
     WHERE stage = 'active' AND close_date IS NOT NULL AND TRIM(close_date) != ''
   `).run();
+}
+
+function reopenCompletedProjectsOnce(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )
+  `);
+  const done = db.prepare("SELECT 1 FROM app_meta WHERE key = 'projects_reopen_all_v1'").get();
+  if (done) return;
+  db.prepare("UPDATE projects SET status = 'active' WHERE status = 'completed'").run();
+  db.prepare("INSERT INTO app_meta (key, value) VALUES ('projects_reopen_all_v1', '1')").run();
 }
 
 function migrateProjectsTables(db) {

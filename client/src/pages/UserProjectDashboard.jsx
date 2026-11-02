@@ -138,12 +138,16 @@ export default function UserProjectDashboard() {
                       if (!open) setShowAddProject(false);
                       return !open;
                     })}
-                    className="text-xs font-bold uppercase tracking-widest text-secondary"
+                    className={`min-h-10 px-3 rounded-lg border text-xs font-bold uppercase tracking-wide ${
+                      showCompleted
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-white text-primary border-outline-variant/40 hover:bg-surface-container-low'
+                    }`}
                   >
-                    {showCompleted ? 'Hide completed' : 'Show completed'}
+                    {showCompleted ? 'Showing completed' : 'Show completed'}
                   </button>
                   <p className="text-xs font-bold uppercase tracking-widest text-primary sm:text-right">
-                    {projects.length} {projects.length === 1 ? 'project' : 'projects'}
+                    {projects.length} {showCompleted ? 'completed' : 'open'}
                   </p>
                 </div>
               </div>

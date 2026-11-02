@@ -225,7 +225,7 @@ export default function ProjectListPanel({
 
       <div className="hidden md:block bg-white rounded-xl border border-outline-variant/10 shadow-executive overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[36rem]">
+          <table className="w-full text-left min-w-[48rem]">
             <thead>
               <tr className="border-b border-outline-variant/15 bg-surface-container-low/60">
                 <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
@@ -237,7 +237,7 @@ export default function ProjectListPanel({
                 <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant w-32">
                   Priority
                 </th>
-                <th className="px-4 py-3 w-36" aria-label="Actions" />
+                <th className="px-4 py-3 w-64" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>

@@ -123,7 +123,7 @@ Order in `client/src/constants/nav.js` (sidebar and mobile bottom nav): Team Hub
 ## DOMAIN — Project Dashboard
 
 - `/tasks/:userId/projects` — projects-only card grid (optional target date / `deadline`); no personal todo columns
-- Write: owner, admin, or owner lead. Complete marks `status = completed` and hides the project. Show completed lists only completed projects. Components: `client/src/components/projects/*`
+- Write: owner, admin, or owner lead. Each row has visible buttons: Mark complete hides it from the open list; Make active puts it back. Show completed lists only completed projects. Components: `client/src/components/projects/*`
 - Day-to-day tasks live under Admin Tasks; projects track longer initiatives
 
 ## DOMAIN — CRM

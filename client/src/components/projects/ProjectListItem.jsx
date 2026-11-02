@@ -1,6 +1,19 @@
 import DateText from '../shared/DateText';
 import { ProjectPriorityBadge } from './dashboardShared';
 
+const editButtonClass =
+  'inline-flex items-center justify-center min-h-10 px-3 rounded-lg border border-outline-variant/40 bg-white text-[11px] font-bold uppercase tracking-wide text-primary hover:bg-surface-container-low';
+
+function statusButtonClass(completed) {
+  return completed
+    ? 'inline-flex items-center justify-center min-h-10 px-3 rounded-lg border border-primary-container bg-white text-[11px] font-bold uppercase tracking-wide text-primary hover:bg-surface-container-low'
+    : 'inline-flex items-center justify-center min-h-10 px-3 rounded-lg bg-primary-container text-white text-[11px] font-bold uppercase tracking-wide hover:brightness-110';
+}
+
+function statusButtonLabel(completed) {
+  return completed ? 'Make active' : 'Mark complete';
+}
+
 export default function ProjectListItem({
   project,
   expanded,
@@ -57,14 +70,14 @@ export default function ProjectListItem({
             </p>
           </button>
           {canEdit && (
-            <div className="mt-3 flex justify-end border-t border-outline-variant/10 pt-2 -mb-1">
+            <div className="mt-3 flex justify-end gap-2 border-t border-outline-variant/10 pt-3">
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   onEdit();
                 }}
-                className="inline-flex items-center justify-center min-h-11 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wide text-on-surface-variant hover:text-secondary hover:bg-surface-container-high"
+                className={editButtonClass}
               >
                 Edit
               </button>
@@ -74,9 +87,9 @@ export default function ProjectListItem({
                   e.stopPropagation();
                   onComplete?.(project);
                 }}
-                className="inline-flex items-center justify-center min-h-11 px-3 rounded-lg text-[11px] font-bold uppercase tracking-wide text-secondary hover:bg-surface-container-high"
+                className={statusButtonClass(project.status === 'completed')}
               >
-                {project.status === 'completed' ? 'Reopen' : 'Complete'}
+                {statusButtonLabel(project.status === 'completed')}
               </button>
             </div>
           )}
@@ -131,28 +144,28 @@ export default function ProjectListItem({
       </td>
       <td className="px-4 py-3 align-top text-right whitespace-nowrap">
         {canEdit && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-            className="text-[11px] font-bold uppercase tracking-wide text-on-surface-variant hover:text-secondary px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-          >
-            Edit
-          </button>
-        )}
-        {canEdit && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onComplete?.(project);
-            }}
-            className="text-[11px] font-bold uppercase tracking-wide text-secondary px-2 py-1 rounded-md"
-          >
-            {project.status === 'completed' ? 'Reopen' : 'Complete'}
-          </button>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              className={editButtonClass}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onComplete?.(project);
+              }}
+              className={statusButtonClass(project.status === 'completed')}
+            >
+              {statusButtonLabel(project.status === 'completed')}
+            </button>
+          </div>
         )}
       </td>
     </tr>
