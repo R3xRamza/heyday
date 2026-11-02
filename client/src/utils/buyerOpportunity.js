@@ -1,5 +1,7 @@
 /** Canonical buyer opportunity helpers (client). */
 
+import { formatDate } from './format';
+
 export const BUYER_STATUSES = [
   { value: 'pending', label: 'Pending' },
   { value: 'option_period', label: 'Option period' },
@@ -361,9 +363,8 @@ export function encodeBuyerRepStorage({ signed, expires_on }) {
 
 export function formatRepExpiryLabel(expiresOn) {
   if (!expiresOn) return null;
-  const d = parseRepExpiryDate(expiresOn);
-  if (!d) return null;
-  return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+  const label = formatDate(expiresOn);
+  return label === '—' ? null : label;
 }
 
 /**

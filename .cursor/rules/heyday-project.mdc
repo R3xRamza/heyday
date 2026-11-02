@@ -93,7 +93,7 @@ Order in `client/src/constants/nav.js` (sidebar and mobile bottom nav): Team Hub
 - Brand: feather (#134041), sky, lemon; Tailwind tokens `primary-container`, `secondary`, `surface-*`
 - `html` font-size 18px. Icons: `shared/Icon.jsx` + lucide in Sidebar
 - Full-bleed pages: **no `max-w` caps** that leave dead right margin on main content — use `w-full` + horizontal padding only (CRM Hub / Vendors already follow this; prefer for other list hubs going forward)
-- Reuse `DateText`, `TeamAvatar`, `DashboardLayout`
+- Reuse `DateText`, `TeamAvatar`, `DashboardLayout`. Displayed calendar dates are mm/dd/yyyy via `formatDate`. Stored values stay YYYY-MM-DD
 
 ## DOMAIN — Transactions
 
@@ -159,7 +159,7 @@ Order in `client/src/constants/nav.js` (sidebar and mobile bottom nav): Team Hub
 ## DOMAIN — Opportunities
 
 - `/opportunities` — Buyers | Sellers | Leases, search, status chips, New, Agent column (team dropdown) and an Agent filter. Full-bleed, `fillViewport`. Agent scope applies; creating while scope is All assigns Meredith. Lease end date sorts from the column header.
-- Leases: one Tenant/Landlord column, address, lease end date, notes, type Listing or Buyer (`opportunity_leases`)
+- Leases: one Tenant/Landlord column, address, lease end date (mm/dd/yyyy), notes, type Listing or Buyer (`opportunity_leases`). The Agent column stays wide enough for the initials and sticks to the left when the table scrolls
 - Buyers: status Pending, Option period, Active, On hold (legacy Closed still labels). Sellers: status is stored as Leads
 - Column show/hide, order, and width save per user via `/api/user-prefs/opportunities`
 

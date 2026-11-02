@@ -2,7 +2,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import OpportunityStatusBadge from './OpportunityStatusBadge';
 import OpportunityAgentSelect from './OpportunityAgentSelect';
 import OpportunityTableHead, { TD } from './OpportunityTableHead';
-import { visibleColumnDefs } from '../../utils/opportunityTablePrefs';
+import { columnWidth, visibleColumnDefs } from '../../utils/opportunityTablePrefs';
 import { formatSellerPrice, formatSellerAddressDisplay } from '../../utils/sellerOpportunity';
 
 const TD_MUTED = `${TD} text-on-surface-variant`;
@@ -15,8 +15,8 @@ function Cell({ children, className = '', title, style }) {
   );
 }
 
-function cellStyle(widths, id, fallback) {
-  const w = widths[id] ?? fallback;
+function cellStyle(widths, col) {
+  const w = columnWidth(widths, col);
   return { width: w, minWidth: w, maxWidth: w };
 }
 
@@ -33,10 +33,10 @@ export default function SellerOpportunitiesTable({
 }) {
   const columns = visibleColumnDefs('sellers', prefs);
   const widths = prefs.widths || {};
-  const totalMin = columns.reduce((sum, c) => sum + (widths[c.id] ?? c.defaultWidth), 0);
+  const totalMin = columns.reduce((sum, c) => sum + columnWidth(widths, c), 0);
 
   function renderCell(col, row) {
-    const style = cellStyle(widths, col.id, col.defaultWidth);
+    const style = cellStyle(widths, col);
     switch (col.id) {
       case 'agent':
         return (
@@ -110,7 +110,7 @@ export default function SellerOpportunitiesTable({
       >
         <colgroup>
           {columns.map((c) => (
-            <col key={c.id} style={{ width: widths[c.id] ?? c.defaultWidth }} />
+            <col key={c.id} style={{ width: columnWidth(widths, c) }} />
           ))}
           {/* Flexible spacer — leftover viewport width lands here, not on data columns */}
           <col />

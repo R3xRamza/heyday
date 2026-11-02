@@ -2,33 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dices } from 'lucide-react';
 import Icon from '../shared/Icon';
-import { formatPhone } from '../../utils/format';
+import { formatDate, formatPhone } from '../../utils/format';
 
 const cardClass =
   'shrink-0 min-w-[7.5rem] md:min-w-[8.5rem] flex-1 basis-[7.5rem] rounded-xl border px-3 md:px-4 py-3 md:py-3.5 text-left transition-all';
-
-function parseDate(dateStr) {
-  if (!dateStr) return null;
-  const normalized = String(dateStr).includes('T')
-    ? dateStr
-    : String(dateStr).includes(' ')
-      ? String(dateStr).replace(' ', 'T')
-      : `${dateStr}T12:00:00`;
-  const d = new Date(normalized);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function monthYear(dateStr) {
-  const d = parseDate(dateStr);
-  if (!d) return null;
-  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-}
-
-function reachedDate(dateStr) {
-  const d = parseDate(dateStr);
-  if (!d) return '—';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 function contactLine(pick) {
   if (pick.phone) return formatPhone(pick.phone);
@@ -37,8 +14,8 @@ function contactLine(pick) {
 }
 
 function PickCard({ pick, busy, onOpen, onReplace, onToggleReached }) {
-  const since = monthYear(pick.dateAdded);
-  const reachedOn = monthYear(pick.reachedAt);
+  const since = pick.dateAdded ? formatDate(pick.dateAdded) : null;
+  const reachedOn = pick.reachedAt ? formatDate(pick.reachedAt) : null;
   const reached = Boolean(pick.reachedAt);
   const topLabel = reached && reachedOn
     ? `Reached out ${reachedOn}`
@@ -135,7 +112,7 @@ function ContactedList({ rows, onOpen }) {
               </td>
               <td className="px-3 py-2 text-on-surface-variant">{row.stage || '—'}</td>
               <td className="px-3 py-2 text-on-surface-variant">{contactLine(row)}</td>
-              <td className="px-3 py-2 whitespace-nowrap">{reachedDate(row.reachedAt)}</td>
+              <td className="px-3 py-2 whitespace-nowrap">{formatDate(row.reachedAt)}</td>
               <td className="px-3 py-2 text-on-surface-variant">{row.reachedByName || '—'}</td>
             </tr>
           ))}

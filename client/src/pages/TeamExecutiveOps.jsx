@@ -5,7 +5,7 @@ import Icon from '../components/shared/Icon';
 import TeamAvatar from '../components/TeamAvatar';
 import DateText from '../components/shared/DateText';
 import { getTeamProfile } from '../data/teamProfiles';
-import { formatCurrency, shortAddress } from '../utils/format';
+import { formatCurrency, formatDate, shortAddress } from '../utils/format';
 import ClosingSoonPanel, { sharedMilestoneRows } from '../components/tasks/ClosingSoonPanel';
 import AgentScopeToggle from '../components/AgentScopeToggle';
 import { useAgentScope } from '../context/AgentScopeContext';
@@ -134,7 +134,7 @@ function relativeTime(dateStr) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.round(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return formatDate(dateStr);
 }
 
 function celebrationWindowLabel() {

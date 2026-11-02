@@ -23,7 +23,12 @@ export function columnWidthFloor(colId) {
   if (colId === 'timing') return 120;
   if (colId === 'preapproval') return 96;
   if (colId === 'buyer_name') return 120;
+  if (colId === 'agent') return 132;
   return MIN_COLUMN_WIDTH;
+}
+
+export function columnWidth(widths, col) {
+  return Math.max(widths?.[col.id] ?? col.defaultWidth, columnWidthFloor(col.id));
 }
 
 export const BUYER_COLUMNS = [

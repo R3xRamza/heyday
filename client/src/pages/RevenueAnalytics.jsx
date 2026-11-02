@@ -7,7 +7,7 @@ import Icon from '../components/shared/Icon';
 import ListPagination from '../components/shared/ListPagination';
 import DateText from '../components/shared/DateText';
 import PriceInput from '../components/shared/PriceInput';
-import { formatCurrency, shortAddress } from '../utils/format';
+import { formatCurrency, formatDate, shortAddress } from '../utils/format';
 import { useAgentScope } from '../context/AgentScopeContext';
 import { appendAgentScope } from '../utils/agentScope';
 import { useIsMdUp } from '../hooks/useMediaQuery';
@@ -586,7 +586,7 @@ export default function RevenueAnalytics() {
           <span className="text-[11px] text-on-surface-variant hidden lg:inline shrink-0">
             Calendar year
             {!multiAgent && s?.anniversaryStart && s?.anniversaryEnd
-              ? ` · cap ${s.anniversaryStart} → ${s.anniversaryEnd}`
+              ? ` · cap ${formatDate(s.anniversaryStart)} → ${formatDate(s.anniversaryEnd)}`
               : ' · cap follows each anniversary'}
           </span>
           <Link

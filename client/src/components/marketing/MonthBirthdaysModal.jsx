@@ -6,15 +6,16 @@ import {
   celebrationEventKey,
   celebrationTypeLabel,
 } from './calendarUtils';
+import { formatDate } from '../../utils/format';
 
 function formatDayHeader(dateStr) {
-  const d = new Date(`${dateStr}T12:00:00`);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return formatDate(dateStr);
 }
 
 function formatWeekdayDate(dateStr) {
   const d = new Date(`${dateStr}T12:00:00`);
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+  return `${weekday} ${formatDate(dateStr)}`;
 }
 
 function groupByDate(events) {
@@ -37,24 +38,16 @@ function contactSnippet(contact) {
 function formatBirthdayLabel(raw) {
   if (!raw?.trim()) return null;
   const s = raw.trim();
-
-  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (iso) {
-    const d = new Date(`${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}T12:00:00`);
-    if (!Number.isNaN(d.getTime())) {
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
-  }
+  const iso = formatDate(s);
+  if (iso !== s) return iso;
 
   const slash = s.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/);
-  if (slash) {
-    const d = new Date(2000, Number(slash[1]) - 1, Number(slash[2]));
-    if (!Number.isNaN(d.getTime())) {
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
-  }
-
-  return s;
+  if (!slash) return s;
+  const month = slash[1].padStart(2, '0');
+  const day = slash[2].padStart(2, '0');
+  if (!slash[3]) return `${month}/${day}`;
+  const year = slash[3].length === 2 ? `20${slash[3]}` : slash[3];
+  return `${month}/${day}/${year}`;
 }
 
 function AddBirthdayPanel({ viewDate, onCancel, onSave, saving }) {

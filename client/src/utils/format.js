@@ -23,11 +23,13 @@ export function parsePriceInput(str) {
   return Number.isNaN(n) ? null : Math.round(n);
 }
 
+/** Display a stored calendar date as mm/dd/yyyy. Values stay YYYY-MM-DD in the database. */
 export function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  const d = new Date(`${dateStr}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  if (dateStr == null || dateStr === '') return '—';
+  const raw = String(dateStr).trim();
+  const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) return `${ymd[2]}/${ymd[3]}/${ymd[1]}`;
+  return raw;
 }
 
 /** Human-readable due label; always includes the calendar date when one exists. */

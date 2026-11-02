@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Icon from '../shared/Icon';
-import { formatCurrency } from '../../utils/format';
+import { formatCurrency, formatDate } from '../../utils/format';
 import { useAgentScope } from '../../context/AgentScopeContext';
 import { appendAgentScope } from '../../utils/agentScope';
 
@@ -20,13 +20,6 @@ function formatDeduction(value) {
   const n = Math.abs(Number(value) || 0);
   if (n === 0) return formatMoney(0);
   return formatMoney(-n);
-}
-
-function formatDateLabel(ymd) {
-  if (!ymd) return '—';
-  const d = new Date(`${ymd}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return ymd;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function ProgressBar({ value, max, tone = 'secondary' }) {
@@ -565,7 +558,7 @@ export default function TransactionCommission({ transactionId, salesPrice, onTra
                 )}
               </div>
               <p className="text-sm text-primary font-semibold mb-4">
-                {formatDateLabel(anniversary?.start)} – {formatDateLabel(anniversary?.end)}
+                {formatDate(anniversary?.start)} – {formatDate(anniversary?.end)}
               </p>
 
               <div className="space-y-4">

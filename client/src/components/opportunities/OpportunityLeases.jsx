@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { appendAgentScope } from '../../utils/agentScope';
+import { formatDate } from '../../utils/format';
 import { useAgentScope } from '../../context/AgentScopeContext';
 import OpportunityAgentSelect from './OpportunityAgentSelect';
 
@@ -139,10 +140,10 @@ export default function OpportunityLeases({ members = [], agentId = '' }) {
       </form>
 
       <div className="bg-white border border-outline-variant/20 rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[44rem] text-sm">
           <thead>
             <tr className="text-left text-[10px] uppercase tracking-widest text-on-surface-variant border-b border-outline-variant/15">
-              <th className="px-3 py-2">Agent</th>
+              <th className="sticky left-0 z-10 bg-white px-3 py-2 whitespace-nowrap min-w-[5.5rem]">Agent</th>
               <th className="px-3 py-2">Tenant / Landlord</th>
               <th className="px-3 py-2">Address</th>
               <th className="px-3 py-2">
@@ -160,7 +161,7 @@ export default function OpportunityLeases({ members = [], agentId = '' }) {
               <tr><td colSpan={7} className="px-3 py-8 text-center text-on-surface-variant">No lease opportunities yet.</td></tr>
             ) : sorted.map((row) => (
               <tr key={row.id} className="border-b border-outline-variant/10">
-                <td className="px-3 py-2">
+                <td className="sticky left-0 z-10 bg-white px-3 py-2 whitespace-nowrap min-w-[5.5rem]">
                   <OpportunityAgentSelect
                     value={row.agent_id}
                     members={members}
@@ -169,7 +170,7 @@ export default function OpportunityLeases({ members = [], agentId = '' }) {
                 </td>
                 <td className="px-3 py-2">{row.party_name || '—'}</td>
                 <td className="px-3 py-2">{row.address}</td>
-                <td className="px-3 py-2 whitespace-nowrap">{row.lease_end_date || '—'}</td>
+                <td className="px-3 py-2 whitespace-nowrap">{formatDate(row.lease_end_date)}</td>
                 <td className="px-3 py-2">{row.notes || '—'}</td>
                 <td className="px-3 py-2">{row.opportunity_type === 'buyer' ? 'Buyer' : 'Listing'}</td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">

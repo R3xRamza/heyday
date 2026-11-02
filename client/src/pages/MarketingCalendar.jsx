@@ -12,6 +12,7 @@ import MarketingTaskModal from '../components/marketing/MarketingTaskModal';
 import MonthBirthdaysModal from '../components/marketing/MonthBirthdaysModal';
 import CreateContentFab from '../components/marketing/CreateContentFab';
 import { displayTaskTitle } from '../utils/taskDisplay.js';
+import { formatDate } from '../utils/format';
 import {
   groupEventsByDate,
   monthRange,
@@ -210,9 +211,7 @@ export default function MarketingCalendar() {
 
   const periodLabel = useMemo(() => {
     if (viewMode === 'week') {
-      const start = new Date(`${range.start}T12:00:00`);
-      const end = new Date(`${range.end}T12:00:00`);
-      return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+      return `${formatDate(range.start)} – ${formatDate(range.end)}`;
     }
     return viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   }, [viewDate, viewMode, range]);

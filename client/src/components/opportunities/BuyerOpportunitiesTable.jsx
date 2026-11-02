@@ -6,6 +6,7 @@ import {
   normalizeBuyerStatus,
   normalizeBuyerTiming,
   normalizePreapproval,
+  columnWidth,
   visibleColumnDefs,
 } from '../../utils/opportunityTablePrefs';
 import BuyerRepIcons from './BuyerRepIcons';
@@ -23,8 +24,8 @@ function TextCell({ children, className = '', title, style }) {
   );
 }
 
-function cellStyle(widths, id, fallback) {
-  const w = widths[id] ?? fallback;
+function cellStyle(widths, col) {
+  const w = columnWidth(widths, col);
   return { width: w, minWidth: w, maxWidth: w };
 }
 
@@ -41,10 +42,10 @@ export default function BuyerOpportunitiesTable({
   const columns = visibleColumnDefs('buyers', prefs);
   const widths = prefs.widths || {};
   // Sum of fixed columns. Spacer col absorbs leftover width so siblings don't redistribute on resize.
-  const totalMin = columns.reduce((sum, c) => sum + (widths[c.id] ?? c.defaultWidth), 0);
+  const totalMin = columns.reduce((sum, c) => sum + columnWidth(widths, c), 0);
 
   function renderCell(col, row) {
-    const style = cellStyle(widths, col.id, col.defaultWidth);
+    const style = cellStyle(widths, col);
     const status = normalizeBuyerStatus(row.status);
     const statusValue = status === 'closed' ? 'active' : status;
     const timing = normalizeBuyerTiming(row.timing) || '';
@@ -151,7 +152,7 @@ export default function BuyerOpportunitiesTable({
       >
         <colgroup>
           {columns.map((c) => (
-            <col key={c.id} style={{ width: widths[c.id] ?? c.defaultWidth }} />
+            <col key={c.id} style={{ width: columnWidth(widths, c) }} />
           ))}
           {/* Flexible spacer — leftover viewport width lands here, not on data columns */}
           <col />

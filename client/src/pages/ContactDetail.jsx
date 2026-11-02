@@ -4,6 +4,7 @@ import DashboardLayout from '../components/DashboardLayout';
 import Icon from '../components/shared/Icon';
 import ListPagination from '../components/shared/ListPagination';
 import DateText from '../components/shared/DateText';
+import { formatDate } from '../utils/format';
 
 const ACTIVITY_TABS = [
   { key: 'all', label: 'All' },
@@ -238,8 +239,8 @@ export default function ContactDetail() {
           <Field label="Lead source" value={contact.lead_source} />
           <Field label="Assigned to" value={contact.assigned_to_name || contact.assigned_user_name} />
           <Field label="Tags" value={contact.tags} />
-          <Field label="Birthday" value={contact.birthday} />
-          <Field label="Anniversary" value={contact.anniversary} />
+          <Field label="Birthday" value={contact.birthday ? formatDate(contact.birthday) : ''} />
+          <Field label="Anniversary" value={contact.anniversary ? formatDate(contact.anniversary) : ''} />
           <Field label="Sphere source" value={contact.sphere_source} />
           <Field label="Referred by" value={contact.referred_by} />
           <Field label="Background" value={contact.description || contact.notes} />

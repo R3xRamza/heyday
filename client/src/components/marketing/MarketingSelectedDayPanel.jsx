@@ -1,15 +1,13 @@
 import { useMemo } from 'react';
 import MarketingEventChip from './MarketingEventChip';
 import { sortDayEvents } from './calendarUtils';
+import { formatDate } from '../../utils/format';
 
 function formatSelectedDay(dateStr) {
   if (!dateStr) return '';
   const d = new Date(`${dateStr}T12:00:00`);
-  return d.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  });
+  const weekday = d.toLocaleDateString('en-US', { weekday: 'long' });
+  return `${weekday}, ${formatDate(dateStr)}`;
 }
 
 /** Mobile agenda for the selected calendar day (chips are too small inside cells). */
